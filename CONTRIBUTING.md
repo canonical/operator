@@ -140,7 +140,7 @@ The framework has some tests that interact with a real/live Pebble server, which
 tox -e pebble
 ```
 
-Property-based tests, which use [Hypothesis](https://hypothesis.readthedocs.io/), live in `test/property/` on the long-lived `property-tests` branch, not on `main`. They run on their own rather than as part of the unit tests, and Hypothesis is in its own `property` dependency group, so the unit tests don't need it. Open pull requests that add or change property tests against `property-tests`. Changes from `main` are merged into it regularly. A bug the property tests find is fixed on `main`, with an ordinary unit test for the failing example.
+Property-based tests, which use [Hypothesis](https://hypothesis.readthedocs.io/), live in `test/property/` on the long-lived `property-tests` branch, not on `main`. That includes property tests for `ops.testing`, so that every property test shares the settings profiles in `test/property/conftest.py`. They run on their own rather than as part of the unit tests, and Hypothesis is in its own `property` dependency group, so the unit tests don't need it. Open pull requests that add or change property tests against `property-tests`. Changes from `main` are merged into it regularly. A bug the property tests find is fixed on `main`, with an ordinary unit test for the failing example.
 
 ```sh
 tox -e property
