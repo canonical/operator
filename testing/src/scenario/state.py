@@ -1166,8 +1166,12 @@ class CheckInfo:
     name: str
     """Name of the check."""
 
-    level: pebble.CheckLevel | None
-    """Level of the check."""
+    level: pebble.CheckLevel
+    """Level of the check.
+
+    This is :attr:`ops.pebble.CheckLevel.UNSET` if the check has no level. Passing
+    ``None`` to the constructor is the same as not passing a level.
+    """
 
     startup: pebble.CheckStartup
     """Startup mode of the check."""
@@ -1218,8 +1222,7 @@ class CheckInfo:
         change_id: pebble.ChangeID | None = None,
     ):
         object.__setattr__(self, 'name', name)
-        if level is not None:
-            level = pebble.CheckLevel(level)
+        level = pebble.CheckLevel.UNSET if level is None else pebble.CheckLevel(level)
         object.__setattr__(self, 'level', level)
         object.__setattr__(self, 'startup', startup)
         object.__setattr__(self, 'status', status)

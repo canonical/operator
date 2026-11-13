@@ -946,14 +946,13 @@ class _MockPebbleClient(_TestingPebbleClient):
         """Copy any new or changed check infos into the state."""
         infos: set[CheckInfo] = set()
         for info in self._check_infos.values():
-            level = pebble.CheckLevel(info.level) if isinstance(info.level, str) else info.level
             if isinstance(info.status, str):
                 status = pebble.CheckStatus(info.status)
             else:
                 status = info.status
             check_info = CheckInfo(
                 name=info.name,
-                level=level,
+                level=info.level,
                 startup=info.startup,
                 status=status,
                 successes=info.successes,
