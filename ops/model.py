@@ -1266,9 +1266,13 @@ class SecretInfo:
     def from_dict(cls, id: str, d: dict[str, Any], model_uuid: str | None = None) -> SecretInfo:
         """Create new SecretInfo object from ID and dict parsed from JSON."""
         expires = typing.cast('str | None', d.get('expiry'))
+        raw_rotation = typing.cast('str | None', d.get('rotation'))
         try:
-            rotation = SecretRotate(typing.cast('str | None', d.get('rotation')))
+            rotation = SecretRotate(raw_rotation) if raw_rotation else None
         except ValueError:
+            logger.warning(
+                'Unknown secret rotation policy %r from Juju for secret %s.', raw_rotation, id
+            )
             rotation = None
         rotates = typing.cast('str | None', d.get('rotates'))
         return cls(

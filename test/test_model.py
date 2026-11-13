@@ -4626,7 +4626,7 @@ class TestSecretInfo:
         assert repr(info).startswith('SecretInfo(')
         assert repr(info).endswith(')')
 
-    def test_from_dict(self):
+    def test_from_dict(self, caplog: pytest.LogCaptureFixture):
         utc = datetime.timezone.utc
         info = ops.SecretInfo.from_dict(
             'secret:4',
@@ -4648,15 +4648,19 @@ class TestSecretInfo:
         assert info.rotates == datetime.datetime(2023, 1, 9, 14, 10, 0, tzinfo=utc)
         assert info.description == 'desc'
 
-        info = ops.SecretInfo.from_dict(
-            '4',
-            {
-                'label': 'fromdict',
-                'revision': 8,
-                'rotation': 'badvalue',
-            },
-            model_uuid='abcd',
-        )
+        with caplog.at_level(level='WARNING', logger='ops.model'):
+            info = ops.SecretInfo.from_dict(
+                '4',
+                {
+                    'label': 'fromdict',
+                    'revision': 8,
+                    'rotation': 'badvalue',
+                },
+                model_uuid='abcd',
+            )
+        assert [r.getMessage() for r in caplog.records] == [
+            "Unknown secret rotation policy 'badvalue' from Juju for secret 4."
+        ]
         assert info.id == 'secret://abcd/4'
         assert info.label == 'fromdict'
         assert info.revision == 8
@@ -4664,6 +4668,12 @@ class TestSecretInfo:
         assert info.rotation is None
         assert info.rotates is None
         assert info.description is None
+
+        caplog.clear()
+        with caplog.at_level(level='WARNING', logger='ops.model'):
+            info = ops.SecretInfo.from_dict('7', {'revision': 1}, model_uuid='abcd')
+        assert info.rotation is None
+        assert caplog.records == []
 
         with pytest.warns(DeprecationWarning, match='`model_uuid` should always be provided'):
             info = ops.SecretInfo.from_dict('5', {'revision': 9})
