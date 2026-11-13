@@ -1282,11 +1282,13 @@ class Check:
                 self._merge_tcp(value)
             elif name == 'exec':
                 self._merge_exec(value)
-            elif name == 'startup' and value == CheckStartup.UNSET:
+            # An unset startup or level in the layer being merged keeps the
+            # current value, as in Pebble. (CheckLevel.UNSET means 'there is no
+            # level', while CheckStartup.UNSET means 'use the default'.)
+            elif (name == 'startup' and value == CheckStartup.UNSET) or (
+                name == 'level' and value == CheckLevel.UNSET
+            ):
                 continue
-            # Note that CheckLevel.UNSET has a different meaning to
-            # CheckStartup.UNSET. In the former, it means 'there is no level';
-            # in the latter it means 'use the default'.
             else:
                 setattr(self, name, value)
 
