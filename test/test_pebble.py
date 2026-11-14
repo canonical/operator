@@ -3956,6 +3956,176 @@ class TestExec:
         ]
         assert stdio.sends == []
 
+    def test_wait_output_multibyte_split_across_messages(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        # U+1F600 is four bytes in UTF-8; split it between two messages.
+        stdio.receives.append(b'cr\xc3')
+        stdio.receives.append(b'\xa8me \xf0\x9f')
+        stdio.receives.append(b'\x98\x80\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        out, err = process.wait_output()
+        assert out == 'crème 😀\n'
+        assert err == ''
+
+    @pytest.mark.parametrize(
+        'encoding,text',
+        [
+            ('utf-8', 'crème 😀\n'),
+            ('utf-16', 'crème 😀\n'),
+            ('utf-32', 'crème 😀\n'),
+            ('utf-16-le', 'crème 😀\n'),
+            ('shift_jis', '日本語\n'),
+        ],
+    )
+    def test_output_split_anywhere_decodes_whole(
+        self, client: MockClient, encoding: str, text: str
+    ):
+        # The BOM-sniffing codecs (utf-16, utf-32) only see a byte order mark
+        # at the start of the stream, so every later message must be decoded
+        # with the state the earlier ones left behind.
+        data = text.encode(encoding)
+        for split in range(1, len(data)):
+            stdio, stderr, _ = self.add_responses(client, '123', 0)
+            stdio.receives.append(data[:split])
+            stdio.receives.append(data[split:])
+            stdio.receives.append('{"command":"end"}')
+            stderr.receives.append('{"command":"end"}')
+
+            process = client.exec(['echo'], encoding=encoding)
+            assert process.stdout is not None
+            pieces: list[str] = []
+            while piece := process.stdout.read():
+                pieces.append(piece)
+            process.wait()
+            assert ''.join(pieces) == text, f'split at byte {split}'
+
+    def test_stdout_read_multibyte_split_across_messages(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.append(b'cr\xc3')
+        stdio.receives.append(b'\xa8me\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        assert process.stdout is not None
+        # Each read returns one message, less any character that is only
+        # partly in it, which comes with the next message.
+        assert process.stdout.read() == 'cr'
+        assert process.stdout.read() == 'ème\n'
+        assert process.stdout.read() == ''
+        process.wait()
+
+    def test_websocket_to_writer_multibyte_split_across_messages(self):
+        ws = MockWebsocket()
+        ws.receives = [b'cr\xc3', b'\xa8me\n', '{"command":"end"}']
+        out = io.StringIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            'utf-8',
+        )
+        assert out.getvalue() == 'crème\n'
+
+    @pytest.mark.parametrize(
+        'receives,expected',
+        [
+            pytest.param([b'ok \xc3', '{"command":"end"}'], 'ok �', id='partial-then-end'),
+            pytest.param([b'ok \xc3'], 'ok �', id='partial-then-closed'),
+            pytest.param(
+                [b'a\xffb', b'more', '{"command":"end"}'], 'a�bmore', id='invalid-mid-stream'
+            ),
+        ],
+    )
+    def test_websocket_to_writer_replaces_undecodable_bytes(
+        self, receives: list[str | bytes], expected: str
+    ):
+        ws = MockWebsocket()
+        chunks = list(receives)
+
+        def recv():
+            if chunks:
+                return chunks.pop(0)
+            raise websocket.WebSocketConnectionClosedException('socket is already closed.')
+
+        ws.recv = recv
+        out = io.StringIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            'utf-8',
+        )
+        assert out.getvalue() == expected
+
+    def test_websocket_reader_holds_back_incomplete_character(self):
+        ws = MockWebsocket()
+        ws.receives = [b'cr\xc3', b'\xa8me \xf0', b'\x9f', b'\x98\x80\n', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        # Each read() returns one message's worth, less any incomplete
+        # character at the end, which is returned with the next message.
+        assert reader.read() == b'cr'
+        assert reader.read() == b'\xc3\xa8me '
+        # A message that is nothing but part of a character is joined with the next.
+        assert reader.read() == b'\xf0\x9f\x98\x80\n'
+        assert reader.read() == b''
+
+    def test_websocket_reader_incomplete_character_at_eof(self):
+        ws = MockWebsocket()
+        ws.receives = [b'ok \xc3', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        assert reader.read() == b'ok '
+        # There is nothing to complete it with, so the caller gets the bytes.
+        assert reader.read() == b'\xc3'
+        assert reader.read() == b''
+
+    def test_websocket_reader_invalid_bytes_do_not_raise(self):
+        ws = MockWebsocket()
+        ws.receives = [b'a\xffb', b'more', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        assert reader.read() == b'a\xffb'
+        assert reader.read() == b'more'
+        assert reader.read() == b''
+
+    @pytest.mark.parametrize(
+        'receives,expected',
+        [
+            pytest.param([b'ok \xc3'], 'ok �', id='partial-then-end'),
+            pytest.param([b'a\xffb', b'more'], 'a�bmore', id='invalid-mid-stream'),
+        ],
+    )
+    def test_wait_output_replaces_undecodable_bytes(
+        self, client: MockClient, receives: list[str | bytes], expected: str
+    ):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.extend([*receives, '{"command":"end"}'])
+        stderr.receives.extend([*receives, '{"command":"end"}'])
+
+        process = client.exec(['echo'])
+        assert process.wait_output() == (expected, expected)
+
+    def test_stdout_read_replaces_undecodable_bytes(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.extend([b'a\xffb', b'more', '{"command":"end"}'])
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        assert process.stdout is not None
+        assert process.stdout.read() == 'a�b'
+        assert process.stdout.read() == 'more'
+        assert process.stdout.read() == ''
+        process.wait()
+
+    def test_websocket_reader_bytes_reads_one_message(self):
+        ws = MockWebsocket()
+        ws.receives = [b'foo', b'bar', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws))
+        assert reader.read() == b'foo'
+        assert reader.read(1) == b'b'
+        assert reader.read() == b'ar'
+        assert reader.read() == b''
+
     def test_wait_output_combine_stderr(self, client: MockClient):
         stdio, _, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'invalid time interval\n')
