@@ -94,7 +94,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         if not self.model.get_relation("database"):
             # We need the user to do 'juju integrate'.
             event.add_status(ops.BlockedStatus("Waiting for database relation"))
-        elif not self.database.fetch_relation_data():
+        elif not self.database.is_resource_created():
             # We need the charms to finish integrating.
             event.add_status(ops.WaitingStatus("Waiting for database relation"))
         try:
