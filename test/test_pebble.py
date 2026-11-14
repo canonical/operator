@@ -1096,7 +1096,8 @@ class TestService:
         assert s.summary == 'New summary'
         assert s.description == 'The lazy quick brown'
         assert s.startup == 'disabled'
-        assert s.override == 'replace'
+        # Like Pebble, merging keeps the existing override.
+        assert s.override == 'merge'
         assert s.command == 'echo new'
         assert s.after == ['a1', 'a2', 'a3']
         assert s.before == ['b1', 'b2', 'b3']
@@ -1221,6 +1222,21 @@ class TestCheck:
         check = pebble.Check('chk-http', d)
         assert check.level == 'foobar!'  # remains a string
 
+    def test_merge_keeps_level(self):
+        base = pebble.Check(
+            'chk', {'override': 'replace', 'level': 'alive', 'http': {'url': 'http://a/'}}
+        )
+        override = pebble.Check('chk', {'override': 'merge', 'period': '5s'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.ALIVE
+        assert base.period == '5s'
+        # Like Pebble, merging keeps the existing override.
+        assert base.override == 'replace'
+
+        override = pebble.Check('chk', {'override': 'merge', 'level': 'ready'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.READY
+
     def test_equality(self):
         d: pebble.CheckDict = {
             'override': 'replace',
@@ -1265,6 +1281,14 @@ class TestCheck:
 
 
 class TestLogTarget:
+    def test_merge_keeps_override(self):
+        base = pebble.LogTarget(
+            'tgt', {'override': 'replace', 'type': 'loki', 'location': 'http://a/'}
+        )
+        base._merge(pebble.LogTarget('tgt', {'override': 'merge', 'services': ['svc']}))
+        assert base.override == 'replace'
+        assert base.services == ['svc']
+
     def _assert_empty(self, target: pebble.LogTarget, name: str):
         assert target.name == name
         assert target.override == ''

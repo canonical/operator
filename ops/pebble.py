@@ -1073,7 +1073,8 @@ class Service:
             if name in ('user_id', 'group_id') and value is not None:
                 setattr(self, name, value)
                 continue
-            if not value or name == 'name':
+            # Pebble keeps the existing override when it merges a layer in.
+            if not value or name in ('name', 'override'):
                 continue
             if name in ['after', 'before', 'requires']:
                 getattr(self, name).extend(value)
@@ -1274,7 +1275,8 @@ class Check:
             # 'not value' is safe here because a threshold of 0 is valid but
             # inconsistently applied and not of any actual use, and the other
             # fields are strings where the empty string means 'not in the layer'.
-            if not value or name == 'name':
+            # Pebble keeps the existing override when it merges a layer in.
+            if not value or name in ('name', 'override'):
                 continue
             if name == 'http':
                 self._merge_http(value)
@@ -1284,9 +1286,13 @@ class Check:
                 self._merge_exec(value)
             elif name == 'startup' and value == CheckStartup.UNSET:
                 continue
-            # Note that CheckLevel.UNSET has a different meaning to
-            # CheckStartup.UNSET. In the former, it means 'there is no level';
-            # in the latter it means 'use the default'.
+            elif name == 'level' and value == CheckLevel.UNSET:
+                # Like every other field, a level the other layer does not
+                # set leaves this layer's level alone (which is what Pebble
+                # does when it combines the layers). This is a separate case
+                # from startup because CheckLevel.UNSET means 'there is no
+                # level', while CheckStartup.UNSET means 'use the default'.
+                continue
             else:
                 setattr(self, name, value)
 
@@ -1359,7 +1365,8 @@ class LogTarget:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
-            if not value or name == 'name':
+            # Pebble keeps the existing override when it merges a layer in.
+            if not value or name in ('name', 'override'):
                 continue
             if name == 'labels':
                 getattr(self, name).update(value)
