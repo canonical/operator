@@ -86,7 +86,8 @@ class Handle:
     same parent and kind will have unique keys.
 
     The handle key is a string uniquely identifying the object. No other objects
-    under the same parent and kind may have the same key.
+    under the same parent and kind may have the same key. The key must not contain
+    ``/``, ``[``, or ``]``.
     """
 
     def __init__(self, parent: Handle | Object | None, kind: str, key: str | None):
@@ -96,6 +97,11 @@ class Handle:
         self._parent: Handle | None = parent
         self._kind = kind
         self._key = key
+        if key and ('/' in key or '[' in key or ']' in key):
+            # The path is parsed back into handles by from_path, so a key
+            # containing the separators would be stored but could not be
+            # restored, and the error would only appear in a later dispatch.
+            raise ValueError(f'handle key {key!r} must not contain "/", "[" or "]"')
         if parent:
             if key:
                 self._path = f'{parent}/{kind}[{key}]'
@@ -114,7 +120,9 @@ class Handle:
     def __hash__(self):
         return hash((self.parent, self.kind, self.key))
 
-    def __eq__(self, other: Handle):
+    def __eq__(self, other: object):
+        if not isinstance(other, Handle):
+            return NotImplemented
         return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
 
     def __str__(self):
@@ -499,6 +507,10 @@ class PrefixedEvents:
         self._prefix = key.replace('-', '_') + '_'
 
     def __getattr__(self, name: str) -> BoundEvent:
+        if name.startswith('_'):
+            # Looking up our own private attributes (as copy and pickle do
+            # before __init__ has run) must not recurse.
+            raise AttributeError(name)
         return getattr(self._emitter, self._prefix + name)
 
 
@@ -559,7 +571,7 @@ https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-co
 
 """
 
-_event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
+_event_regex = r'^(|.*/)on/\w+\[\d+\]$'
 
 
 class Framework(Object):
@@ -769,7 +781,7 @@ class Framework(Object):
             framework.observe(someobj.something_happened, self._on_something_happened)
 
         Raises:
-            RuntimeError: if bound_event or observer are the wrong type.
+            TypeError: if bound_event or observer are the wrong type.
         """
         if not isinstance(bound_event, BoundEvent):
             raise TypeError(
@@ -809,6 +821,16 @@ class Framework(Object):
                 f'{type(observer_obj).__name__}.{method_name} must be callable with '
                 "only 'self' and the 'event'"
             ) from e
+
+        # The observer is stored by name and looked up again when the event is
+        # emitted, so a name that doesn't find the method is never called.
+        if not hasattr(observer_obj, method_name):
+            logger.warning(
+                '%s has no attribute %r, so this observer will not be called: observers '
+                'must be methods, accessed by the name they are defined with.',
+                type(observer_obj).__name__,
+                method_name,
+            )
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
@@ -971,6 +993,11 @@ class Framework(Object):
             try:
                 event = self.load_snapshot(event_handle)
             except NoTypeError:
+                logger.warning(
+                    'Dropping the deferred event %s: its type is no longer registered. '
+                    'Observe the event in every dispatch for deferred events to be re-emitted.',
+                    event_path,
+                )
                 self._storage.drop_notice(event_path, observer_path, method_name)
                 continue
 
@@ -997,7 +1024,14 @@ class Framework(Object):
                     logger.debug('Emitting custom event %s.', event)
 
                 custom_handler = getattr(observer, method_name, None)
-                if custom_handler:
+                if custom_handler is None:
+                    logger.warning(
+                        'Observer %s has no method %s to handle the event %s.',
+                        observer_path,
+                        method_name,
+                        event,
+                    )
+                else:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
                     if event_is_from_juju:
@@ -1180,6 +1214,10 @@ class BoundStoredState:
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)
 
     def __getattr__(self, key: str) -> Any:
+        if '_data' not in self.__dict__:
+            # Looking up attributes (as copy and pickle do) before __init__
+            # has run must not recurse through self._data.
+            raise AttributeError(key)
         # "on" is the only reserved key that can't be used in the data map.
         if key == 'on':
             raise AttributeError("attribute 'on' is reserved")
@@ -1396,12 +1434,12 @@ class StoredList(typing.MutableSequence[Any]):
 
     def insert(self, index: int, value: Any):
         """Insert value before index."""
-        self._under.insert(index, value)
+        self._under.insert(index, _unwrap_stored(self._stored_data, value))
         self._stored_data.dirty = True
 
     def append(self, value: Any):
         """Append value to the end of the list."""
-        self._under.append(value)
+        self._under.append(_unwrap_stored(self._stored_data, value))
         self._stored_data.dirty = True
 
     def __eq__(self, other: Any):

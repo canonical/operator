@@ -803,7 +803,12 @@ class StorageEvent(HookEvent):
     """
 
     storage: model.Storage
-    """Storage instance this event refers to."""
+    """Storage instance this event refers to.
+
+    If the event was deferred, the storage may have been removed by the time the
+    event is re-emitted. In that case, the storage isn't in :attr:`ops.Model.storages`,
+    and its location may no longer exist.
+    """
 
     def __init__(self, handle: Handle, storage: model.Storage) -> None:
         super().__init__(handle)
@@ -832,12 +837,12 @@ class StorageEvent(HookEvent):
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
-            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore
-            if self.storage is None:
-                raise RuntimeError(
-                    f'failed loading storage (name={storage_name!r}, '
-                    f'index={storage_index!r}) from snapshot'
-                )
+            storage = next((s for s in storages if s.index == storage_index), None)
+            if storage is None:
+                # The storage has been removed since the event was deferred, so
+                # rebuild it from the snapshot rather than failing every dispatch.
+                storage = model.Storage(storage_name, storage_index, self.framework.model._backend)
+            self.storage = storage
             if storage_location is None:
                 raise RuntimeError(
                     'failed loading storage location from snapshot.'
