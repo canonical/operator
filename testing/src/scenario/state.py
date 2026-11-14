@@ -410,7 +410,10 @@ class Secret:
         object.__setattr__(self, 'expire', expire)
         object.__setattr__(self, 'rotate', rotate)
         object.__setattr__(self, '_tracked_revision', 1)
-        object.__setattr__(self, '_latest_revision', 1)
+        # Different latest content means there is a newer revision than the
+        # tracked one.
+        has_newer = latest_content is not None and dict(latest_content) != dict(tracked_content)
+        object.__setattr__(self, '_latest_revision', 2 if has_newer else 1)
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -450,10 +453,12 @@ class Secret:
         description: str | None = None,
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
+        new_revision: bool = False,
     ):
-        """Update the metadata."""
+        """Update the metadata, and the content if a new revision is being created."""
         # bypass frozen dataclass
-        object.__setattr__(self, '_latest_revision', self._latest_revision + 1)
+        if new_revision:
+            object.__setattr__(self, '_latest_revision', self._latest_revision + 1)
         if content:
             object.__setattr__(self, 'latest_content', content)
         if label:
@@ -2744,10 +2749,17 @@ class Event:
                     'app_name': remote_app,
                 },
             )
-            if not self.name.endswith(('_created', '_broken')):
+            if (
+                not self.name.endswith(('_created', '_broken'))
+                and self._relation_remote_unit_id is not None
+            ):
                 snapshot_data['unit_name'] = f'{remote_app}/{self._relation_remote_unit_id}'
             if self.name.endswith('_departed'):
-                snapshot_data['departing_unit'] = f'{remote_app}/{self._relation_departed_unit_id}'
+                departing_unit_id = self._relation_departed_unit_id
+                if departing_unit_id is None:
+                    departing_unit_id = self._relation_remote_unit_id
+                if departing_unit_id is not None:
+                    snapshot_data['departing_unit'] = f'{remote_app}/{departing_unit_id}'
 
         elif self._is_storage_event:
             # Enforced by the consistency checker, but for type checkers:
