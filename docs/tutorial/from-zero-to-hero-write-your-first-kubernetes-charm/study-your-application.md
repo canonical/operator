@@ -30,13 +30,12 @@ The [app source](https://github.com/canonical/api_demo_server/tree/master/src/ap
 - `app.py`, which describes the API endpoints and the logging definition.
 - `database.py`, which describes the interaction with the PostgreSQL database.
 
-The app supports environment variables to configure the output logging file and the database connection information:
+The app supports environment variables to configure the database connection information:
 
-- `DEMO_SERVER_LOGFILE`
-- `DEMO_SERVER_DB_HOST`
-- `DEMO_SERVER_DB_PORT`
-- `DEMO_SERVER_DB_USER`
-- `DEMO_SERVER_DB_PASSWORD`
+- `POSTGRESQL_DB_HOSTNAME`
+- `POSTGRESQL_DB_PORT`
+- `POSTGRESQL_DB_USERNAME`
+- `POSTGRESQL_DB_PASSWORD`
 
 For more detail about the structure of the app, see https://github.com/canonical/api_demo_server.
 

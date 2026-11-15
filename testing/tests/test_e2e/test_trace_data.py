@@ -51,3 +51,12 @@ def test_trace_data():
         'PreCommitEvent',
         'CommitEvent',
     }
+
+
+def test_trace_data_from_every_run():
+    # The tracer provider is shut down at the end of every run, and from
+    # opentelemetry-sdk 1.45 that used to leave every later run with no spans.
+    for _ in range(3):
+        ctx = Context(TracedCharm, meta=META)
+        ctx.run(ctx.on.start(), State(leader=True))
+        assert 'ops.main' in {s.name for s in ctx.trace_data}

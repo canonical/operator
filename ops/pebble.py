@@ -458,7 +458,25 @@ class TimeoutError(TimeoutError, Error):
 
 
 class ConnectionError(Error):
-    """Raised when the Pebble client can't connect to the socket."""
+    """Raised when the Pebble client can't connect to the socket.
+
+    This is also raised if the connection fails or times out before Pebble's
+    response is complete.
+    """
+
+
+class _ConnectionTimeoutError(ConnectionError, builtins.TimeoutError):
+    """Raised when a request to Pebble times out.
+
+    This is also a built-in ``TimeoutError``, because :meth:`Client.wait_change`
+    needs to tell a timeout apart from losing the connection.
+    """
+
+
+def _wrap_response_error(e: OSError | http.client.HTTPException) -> ConnectionError:
+    """Return the ConnectionError to raise for an error reading a response from Pebble."""
+    cls = _ConnectionTimeoutError if isinstance(e, builtins.TimeoutError) else ConnectionError
+    return cls(f'{type(e).__name__} - {e}')
 
 
 class ProtocolError(Error):
@@ -1038,7 +1056,11 @@ class Service:
             ('backoff-limit', self.backoff_limit),
             ('kill-delay', self.kill_delay),
         ]
-        dct = {name: value for name, value in fields if value}
+        dct = {
+            name: value
+            for name, value in fields
+            if value or (name in ('user-id', 'group-id') and value is not None)
+        }
         return typing.cast('ServiceDict', dct)
 
     def _merge(self, other: Service):
@@ -1048,6 +1070,9 @@ class Service:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            if name in ('user_id', 'group_id') and value is not None:
+                setattr(self, name, value)
+                continue
             if not value or name == 'name':
                 continue
             if name in ['after', 'before', 'requires']:
@@ -1193,6 +1218,12 @@ class Check:
         if self.exec is None:
             self.exec = {}
         for name, value in other.items():
+            # A user or group ID of 0 (root) is an explicit value, so only None is unset.
+            if name in ('user-id', 'group-id') and value is not None:
+                # Pyright knows self.exec[name] should be an int because of name,
+                # but not that value must be an int here because it came from items().
+                self.exec[name] = value  # pyright: ignore[reportGeneralTypeIssues]
+                continue
             if not value:
                 continue
             if name == 'environment':
@@ -1455,7 +1486,9 @@ class CheckInfo:
     level: CheckLevel | str | None
     """Check level.
 
-    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or ``None`` (level not set).
+    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or
+    :attr:`CheckLevel.UNSET` (level not set). A level that this version of ops
+    doesn't recognise is kept as a ``str``.
     """
 
     startup: CheckStartup
@@ -2306,7 +2339,7 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        raw_resp: dict[str, Any] = json.loads(response.read())
+        raw_resp: dict[str, Any] = json.loads(self._read_response(response))
         return raw_resp
 
     @staticmethod
@@ -2363,8 +2396,25 @@ class Client:
                     '(container restarted?)'
                 ) from None
             raise ConnectionError(e.reason) from e
+        except (OSError, http.client.HTTPException) as e:
+            # urllib only wraps errors from sending the request. Errors while
+            # waiting for the response, such as Pebble closing the connection,
+            # a timeout, or something other than Pebble answering on the socket,
+            # come through unwrapped. InvalidURL is the exception: building the
+            # request raises that for a bad URL, so it isn't a connection error.
+            if isinstance(e, http.client.InvalidURL):
+                raise
+            raise _wrap_response_error(e) from e
 
         return response
+
+    @staticmethod
+    def _read_response(response: http.client.HTTPResponse, n: int | None = None) -> bytes:
+        """Read from a response, raising ConnectionError if the read fails."""
+        try:
+            return response.read(n)
+        except (OSError, http.client.HTTPException) as e:
+            raise _wrap_response_error(e) from e
 
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
@@ -2763,7 +2813,7 @@ class Client:
             parser = _FilesParser(boundary)
             try:
                 while True:
-                    chunk = response.read(self._chunk_size)
+                    chunk = self._read_response(response, self._chunk_size)
                     if not chunk:
                         break
                     parser.feed(chunk)
@@ -2854,7 +2904,7 @@ class Client:
             }
             response = self._request_raw('POST', '/v1/files', None, headers, data)
             self._ensure_content_type(response.headers, 'application/json')
-            resp = json.loads(response.read())
+            resp = json.loads(self._read_response(response))
             # we need to cast the Dict[Any, Any] to _FilesResponse
             self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
@@ -3272,7 +3322,7 @@ class Client:
                 if not combine_stderr:
                     stderr_ws = self._connect_websocket(task_id, 'stderr')
                     connected.append(stderr_ws)
-            except websocket.WebSocketException as e:
+            except (websocket.WebSocketException, OSError) as e:
                 # Error connecting to websockets, probably due to the exec/change
                 # finishing early with an error. Close any websockets that did
                 # connect, then call wait_change to pick up the change error.
@@ -3360,10 +3410,14 @@ class Client:
         # case the Pebble side times out (5s), so this side doesn't hang. See:
         # https://github.com/canonical/operator/issues/1246
         sock.settimeout(self.timeout)
-        sock.connect(self.socket_path)
-        url = self._websocket_url(task_id, websocket_id)
-        ws: _WebSocket = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
-        ws.connect(url, socket=sock)
+        try:
+            sock.connect(self.socket_path)
+            url = self._websocket_url(task_id, websocket_id)
+            ws: _WebSocket = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
+            ws.connect(url, socket=sock)
+        except BaseException:
+            sock.close()
+            raise
         # Reset to no timeout so connection can be "long polling" when data is
         # being received.
         sock.settimeout(None)

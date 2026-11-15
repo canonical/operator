@@ -126,13 +126,17 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
             if self.unit.is_leader():
                 assert local_app_data['k'] == 'local val'  # test read
                 local_app_data['k'] = 'new val'  # test write
+                assert len(local_app_data.items()) == 1
+                assert 'k' in local_app_data
             else:
                 with pytest.raises(ops.RelationDataAccessError):
                     local_app_data['k']
-            # these probably fail at real runtime with a ModelError
-            # but pass here because the validation methods are only hooked up to get/set
-            assert len(local_app_data.items()) == 1
-            assert 'k' in local_app_data
+                # Reads that don't go via __getitem__ are validated as well, so that
+                # they raise here rather than a ModelError at real runtime.
+                with pytest.raises(ops.RelationDataAccessError):
+                    len(local_app_data.items())
+                with pytest.raises(ops.RelationDataAccessError):
+                    _ = 'k' in local_app_data
 
     ctx = Context(
         ValidateCharm,

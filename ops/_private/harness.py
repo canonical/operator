@@ -2400,6 +2400,7 @@ class _TestingModelBackend:
         self._pebble_clients_can_connect: dict[_TestingPebbleClient, bool] = {}
         self._planned_units: int | None = None
         self._hook_is_running = ''
+        self._event_is_deferred = False
         self._secrets: list[_Secret] = []
         self._opened_ports: set[model.Port] = set()
         self._networks: dict[tuple[str | None, int | None], _NetworkDict] = {}
