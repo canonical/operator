@@ -170,11 +170,16 @@ def test_a_charm_module_needs_exactly_one_charm_class(
         worker.run(on.install(), State())
 
 
-def test_an_event_that_runs_too_long_kills_the_worker(workers: list[Worker]):
+def test_an_event_that_runs_too_long_kills_the_worker(
+    workers: list[Worker], monkeypatch: pytest.MonkeyPatch
+):
+    # Without this, sys.stdout in the worker is block-buffered.
+    monkeypatch.delenv('PYTHONUNBUFFERED', raising=False)
     worker = Worker(CHARMS / 'slow', timeout=0.5)
     workers.append(worker)
-    with pytest.raises(IsolationError, match=r'more than 0\.5 seconds'):
+    with pytest.raises(IsolationError, match=r'more than 0\.5 seconds') as caught:
         worker.run(on.install(), State())
+    assert 'about to hang' in str(caught.value)
     with pytest.raises(IsolationError, match='not restarted'):
         worker.run(on.install(), State())
 
