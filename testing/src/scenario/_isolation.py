@@ -53,6 +53,10 @@ def load_charm_spec(
 
 def _worker_environ() -> dict[str, str]:
     environ = dict(os.environ)
+    # python -m puts the current directory first on sys.path, and the worker
+    # inherits the test's, which would shadow the worker's own ops and
+    # scenario. A 3.10 interpreter ignores this, where -P would be an error.
+    environ['PYTHONSAFEPATH'] = '1'
     # In a source checkout, the worker can only import scenario from here.
     # Installed, this is the test environment's site-packages, which would
     # undo the isolation, so the worker has to have its own ops-scenario.

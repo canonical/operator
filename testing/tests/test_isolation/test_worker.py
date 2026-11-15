@@ -68,6 +68,18 @@ def test_each_worker_has_its_own_dependencies(workers: list[Worker]):
     assert 'confdep' not in sys.modules
 
 
+def test_the_current_directory_doesnt_shadow_the_workers_packages(
+    workers: list[Worker], tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    shadow = tmp_path / 'ops'
+    shadow.mkdir()
+    (shadow / '__init__.py').write_text("raise ImportError('imported ops from the cwd')\n")
+    monkeypatch.chdir(tmp_path)
+    worker = Worker(CHARMS / 'report')
+    workers.append(worker)
+    assert worker.run(on.install(), State()).unit_status.message.startswith('report/0 ')
+
+
 def test_the_worker_is_kept_between_events(report: Worker):
     first = report.run(on.install(), State())
     second = report.run(on.config_changed(), first)
