@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib
 import os
 import pathlib
+import signal
 import sys
 from collections.abc import Iterator
 
@@ -121,6 +122,40 @@ def test_a_crash_is_reported_and_the_worker_not_restarted(workers: list[Worker])
     fresh = Worker(CHARMS / 'hardexit')
     workers.append(fresh)
     assert fresh.run(on.install(), State()).unit_status == ActiveStatus('installed')
+
+
+def test_a_worker_that_died_between_events_is_reported(workers: list[Worker]):
+    worker = Worker(CHARMS / 'report')
+    workers.append(worker)
+    pid = _pid(worker.run(on.install(), State()))
+    os.kill(pid, signal.SIGKILL)
+    os.waitpid(pid, 0)  # So the next write finds the pipe closed.
+    with pytest.raises(IsolationError, match='crashed without responding'):
+        worker.run(on.install(), State())
+    with pytest.raises(IsolationError, match='not restarted'):
+        worker.run(on.install(), State())
+
+
+@pytest.mark.parametrize(
+    ('source', 'found'),
+    [
+        ('import ops\n', r'found \[\]'),
+        (
+            'import ops\nclass One(ops.CharmBase): pass\nclass Two(ops.CharmBase): pass\n',
+            r"found \['One', 'Two'\]",
+        ),
+    ],
+)
+def test_a_charm_module_needs_exactly_one_charm_class(
+    tmp_path: pathlib.Path, workers: list[Worker], source: str, found: str
+):
+    (tmp_path / 'metadata.yaml').write_text('name: classes\n')
+    (tmp_path / 'src').mkdir()
+    (tmp_path / 'src' / 'charm.py').write_text(source)
+    worker = Worker(tmp_path)
+    workers.append(worker)
+    with pytest.raises(IsolationError, match=f'Expected one CharmBase subclass .*{found}'):
+        worker.run(on.install(), State())
 
 
 def test_an_event_that_runs_too_long_kills_the_worker(workers: list[Worker]):

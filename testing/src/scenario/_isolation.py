@@ -12,6 +12,7 @@ first event and is kept for later ones. A worker that dies or times out raises
 from __future__ import annotations
 
 import collections
+import contextlib
 import os
 import pathlib
 import subprocess
@@ -50,19 +51,17 @@ def load_charm_spec(
     return meta, config, actions
 
 
-def _worker_environ(python_path: Sequence[str]) -> dict[str, str]:
+def _worker_environ() -> dict[str, str]:
     environ = dict(os.environ)
-    parts = list(python_path)
     # In a source checkout, the worker can only import scenario from here.
     # Installed, this is the test environment's site-packages, which would
     # undo the isolation, so the worker has to have its own ops-scenario.
     scenario_parent = pathlib.Path(__file__).resolve().parent.parent
-    if scenario_parent.name not in {'site-packages', 'dist-packages'}:
-        parts.append(str(scenario_parent))
-    if environ.get('PYTHONPATH'):
-        parts.append(environ['PYTHONPATH'])
-    if parts:
-        environ['PYTHONPATH'] = os.pathsep.join(parts)
+    if scenario_parent.name in {'site-packages', 'dist-packages'}:
+        return environ
+    existing = environ.get('PYTHONPATH')
+    parts = [str(scenario_parent), *([existing] if existing else [])]
+    environ['PYTHONPATH'] = os.pathsep.join(parts)
     return environ
 
 
@@ -74,8 +73,6 @@ class Worker:
         python: The interpreter to run the worker with.
         extra_sys_path: Directories put at the front of the worker's
             ``sys.path`` before the charm is imported.
-        python_path: Directories put at the front of the worker's
-            ``PYTHONPATH``.
         app_name: The application name; the charm's name if not given.
         juju_version: The Juju version the charm sees.
         app_trusted: Whether the application is trusted.
@@ -89,7 +86,6 @@ class Worker:
         *,
         python: str = sys.executable,
         extra_sys_path: Sequence[str] = (),
-        python_path: Sequence[str] = (),
         app_name: str | None = None,
         juju_version: str = _DEFAULT_JUJU_VERSION,
         app_trusted: bool = False,
@@ -108,7 +104,7 @@ class Worker:
             'app_trusted': app_trusted,
         }
         self._command = [python, '-m', 'scenario._isolated_worker']
-        self._environ = _worker_environ(python_path)
+        self._environ = _worker_environ()
         self._timeout = timeout
         self._proc: subprocess.Popen[bytes] | None = None
         self._stderr: collections.deque[str] = collections.deque(maxlen=200)
@@ -227,4 +223,6 @@ class Worker:
         self._reader = self._stderr_reader = None
         for stream in (proc.stdin, proc.stdout, proc.stderr):
             if stream is not None:
-                stream.close()
+                # Closing stdin flushes it, which fails if the worker is gone.
+                with contextlib.suppress(OSError):
+                    stream.close()
