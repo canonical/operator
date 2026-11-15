@@ -27,9 +27,10 @@ from ops import pebble
 
 from . import _version
 from . import state as _state
+from ._juju_errors import IsolationError
 
 
-class _VersionMismatchError(RuntimeError):
+class _VersionMismatchError(IsolationError):
     """A payload was encoded by a different ``ops.testing`` from this process's."""
 
 

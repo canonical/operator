@@ -1,0 +1,172 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+from __future__ import annotations
+
+import importlib
+import os
+import pathlib
+import sys
+from collections.abc import Iterator
+
+import pytest
+from scenario import ActiveStatus, State
+from scenario._isolation import Worker, load_charm_spec
+from scenario._juju_errors import IsolationError
+from scenario.context import CharmEvents
+from scenario.errors import MetadataNotFoundError
+
+HERE = pathlib.Path(__file__).parent
+CHARMS = HERE / 'charms'
+V1 = str(HERE / 'deps' / 'confdep_v1')
+V2 = str(HERE / 'deps' / 'confdep_v2')
+
+on = CharmEvents()
+
+
+@pytest.fixture
+def workers() -> Iterator[list[Worker]]:
+    """Workers appended to this list are closed at the end of the test."""
+    started: list[Worker] = []
+    yield started
+    for worker in started:
+        worker.close()
+
+
+@pytest.fixture(scope='module')
+def report() -> Iterator[Worker]:
+    worker = Worker(CHARMS / 'report')
+    yield worker
+    worker.close()
+
+
+def _pid(state: State) -> int:
+    return int(state.unit_status.message.rsplit('pid=', 1)[1])
+
+
+def test_two_versions_of_a_dependency_cant_share_a_process():
+    sys.path.insert(0, V1)
+    try:
+        v1 = importlib.import_module('confdep')
+    finally:
+        sys.path.remove(V1)
+    sys.path.insert(0, V2)
+    try:
+        assert importlib.import_module('confdep') is v1
+    finally:
+        sys.path.remove(V2)
+        sys.modules.pop('confdep')
+
+
+def test_each_worker_has_its_own_dependencies(workers: list[Worker]):
+    alpha = Worker(CHARMS / 'alpha', extra_sys_path=[V1])
+    beta = Worker(CHARMS / 'beta', extra_sys_path=[V2])
+    workers += [alpha, beta]
+    assert alpha.run(on.install(), State()).unit_status == ActiveStatus('confdep=1.0 legacy')
+    assert beta.run(on.install(), State()).unit_status == ActiveStatus('confdep=2.0 new')
+    assert 'confdep' not in sys.modules
+
+
+def test_the_worker_is_kept_between_events(report: Worker):
+    first = report.run(on.install(), State())
+    second = report.run(on.config_changed(), first)
+    assert _pid(first) == _pid(second) != os.getpid()
+
+
+def test_the_state_reaches_the_charm_and_comes_back(report: Worker):
+    state_in = State(leader=True, config={'name': 'given'}, unit_status=ActiveStatus('old'))
+    state_out = report.run(on.config_changed(), state_in)
+    assert state_out.unit_status.message.startswith(
+        'report/0 leader=True trusted=False juju=3.6.14 name=given '
+    )
+    assert state_out.leader
+    assert state_out.config == {'name': 'given'}
+
+
+def test_one_worker_runs_any_unit(report: Worker):
+    zero = report.run(on.install(), State())
+    three = report.run(on.install(), State(), unit_id=3)
+    assert zero.unit_status.message.startswith('report/0 ')
+    assert three.unit_status.message.startswith('report/3 ')
+    assert _pid(zero) == _pid(three)
+
+
+def test_the_worker_gets_the_application_settings(workers: list[Worker]):
+    worker = Worker(CHARMS / 'report', app_name='other', juju_version='3.4.2', app_trusted=True)
+    workers.append(worker)
+    state_out = worker.run(on.install(), State())
+    assert state_out.unit_status.message.startswith(
+        'other/0 leader=False trusted=True juju=3.4.2 name=default '
+    )
+
+
+def test_a_charm_that_raises_leaves_the_worker_running(workers: list[Worker]):
+    worker = Worker(CHARMS / 'alpha')  # Without confdep.
+    workers.append(worker)
+    for _ in range(2):
+        with pytest.raises(IsolationError, match="No module named 'confdep'") as caught:
+            worker.run(on.install(), State())
+        assert 'crashed' not in str(caught.value)
+
+
+def test_a_crash_is_reported_and_the_worker_not_restarted(workers: list[Worker]):
+    worker = Worker(CHARMS / 'hardexit')
+    workers.append(worker)
+    with pytest.raises(IsolationError, match='crashed without responding') as caught:
+        worker.run(on.start(), State())
+    assert 'Return code: 70' in str(caught.value)
+    # install works in a fresh worker, so this fails only because it isn't restarted.
+    with pytest.raises(IsolationError, match='crashed earlier, and is not restarted'):
+        worker.run(on.install(), State())
+    fresh = Worker(CHARMS / 'hardexit')
+    workers.append(fresh)
+    assert fresh.run(on.install(), State()).unit_status == ActiveStatus('installed')
+
+
+def test_an_event_that_runs_too_long_kills_the_worker(workers: list[Worker]):
+    worker = Worker(CHARMS / 'slow', timeout=0.5)
+    workers.append(worker)
+    with pytest.raises(IsolationError, match=r'more than 0\.5 seconds'):
+        worker.run(on.install(), State())
+    with pytest.raises(IsolationError, match='not restarted'):
+        worker.run(on.install(), State())
+
+
+def test_charm_output_doesnt_reach_the_protocol(workers: list[Worker]):
+    worker = Worker(CHARMS / 'noisy')
+    workers.append(worker)
+    for _ in range(2):
+        assert worker.run(on.install(), State()).unit_status == ActiveStatus('survived')
+
+
+def test_close_stops_the_worker_and_a_later_event_starts_another():
+    worker = Worker(CHARMS / 'report')
+    try:
+        pid = _pid(worker.run(on.install(), State()))
+        worker.close()
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+        worker.close()
+        assert _pid(worker.run(on.install(), State())) != pid
+    finally:
+        worker.close()
+
+
+def test_metadata_is_read_from_a_unified_charmcraft_yaml():
+    meta, config, actions = load_charm_spec(CHARMS / 'report')
+    assert meta['name'] == 'report'
+    assert 'config' not in meta
+    assert config == {'options': {'name': {'type': 'string', 'default': 'default'}}}
+    assert actions is None
+
+
+def test_metadata_is_read_from_metadata_yaml():
+    meta, config, actions = load_charm_spec(CHARMS / 'alpha')
+    assert meta['name'] == 'alpha'
+    assert config is None
+    assert actions is None
+
+
+def test_a_charm_without_metadata_is_rejected(tmp_path: pathlib.Path):
+    with pytest.raises(MetadataNotFoundError, match='No charm metadata'):
+        Worker(tmp_path)
