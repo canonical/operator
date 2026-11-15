@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pathlib
+import shlex
 import shutil
 import subprocess
 import sys
@@ -463,6 +464,27 @@ def test_a_failed_command_shows_its_stdout_too():
     with pytest.raises(_RequirementsError) as excinfo:
         _charm_requirements._run([sys.executable, '-c', script])
     assert str(excinfo.value).endswith('failed:\non stderr\non stdout\n')
+
+
+@pytest.mark.parametrize(
+    ('url', 'redacted'),
+    [
+        (
+            'git+https://user:secret@example.invalid/pkg.git',
+            'git+https://user:****@example.invalid/pkg.git',
+        ),
+        ('git+https://secret@example.invalid/pkg.git', 'git+https://****@example.invalid/pkg.git'),
+        (
+            'pkg @ https://user:secret@example.invalid/pkg.whl',
+            'pkg @ https://user:****@example.invalid/pkg.whl',
+        ),
+    ],
+)
+def test_a_failed_command_hides_url_credentials(url: str, redacted: str):
+    with pytest.raises(_RequirementsError) as excinfo:
+        _charm_requirements._run([sys.executable, '-c', 'import sys; sys.exit(1)', url])
+    assert 'secret' not in str(excinfo.value)
+    assert shlex.quote(redacted) in str(excinfo.value)
 
 
 def test_pip_fallback_command(monkeypatch: pytest.MonkeyPatch):

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import dataclasses
 import pathlib
+import re
 import shlex
 import shutil
 import subprocess
@@ -60,6 +61,11 @@ _OTHER_PLUGINS = (
 #: The charm's environment never has these installed: the test's own are used.
 #: ops-tracing pins an exact ops version, so it has to match the test's ops too.
 _OPS_DISTRIBUTIONS = ('ops', 'ops-scenario', 'ops-tracing')
+
+_URL_CREDENTIALS = re.compile(
+    r'(?P<scheme>[a-z][a-z0-9+.-]*://)(?P<user>[^/@:\s]*)(?P<password>:[^/@\s]*)?@',
+    re.IGNORECASE,
+)
 
 
 class _RequirementsError(Exception):
@@ -144,7 +150,22 @@ def _run(cmd: Sequence[str], cwd: pathlib.Path | None = None) -> None:
     if result.returncode != 0:
         # pip writes some failures, such as pip check's, to stdout rather than stderr.
         output = '\n'.join(o.strip() for o in (result.stderr, result.stdout) if o.strip())
-        raise _RequirementsError(f'`{shlex.join(cmd)}` failed:\n{output}\n')
+        command = shlex.join(_redact(arg) for arg in cmd)
+        raise _RequirementsError(f'`{command}` failed:\n{output}\n')
+
+
+def _redact(arg: str) -> str:
+    """Hide the credentials in any URL in ``arg``, as pip does in its own output.
+
+    A user with no password is hidden too, because it's usually a token.
+    """
+
+    def replace(match: re.Match[str]) -> str:
+        if match['password'] is None:
+            return f'{match["scheme"]}****@'
+        return f'{match["scheme"]}{match["user"]}:****@'
+
+    return _URL_CREDENTIALS.sub(replace, arg)
 
 
 def charm_requirements(charm_root: pathlib.Path) -> _Requirements:
