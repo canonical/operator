@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import pytest
 from scenario import Context, ICMPPort, Port, State, TCPPort, UDPPort
 from scenario.errors import StateValidationError
@@ -72,6 +74,12 @@ def test_state_rejects_ops_icmp_port_with_port_number():
 def test_state_rejects_ops_port_with_unknown_protocol():
     with pytest.raises(StateValidationError, match='unknown port protocol'):
         State(opened_ports=[ops.Port('sctp', 80)])  # type: ignore
+
+
+@pytest.mark.parametrize('protocol', ['tcp', 'udp'])
+def test_state_rejects_ops_port_without_port_number(protocol: Literal['tcp', 'udp']):
+    with pytest.raises(StateValidationError, match=f'`port` is required for {protocol} ports'):
+        State(opened_ports=[ops.Port(protocol, None)])
 
 
 def test_port_equality_with_ops_port():
