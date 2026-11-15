@@ -141,9 +141,9 @@ def test_a_worker_that_died_between_events_is_reported(workers: list[Worker]):
     workers.append(worker)
     pid = _pid(worker.run(on.install(), State()))
     os.kill(pid, signal.SIGKILL)
-    os.waitpid(pid, 0)  # So the next write finds the pipe closed.
-    with pytest.raises(IsolationError, match='crashed without responding'):
+    with pytest.raises(IsolationError, match='crashed without responding') as caught:
         worker.run(on.install(), State())
+    assert 'Return code: -9' in str(caught.value)
     with pytest.raises(IsolationError, match='not restarted'):
         worker.run(on.install(), State())
 
