@@ -80,13 +80,15 @@ to 40MB of trace data in a disk buffer and this data will be sent out when the r
 established.
 
 Dispatch is called and Python code is run on every Juju event, regardless of whether that event
-is observed. Trace data collected from observed dispatches is given higher priority in the
-buffer, reducing the risk that repetitive and/or uninteresting dispatches would flush the
-important bits of trace data from the buffer.
+is observed. Trace data collected from dispatches where the charm observes an event is given
+higher priority in the buffer, reducing the risk that repetitive and/or uninteresting dispatches
+would flush the important bits of trace data from the buffer. Framework events that occur in
+nearly every dispatch, such as `commit` and `collect-status`, don't count, because charms and
+`StoredState` observe them almost every time.
 
 This hopefully ensures that you can see the trace data for your "install" and "start" events.
 
-Note that for for Kubernetes charms, if the container is recreated, any buffered traces will be lost.
+Note that for Kubernetes charms, if the container is recreated, any buffered traces will be lost.
 
 ### Data format
 
