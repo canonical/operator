@@ -2847,6 +2847,12 @@ bad path\r
         assert content == b'content'
         assert req == {'action': 'write', 'files': [{'path': path}]}
 
+    @pytest.mark.parametrize('path', ['/foo/b\rar', '/foo/b\nar', '/foo/b\x00ar'])
+    def test_push_path_with_control_character(self, client: MockClient, path: str):
+        with pytest.raises(ValueError, match='CR, LF, or NUL'):
+            client.push(path, 'content')
+        assert client.requests == []
+
     def _parse_write_multipart(self, content_type: str, body: _bytes_generator):
         message = email.message.Message()
         message['Content-Type'] = content_type

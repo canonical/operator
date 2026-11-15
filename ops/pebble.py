@@ -2883,8 +2883,14 @@ class Client:
         Raises:
             PathError: If there was an error writing the file to the path; for example, if the
                 destination path doesn't exist and ``make_dirs`` is not used.
+            ValueError: If the path contains a carriage return, line feed, or null
+                character, which can't be sent to Pebble.
         """
         path = str(path)
+        # These would end the filename early in the multipart header, and Pebble
+        # would reject the request with an error that doesn't mention the path.
+        if any(c in path for c in '\r\n\x00'):
+            raise ValueError(f'cannot push to a path containing CR, LF, or NUL: {path!r}')
         with self._start_span('pebble push') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
