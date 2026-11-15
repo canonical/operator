@@ -155,7 +155,10 @@ class Worker:
         return _state_json.decode_state(response['state'])
 
     def close(self) -> None:
-        """Stop the worker, if it's running."""
+        """Stop the worker, if it's running.
+
+        A later event starts a new worker, unless this one crashed.
+        """
         proc = self._proc
         if proc is None:
             return
