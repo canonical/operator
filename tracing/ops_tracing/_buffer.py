@@ -125,8 +125,13 @@ class Buffer:
             # @retry runs this method again, which creates the schema in a new file.
             if type(e) is not sqlite3.DatabaseError:
                 raise
-            logger.warning('Discarding the unreadable trace buffer %s: %s', self.path, e)
-            self.path.unlink()
+            # Keep the file for inspection, but only one copy, so a repeatedly corrupted
+            # buffer can't fill the disk.
+            corrupt = self.path.with_name(self.path.name + '.corrupt')
+            logger.warning(
+                'Moving the unreadable trace buffer %s aside to %s: %s', self.path, corrupt, e
+            )
+            self.path.replace(corrupt)
             raise
 
     def _create_schema(self) -> None:

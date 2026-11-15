@@ -103,13 +103,15 @@ def test_eviction_frees_only_what_is_needed(
 
 def test_unreadable_buffer_is_recreated(tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture):
     path = tmp_path / 'db'
-    path.write_bytes(b'this is not an sqlite database\n' * 100)
+    garbage = b'this is not an sqlite database\n' * 100
+    path.write_bytes(garbage)
 
     with caplog.at_level(logging.WARNING, logger='ops_tracing._buffer'):
         buf = Buffer(path)
 
     assert buf.pushpop() is None
-    assert 'Discarding the unreadable trace buffer' in caplog.text
+    assert 'Moving the unreadable trace buffer' in caplog.text
+    assert (tmp_path / 'db.corrupt').read_bytes() == garbage
 
 
 def test_locked_buffer_is_not_discarded(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
