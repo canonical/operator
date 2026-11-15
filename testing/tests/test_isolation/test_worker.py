@@ -13,7 +13,7 @@ from collections.abc import Iterator
 import pytest
 from scenario import ActiveStatus, State
 from scenario._isolation import Worker, load_charm_spec
-from scenario._juju_errors import IsolationError
+from scenario._isolation_errors import IsolationError
 from scenario.context import CharmEvents
 from scenario.errors import MetadataNotFoundError
 

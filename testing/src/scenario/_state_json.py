@@ -27,7 +27,7 @@ from ops import pebble
 
 from . import _version
 from . import state as _state
-from ._juju_errors import IsolationError
+from ._isolation_errors import IsolationError
 
 
 class _VersionMismatchError(IsolationError):

@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from typing import IO, Any
 
 from . import _state_json
-from ._juju_errors import IsolationError
+from ._isolation_errors import IsolationError
 from ._worker_protocol import read_message, write_message
 from .context import _DEFAULT_JUJU_VERSION
 from .errors import MetadataNotFoundError
