@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import pathlib
 import shlex
 import shutil
@@ -377,14 +379,22 @@ def _wheel(directory: pathlib.Path, name: str, requires: str = '') -> str:
     metadata = f'Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n'
     if requires:
         metadata += f'Requires-Dist: {requires}\n'
+    wheel_info = 'Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n'
+    files = {f'{stem}.dist-info/METADATA': metadata, f'{stem}.dist-info/WHEEL': wheel_info}
+    # Some uv versions only uninstall the files that RECORD lists.
+    record = ''.join(
+        f'{path},{_record_hash(text)},{len(text.encode())}\n' for path, text in files.items()
+    )
+    files[f'{stem}.dist-info/RECORD'] = f'{record}{stem}.dist-info/RECORD,,\n'
     with zipfile.ZipFile(directory / f'{stem}-py3-none-any.whl', 'w') as wheel:
-        wheel.writestr(f'{stem}.dist-info/METADATA', metadata)
-        wheel.writestr(
-            f'{stem}.dist-info/WHEEL',
-            'Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n',
-        )
-        wheel.writestr(f'{stem}.dist-info/RECORD', '')
+        for path, text in files.items():
+            wheel.writestr(path, text)
     return f'{stem}-py3-none-any.whl'
+
+
+def _record_hash(text: str) -> str:
+    digest = hashlib.sha256(text.encode()).digest()
+    return 'sha256=' + base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
 
 
 def _installed(python: pathlib.Path) -> list[str]:

@@ -138,10 +138,12 @@ def _pip(python: pathlib.Path, command: str, *args: str) -> list[str]:
     uv is used if it's on PATH, because an environment that uv made has no
     pip. Otherwise, the test's own pip is used, as charmcraft does.
     """
+    # pip check's report is its normal output, so --quiet would hide why it failed.
+    quiet = [] if command == 'check' else ['--quiet']
     if uv := shutil.which('uv'):
-        return [uv, 'pip', command, '--quiet', '--python', str(python), *args]
+        return [uv, 'pip', command, *quiet, '--python', str(python), *args]
     # pip only accepts --python before the command.
-    pip = [sys.executable, '-m', 'pip', '--python', str(python), command, '--quiet']
+    pip = [sys.executable, '-m', 'pip', '--python', str(python), command, *quiet]
     return [*pip, '--yes', *args] if command == 'uninstall' else [*pip, *args]
 
 
