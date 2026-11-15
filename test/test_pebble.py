@@ -2836,7 +2836,9 @@ bad path\r
         headers, body = client.requests[0][3:]
         chunks = list(body)
         # Pebble reads the filename with Go's mime.ParseMediaType, where a
-        # backslash escapes the next character if it's a tspecial.
+        # backslash escapes the next character if it's a tspecial. This is the
+        # assertion that checks that: the email-based parse below unescapes only
+        # \\ and \", so it would round-trip the old escaping too.
         assert b'; filename="' + escaped + b'"\r\n' in b''.join(chunks)
         req, filename, content = self._parse_write_multipart(
             headers['Content-Type'], (chunk for chunk in chunks)
