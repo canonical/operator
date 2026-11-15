@@ -194,6 +194,13 @@ class Worker:
         except (OSError, ValueError):
             pass  # Closed by _finish.
 
+    @staticmethod
+    def _read_message_into(stream: IO[bytes], result: list[dict[str, Any] | None]) -> None:
+        try:
+            result.append(read_message(stream))
+        except (OSError, ValueError):
+            pass  # Closed by _finish.
+
     def _read_response(self, stream: IO[bytes]) -> dict[str, Any] | None:
         if self._timeout is None:
             return read_message(stream)
@@ -201,7 +208,7 @@ class Worker:
         # killing the worker closes the other end of the pipe, which ends it.
         result: list[dict[str, Any] | None] = []
         self._reader = threading.Thread(
-            target=lambda: result.append(read_message(stream)), daemon=True
+            target=self._read_message_into, args=(stream, result), daemon=True
         )
         self._reader.start()
         self._reader.join(self._timeout)
