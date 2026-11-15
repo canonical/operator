@@ -7,7 +7,7 @@ The charming community has developed two approaches to writing robust, stateless
 - Delta charms handle each Juju event individually.
 
 ```{tip}
-Charm Tech recommends the holistic approach for most charms, and especially for Kubernetes charms and charms that use several charm libraries. Holistic charms are easier to make robust and easier to test well. See [](#which-approach-to-use) for when a delta charm is still a reasonable choice.
+We recommend the holistic approach for most charms, and especially for charms that use several charm libraries. Holistic charms are easier to make robust and easier to test well. See [](#which-approach-to-use) for when a delta charm is still a reasonable choice.
 ```
 
 ## Handling events holistically
@@ -213,9 +213,8 @@ A good rule of thumb is this: if you're starting to use `defer` in various place
 (which-approach-to-use)=
 ## Which approach to use?
 
-Charm Tech recommends the holistic approach.
 Start new charms with a reconciler, and when an existing delta charm starts to grow `defer` calls or ordering bugs, move it towards one.
-The reconciler pattern is especially suitable for Kubernetes charms and for mature, feature-rich charms that use several charm libraries.
+The reconciler pattern is especially suitable for mature, feature-rich charms that use several charm libraries.
 
 A delta charm can still be a reasonable choice for a simple workload whose behaviour maps directly onto Juju events. See [](#when-to-use-the-delta-approach).
 
