@@ -226,7 +226,14 @@ class TestRealPebble:
             assert data == content
 
     @pytest.mark.parametrize(
-        'name', ['back\\slash', 'back\\"slash', 'back\\\\slash', 'trailing\\']
+        'name',
+        [
+            'back\\slash',  # \s isn't a tspecial, so this worked before the fix too.
+            'back\\;slash',
+            'back\\"slash',
+            'back\\\\slash',
+            'trailing\\',
+        ],
     )
     def test_push_pull_awkward_name(
         self, client: pebble.Client, tmp_path: pathlib.Path, name: str
