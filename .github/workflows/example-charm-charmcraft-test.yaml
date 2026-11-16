@@ -59,6 +59,11 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
+      - name: Lock dependencies
+        working-directory: examples/${{ matrix.charm }}
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
+        run: |
+          if [ ! -f uv.lock ]; then uv lock; fi
       - name: Run spread test
         working-directory: examples/${{ matrix.charm }}
         # GitHub Actions sets CI=true, so charmcraft test uses the `ci`
