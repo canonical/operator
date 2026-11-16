@@ -179,7 +179,7 @@ Charmcraft created several files, including:
 
 These files currently contain placeholder code and configuration. It would be possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
 
-Charmcraft didn't write the exact dependency versions into a lock file. Do that now:
+Charmcraft didn't create a lock file. Create one now:
 
 ```text
 uv lock

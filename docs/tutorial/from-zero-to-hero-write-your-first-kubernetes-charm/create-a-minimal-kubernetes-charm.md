@@ -44,7 +44,7 @@ Charmcraft created several files, including:
 
 These files currently contain placeholder code and configuration.
 
-Charmcraft didn't write the exact dependency versions into a lock file. Do that now:
+Charmcraft didn't create a lock file. Create one now:
 
 ```text
 uv lock
