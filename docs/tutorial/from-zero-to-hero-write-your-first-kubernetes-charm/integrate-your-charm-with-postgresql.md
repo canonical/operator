@@ -42,7 +42,7 @@ When you run this command, you'll see a warning similar to:
 WARNING: Charmhub-hosted charm libraries are deprecated.
 ```
 
-You can ignore the warning. A future version of the tutorial will use a library from PyPI instead of Charmhub.
+You can ignore the warning. A future version of the tutorial will use a library from PyPI instead of Charmhub. For context, see {external+charmlibs:ref}`charmhub-libraries-deprecation`.
 
 After Charmcraft has downloaded the library, your project directory contains a `lib` directory:
 
