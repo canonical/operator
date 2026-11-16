@@ -49,7 +49,7 @@ lint = [
     "pyright~=1.1",
 ]
 unit = [
-    "ops[testing]",
+    "ops-scenario",
     "pytest~=9.0",
 ]
 
