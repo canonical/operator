@@ -15,7 +15,7 @@ jobs:
     uses: ./.github/workflows/_build-wheels.yaml
 
   db-charm-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build-wheels
     strategy:
       fail-fast: false
