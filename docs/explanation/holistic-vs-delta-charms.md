@@ -7,7 +7,7 @@ The charming community has developed two approaches to writing robust, stateless
 - Delta charms handle each Juju event individually.
 
 ```{tip}
-We recommend the holistic approach for most charms, and especially for charms that use several charm libraries. Holistic charms are easier to make robust and easier to test well. See [choosing an approach](#which-approach-to-use) for when a delta charm is still a reasonable choice.
+We recommend the holistic approach for most charms. Holistic charms are easier to make robust and easier to test well. See [choosing an approach](#which-approach-to-use) for when a delta charm is still a reasonable choice.
 ```
 
 ## Handling events holistically
