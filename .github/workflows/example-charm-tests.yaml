@@ -48,9 +48,10 @@ jobs:
             charmcraft fetch-libs
           fi
       - name: Lock dependencies
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
         run: |
           cd ${{ matrix.dir }}
-          uv lock
+          if [ ! -f uv.lock ]; then uv lock; fi
       - name: Run linting and static checks
         run: |
           cd ${{ matrix.dir }}

@@ -61,7 +61,9 @@ jobs:
           fi
       - name: Lock dependencies
         working-directory: examples/${{ matrix.charm }}
-        run: uv lock
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
+        run: |
+          if [ ! -f uv.lock ]; then uv lock; fi
       - name: Run spread test
         working-directory: examples/${{ matrix.charm }}
         # GitHub Actions sets CI=true, so charmcraft test uses the `ci`

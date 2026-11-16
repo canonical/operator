@@ -30,9 +30,10 @@ jobs:
         run: sudo concierge prepare -p machine
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
       - name: Lock dependencies
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
         run: |
           cd ${{ matrix.dir }}
-          uv lock
+          if [ ! -f uv.lock ]; then uv lock; fi
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}
@@ -75,9 +76,10 @@ jobs:
             charmcraft fetch-libs
           fi
       - name: Lock dependencies
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
         run: |
           cd ${{ matrix.dir }}
-          uv lock
+          if [ ! -f uv.lock ]; then uv lock; fi
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}
