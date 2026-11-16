@@ -33,15 +33,21 @@ import json
 import os
 import pathlib
 import shutil
+import socket
 import tempfile
 import threading
 import time
 import urllib.error
 import urllib.request
 import uuid
+import warnings
+from collections.abc import Callable, Generator
+from typing import cast
 
 import pytest
 
+import ops
+import ops.testing
 from ops import pebble
 
 from .test_testing import PebbleNoticesMixin, PebbleStorageAPIsTestMixin
@@ -465,3 +471,276 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
 )
 class TestNoticesUsingRealPebble(PebbleNoticesMixin):
     pass
+
+
+# A callable that performs one filesystem operation. Its arguments are a
+# Pebble client and a resolver that turns a path relative to the tree root
+# into a path that client understands (an absolute path for real Pebble, a
+# container path for the testing client).
+_CaseRun = Callable[[pebble.Client, Callable[[str], str]], object]
+
+_FS_PATHS = (
+    'file',
+    'dir',
+    'empty',
+    'fifo',
+    'sock',
+    'to_file',
+    'to_dir',
+    'to_to_file',
+    'broken',
+    'loop',
+    'missing',
+    'file/child',
+    'to_file/child',
+    'broken/child',
+    'loop/child',
+    'missing/child',
+    'fifo/child',
+)
+
+_FS_PATTERNS = (
+    '*.txt',
+    '?.txt',
+    '[a].txt',
+    '[!a].txt',
+    '[^a].txt',
+    '\\[x\\]',
+    '[[]x]',
+    '[',
+    'a\\',
+    '*',
+    '',
+)
+
+
+def _pull_file(client: pebble.Client, path: str) -> None:
+    with client.pull(path) as file:
+        file.read()
+
+
+_FS_OPS: dict[str, Callable[[pebble.Client, str], object]] = {
+    'list': lambda client, path: client.list_files(path),
+    'list_itself': lambda client, path: client.list_files(path, itself=True),
+    'pull': _pull_file,
+    'push': lambda client, path: client.push(path, 'y'),
+    'push_parents': lambda client, path: client.push(path, 'y', make_dirs=True),
+    'remove': lambda client, path: client.remove_path(path),
+    'remove_rec': lambda client, path: client.remove_path(path, recursive=True),
+    'make_dir': lambda client, path: client.make_dir(path),
+    'make_dir_parents': lambda client, path: client.make_dir(path, make_parents=True),
+}
+
+# Cases that currently differ between the testing client and real Pebble,
+# mapped to their difference group. Fixing the mock turns a case's strict
+# xfail into an xpass failure, so the table cannot silently become stale.
+_FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
+    # Group 1: the mock succeeds but real Pebble raises an error.
+    **{
+        ('make_dir_parents', path): 1
+        for path in ('file', 'fifo', 'sock', 'to_file', 'to_to_file', 'broken', 'loop')
+    },
+    **{('remove_rec', path): 1 for path in ('file/child', 'to_file/child', 'loop/child')},
+    ('pattern', '['): 1,
+    ('pattern', 'a\\'): 1,
+    # Group 2: the mock raises an error but real Pebble succeeds.
+    **{('remove', path): 2 for path in ('to_dir', 'broken', 'loop')},
+    ('remove_rec', 'to_dir'): 2,
+    **{('push', path): 2 for path in ('to_dir', 'sock', 'loop')},
+    **{('push_parents', path): 2 for path in ('to_dir', 'sock', 'loop')},
+    # Group 3: the mock raises a different error type than real Pebble.
+    **{
+        ('list', path): 3
+        for path in ('file/child', 'to_file/child', 'fifo/child', 'loop', 'loop/child')
+    },
+    **{
+        ('list_itself', path): 3
+        for path in ('file/child', 'to_file/child', 'fifo/child', 'loop', 'loop/child')
+    },
+    **{
+        ('remove', path): 3 for path in ('file/child', 'to_file/child', 'fifo/child', 'loop/child')
+    },
+    **{
+        ('pull', path): 3
+        for path in ('file/child', 'to_file/child', 'fifo/child', 'loop', 'loop/child', 'sock')
+    },
+    **{('push', path): 3 for path in ('dir', 'empty', 'loop/child')},
+    **{('push_parents', path): 3 for path in ('dir', 'empty', 'loop/child', 'broken/child')},
+    **{
+        ('make_dir', path): 3
+        for path in ('file', 'fifo', 'sock', 'to_file', 'to_to_file', 'broken', 'loop')
+    },
+    ('make_dir', 'loop/child'): 3,
+    **{('make_dir_parents', path): 3 for path in ('broken/child', 'loop/child')},
+    # Group 4: the mock returns a different result than real Pebble.
+    **{('list', path): 4 for path in ('to_file', 'to_to_file', 'fifo', 'sock')},
+    **{('list_itself', path): 4 for path in ('to_file', 'to_to_file', 'to_dir', 'fifo', 'sock')},
+    ('pattern', ''): 4,
+    ('pattern', '[!a].txt'): 4,
+    ('pattern', '[^a].txt'): 4,
+    ('pattern', '\\[x\\]'): 4,
+}
+
+_FS_XFAIL_REASONS = {
+    1: 'group 1: the mock succeeds but real Pebble raises an error',
+    2: 'group 2: the mock raises an error but real Pebble succeeds',
+    3: 'group 3: the mock raises a different error type than real Pebble',
+    4: 'group 4: the mock returns a different result than real Pebble',
+}
+
+# Phrases in error messages that charms and libraries match on (for example,
+# charmlibs-pathops matches 'not a directory'). 'no such file or directory'
+# is deliberately absent: for missing paths both sides already agree on the
+# not-found kind or 404 code, and the mock words missing-parent errors as
+# 'parent directory not found', which no caller matches on.
+_FS_KEY_PHRASES = (
+    'not a directory',
+    'too many levels of symbolic links',
+    'file exists',
+    'syntax error in pattern',
+    'can only read a regular file',
+)
+
+
+def _build_fs_tree(root: pathlib.Path) -> None:
+    (root / 'file').write_text('x')
+    (root / 'dir').mkdir()
+    (root / 'dir' / 'a.txt').touch()
+    (root / 'dir' / 'b.log').touch()
+    (root / 'dir' / '[x]').touch()
+    (root / 'dir' / 'link').symlink_to('a.txt')
+    (root / 'empty').mkdir()
+    (root / 'nonempty').mkdir()
+    (root / 'nonempty' / 'f').touch()
+    os.mkfifo(root / 'fifo')
+    unix_sock = socket.socket(socket.AF_UNIX)
+    unix_sock.bind(str(root / 'sock'))
+    unix_sock.close()
+    for name, target in {
+        'to_file': 'file',
+        'to_dir': 'dir',
+        'to_to_file': 'to_file',
+        'broken': 'nope',
+        'loop': 'loop',
+    }.items():
+        (root / name).symlink_to(target)
+
+
+def _key_phrases(message: str) -> frozenset[str]:
+    return frozenset(phrase for phrase in _FS_KEY_PHRASES if phrase in message)
+
+
+def _outcome(
+    root: pathlib.Path, run: _CaseRun, client: pebble.Client, resolve: Callable[[str], str]
+) -> tuple[object, ...]:
+    try:
+        value = run(client, resolve)
+    except pebble.APIError as error:
+        return ('APIError', error.code, _key_phrases(error.message))
+    except pebble.PathError as error:
+        return ('PathError', error.kind, _key_phrases(error.message))
+    except Exception as error:
+        # The testing client currently lets some OSErrors escape instead of
+        # translating them to PathError, so the bare class name is part of
+        # the comparison.
+        return (type(error).__name__, None, _key_phrases(str(error)))
+    if isinstance(value, list):
+        file_infos = cast('list[pebble.FileInfo]', value)
+        listing = sorted(
+            (info.path.removeprefix(str(root)), info.name, pebble.FileType(info.type).value)
+            for info in file_infos
+        )
+        return ('ok', listing)
+    return ('ok',)
+
+
+def _path_case(op: str, path: str) -> _CaseRun:
+    return lambda client, resolve: _FS_OPS[op](client, resolve(path))
+
+
+def _pattern_case(pattern: str) -> _CaseRun:
+    return lambda client, resolve: client.list_files(resolve('dir'), pattern=pattern)
+
+
+def _case_param(name: str, run: _CaseRun, key: tuple[str, str]):
+    group = _FS_XFAIL_GROUPS.get(key)
+    if group is None:
+        return pytest.param(run, id=name)
+    reason = _FS_XFAIL_REASONS[group]
+    return pytest.param(run, marks=pytest.mark.xfail(strict=True, reason=reason), id=name)
+
+
+def _path_case_runs():
+    for path in _FS_PATHS:
+        for op in _FS_OPS:
+            # pull and push on a FIFO can block real Pebble, and removing a
+            # path below a FIFO hangs it until the client times out, so those
+            # combinations are not covered here.
+            if path == 'fifo' and op in ('pull', 'push', 'push_parents'):
+                continue
+            if (op, path) == ('remove_rec', 'fifo/child'):
+                continue
+            yield _case_param(f'{op} {path}', _path_case(op, path), (op, path))
+
+
+def _fs_cases():
+    return [
+        *_path_case_runs(),
+        _case_param('remove nonempty', _path_case('remove', 'nonempty'), ('remove', 'nonempty')),
+        *(
+            _case_param(
+                f'list dir pattern={pattern!r}', _pattern_case(pattern), ('pattern', pattern)
+            )
+            for pattern in _FS_PATTERNS
+        ),
+    ]
+
+
+@pytest.fixture(scope='module')
+def mock_client_and_root() -> Generator[tuple[pebble.Client, pathlib.Path]]:
+    """The testing Pebble client behind a Harness container, and its filesystem root."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', PendingDeprecationWarning)
+        harness = ops.testing.Harness(ops.CharmBase, meta='{name: charm, containers: {c: {}}}')
+    harness.begin()
+    harness.set_can_connect('c', True)
+    yield harness.model.unit.get_container('c').pebble, harness.get_filesystem_root('c')
+    harness.cleanup()
+
+
+@pytest.mark.skipif(
+    os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
+    reason='RUN_REAL_PEBBLE_TESTS not set',
+)
+class TestMockPebbleFilesystemMatchesRealPebble:
+    """Compare the Harness mock Pebble client's filesystem behaviour with real Pebble.
+
+    Each case runs the same operation against a real Pebble server and against
+    the testing client behind a Harness container, on identical freshly built
+    filesystem trees, and compares the outcome: for successes, the result; for
+    errors, the exception class, the APIError code or PathError kind, and the
+    key phrases in the message that charms match on. Cases that currently
+    differ are marked xfail(strict=True) with their difference group.
+    """
+
+    @pytest.mark.parametrize('run', _fs_cases())
+    def test_fs_case(
+        self,
+        client: pebble.Client,
+        mock_client_and_root: tuple[pebble.Client, pathlib.Path],
+        tmp_path: pathlib.Path,
+        run: _CaseRun,
+    ):
+        mock_client, mock_root = mock_client_and_root
+        # The mock client's root persists between cases, so reset it by hand;
+        # tmp_path is already fresh.
+        for child in mock_root.iterdir():
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        _build_fs_tree(mock_root)
+        _build_fs_tree(tmp_path)
+        real = _outcome(tmp_path, run, client, lambda path: str(tmp_path / path))
+        mock = _outcome(mock_root, run, mock_client, lambda path: f'/{path}')
+        assert mock == real
