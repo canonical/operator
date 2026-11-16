@@ -420,12 +420,14 @@ class UpgradeCharmEvent(HookEvent):
     """Event triggered by request to upgrade the charm.
 
     This event will be triggered when an administrator executes ``juju
-    upgrade-charm``. The event fires after Juju has unpacked the upgraded charm
-    code, and so this event will be handled by the callback method bound to the
-    event in the new codebase. The associated callback method is invoked
-    provided there is no existing error state. The callback method should be
-    used to reconcile current state written by an older version of the charm
-    into whatever form that is needed by the current charm version.
+    refresh``, and when the content of one of the charm's resources changes,
+    such as after ``juju attach-resource``. The event fires after Juju has
+    unpacked the upgraded charm code, and so this event will be handled by the
+    callback method bound to the event in the new codebase. The associated
+    callback method is invoked provided there is no existing error state. The
+    callback method should be used to reconcile current state written by an
+    older version of the charm into whatever form that is needed by the current
+    charm version.
 
     See also: `Juju | Hook | upgrade-charm <https://documentation.ubuntu.com/juju/3.6/reference/hook/#upgrade-charm>`_.
     """
