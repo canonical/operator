@@ -59,7 +59,8 @@ show_missing = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-log_cli_level = "INFO"
+log_cli_format = "%(levelname)s %(name)s %(message)s"
+filterwarnings = ["error"]
 
 # Linting tools configuration
 [tool.ruff]

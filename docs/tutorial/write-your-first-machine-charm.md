@@ -177,7 +177,7 @@ Charmcraft created several files, including:
 - `src/charm.py` - The Python file that will contain the main logic of your charm.
 - `src/tinyproxy.py` - A helper module that will contain functions for interacting with tinyproxy.
 
-These files currently contain placeholder code and configuration. It would be possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
+These files currently contain placeholder code and configuration. It's possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
 
 Charmcraft didn't create a lock file. Create one now:
 
