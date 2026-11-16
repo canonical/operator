@@ -40,5 +40,12 @@ classifiers = [
 "Homepage" = "https://github.com/canonical/operator"
 "Bug Tracker" = "https://github.com/canonical/operator/issues"
 
+[dependency-groups]
+unit = [
+    "jsonpatch~=1.33",
+    "ops-tracing",
+    "pytest~=8.0",
+]
+
 [bdist_wheel]
 universal = 1
