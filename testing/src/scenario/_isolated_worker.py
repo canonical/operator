@@ -33,12 +33,13 @@ def load_charm_type(charm_source: pathlib.Path) -> type[ops.CharmBase]:
         if path not in sys.path:
             sys.path.insert(0, path)
     module = importlib.import_module('charm')
+    # Only classes defined in charm.py, so an imported base class doesn't count.
     charm_types = [
         value
         for value in vars(module).values()
         if isinstance(value, type)
         and issubclass(value, ops.CharmBase)
-        and value is not ops.CharmBase
+        and value.__module__ == module.__name__
     ]
     if len(charm_types) != 1:
         names = [t.__name__ for t in charm_types]

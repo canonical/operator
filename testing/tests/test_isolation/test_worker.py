@@ -170,6 +170,28 @@ def test_a_charm_module_needs_exactly_one_charm_class(
         worker.run(on.install(), State())
 
 
+def test_an_imported_charm_class_isnt_counted(tmp_path: pathlib.Path, workers: list[Worker]):
+    (tmp_path / 'metadata.yaml').write_text('name: subclass\n')
+    (tmp_path / 'lib').mkdir()
+    (tmp_path / 'lib' / 'shared_base.py').write_text(
+        'import ops\nclass SharedBase(ops.CharmBase): pass\n'
+    )
+    (tmp_path / 'src').mkdir()
+    (tmp_path / 'src' / 'charm.py').write_text(
+        'import ops\n'
+        'from shared_base import SharedBase\n'
+        'class Subclass(SharedBase):\n'
+        '    def __init__(self, framework):\n'
+        '        super().__init__(framework)\n'
+        '        framework.observe(self.on.install, self._on_install)\n'
+        '    def _on_install(self, event):\n'
+        '        self.unit.status = ops.ActiveStatus(type(self).__name__)\n'
+    )
+    worker = Worker(tmp_path)
+    workers.append(worker)
+    assert worker.run(on.install(), State()).unit_status == ActiveStatus('Subclass')
+
+
 def test_an_event_that_runs_too_long_kills_the_worker(
     workers: list[Worker], monkeypatch: pytest.MonkeyPatch
 ):
