@@ -185,7 +185,7 @@ Charmcraft didn't create a lock file. Create one now:
 uv lock
 ```
 
-This creates a file called `uv.lock`, which specifies the exact dependency versions that will be installed when you test and build your charm. If you commit your charm to source control, include `uv.lock`.
+This creates a file called `uv.lock`, which specifies the exact dependency versions that will be installed when you test and build your charm. When you commit your charm to source control, include `uv.lock`.
 
 ## Write your charm
 
