@@ -1,7 +1,7 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Run a charm's events in a worker process with its own interpreter.
+"""Run a charm's events in a separate worker process.
 
 The test process never imports the charm: it reads the metadata from disk,
 and events and ``State`` cross to the worker as JSON. The worker starts on the
@@ -77,7 +77,10 @@ class Worker:
 
     Args:
         charm_source: The charm's directory, with ``src/charm.py``.
-        python: The interpreter to run the worker with.
+        python: The interpreter to run the worker with. The default is the
+            test's own, so the worker gets a fresh ``sys.modules`` but the same
+            installed packages. Give another environment's interpreter to
+            isolate those too.
         extra_sys_path: Directories put at the front of the worker's
             ``sys.path`` before the charm is imported.
         app_name: The application name; the charm's name if not given.
