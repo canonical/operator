@@ -213,10 +213,10 @@ A good rule of thumb is this: if you're starting to use `defer` in various place
 (which-approach-to-use)=
 ## Which approach to use?
 
-Start new charms with a reconciler, and when an existing delta charm starts to grow `defer` calls or ordering bugs, move it towards one.
-The reconciler pattern is especially suitable for mature, feature-rich charms that use several charm libraries.
+Start new charms with a reconciler.
+Complex workloads are more robust with the reconciler pattern, especially in mature, feature-rich charms that use several charm libraries.
 
-A delta charm can still be a reasonable choice for a simple workload whose behaviour maps directly onto Juju events. See [](#when-to-use-the-delta-approach).
+Simple workloads can still be served well by a delta charm, if their behaviour maps directly onto Juju events. See [](#when-to-use-the-delta-approach).
 
 ### Dedicated handlers for specific Juju events
 
