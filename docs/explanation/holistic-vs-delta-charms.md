@@ -216,7 +216,7 @@ A good rule of thumb is this: if you're starting to use `defer` in various place
 Start new charms with a reconciler.
 Complex workloads are more robust with the reconciler pattern, especially in mature, feature-rich charms that use several charm libraries.
 
-Simple workloads can still be served well by a delta charm, if their behaviour maps directly onto Juju events. See [](#when-to-use-the-delta-approach).
+Simple workloads can still be served well by a delta charm, if their behaviour maps directly onto Juju events.
 
 ### Dedicated handlers for specific Juju events
 
@@ -260,7 +260,6 @@ This comes down to two observations:
 - The charm author is thinking about their workload more than about minute Juju semantics.
 - When the Juju event is taken out of the equation, the same number of unit tests covers a larger portion of state and event space.
 
-(when-to-use-the-delta-approach)=
 ### When to use the delta approach
 
 A delta approach is most appropriate when the Juju event model can be mapped directly to the workload semantics. Simple operators can typically be written as delta charms.
