@@ -2948,8 +2948,9 @@ class Client:
             source_io: _AnyStrFileLikeIO = source
         boundary = binascii.hexlify(os.urandom(16))
         # Pebble reads this with Go's mime.ParseMediaType, where a backslash
-        # escapes the next character if it's a tspecial. Escape the same two
-        # characters that Go's own multipart.Writer does.
+        # escapes the next character if it's a tspecial. Escape \ and " as Go's
+        # multipart.Writer does. It also percent-encodes CR and LF, which can't
+        # be undone, so push() refuses those instead.
         path_escaped = path.replace('\\', '\\\\').replace('"', '\\"').encode('utf-8')
         content_type = f'multipart/form-data; boundary="{boundary.decode("utf-8")}"'
 
