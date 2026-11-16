@@ -343,7 +343,7 @@ Now run `tox -e unit`. You should see one test failure:
 FAILED tests/unit/test_charm.py::test_relation_data - scenario.errors.UncaughtCharmError: Uncaught DeprecationWarning in charm...
 ```
 
-The test failed because the `data_interfaces` library uses [](#ops.JujuVersion.from_environ), which is no longer recommended. A future version of the tutorial will use the more modern [`dpcharmlibs-interfaces`](https://pypi.org/project/dpcharmlibs-interfaces/) library instead of `data_platform_libs.data_interfaces`. In the meantime, it's best to tell pytest to ignore the issue. In `pyproject.toml`, extend the `filterwarnings` list:
+The test failed because the `data_platform_libs.data_interfaces` library uses [](#ops.JujuVersion.from_environ), which is no longer recommended. A future version of the tutorial will use the more modern [`dpcharmlibs-interfaces`](https://pypi.org/project/dpcharmlibs-interfaces/) library instead of `data_platform_libs.data_interfaces`. In the meantime, it's best to tell pytest to ignore the issue. In `pyproject.toml`, extend the `filterwarnings` list:
 
 ```{literalinclude} ../../../examples/k8s-3-postgresql/pyproject.toml
 :language: toml
