@@ -44,6 +44,14 @@ Charmcraft created several files, including:
 
 These files currently contain placeholder code and configuration. It's possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
 
+Charmcraft didn't create a lock file. Create one now:
+
+```text
+uv lock
+```
+
+This creates a file called `uv.lock`, which specifies the exact dependency versions that will be installed when you test and build your charm. When you commit your charm to source control, include `uv.lock`.
+
 ## Write your charm
 
 ### Edit the metadata
@@ -356,23 +364,15 @@ The result should be similar to the following output:
 
 ```text
 ...
-============================================ test session starts =============================================
-platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python3
-cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/fastapi-demo
-configfile: pyproject.toml
-collected 1 item
 
-tests/unit/test_charm.py::test_pebble_layer PASSED
-
-============================================= 1 passed in 0.54s ==============================================
+============================= 1 passed in 0.54s ==============================
 unit: commands[1]> coverage report
 Name                  Stmts   Miss Branch BrPart  Cover   Missing
 -----------------------------------------------------------------
-src/charm.py             20      0      0      0   100%
+src/charm.py             25      5      4      2    76%   34, 38-42
 src/fastapi_demo.py       8      3      0      0    62%   35-37
 -----------------------------------------------------------------
-TOTAL                    28      3      0      0    89%
+TOTAL                    33      8      4      2    73%
   unit: OK (1.91=setup[0.09]+cmd[1.54,0.28] seconds)
   congratulations :) (1.93 seconds)
 ```
