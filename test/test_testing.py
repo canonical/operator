@@ -27,6 +27,7 @@ import pathlib
 import platform
 import pwd
 import shutil
+import socket
 import sqlite3
 import sys
 import tempfile
@@ -5604,6 +5605,139 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         assert len(files) == 1
         assert files[0].user is None
         assert files[0].group is None
+
+
+class TestMockPebbleFileErrors:
+    """Error behaviour of the mock Pebble filesystem.
+
+    TestMockPebbleFilesystemMatchesRealPebble in test_real_pebble.py checks
+    these behaviours against a real Pebble server.
+    """
+
+    @pytest.fixture
+    def harness(self):
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta="""
+            name: test
+            containers:
+                test-container: {}
+            """,
+        )
+        harness.begin()
+        harness.set_can_connect('test-container', True)
+        yield harness
+        harness.cleanup()
+
+    @pytest.fixture
+    def container(self, harness: ops.testing.Harness[ops.CharmBase]):
+        return harness.charm.unit.get_container('test-container')
+
+    @pytest.fixture
+    def fs_root(self, harness: ops.testing.Harness[ops.CharmBase]):
+        return harness.get_filesystem_root('test-container')
+
+    def test_pull_only_reads_regular_files(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'file').write_text('x')
+        with container.pull('/file') as f:
+            assert f.read() == 'x'
+
+        (fs_root / 'dir').mkdir()
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.pull('/dir')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'can only read a regular file' in excinfo.value.message
+
+        sock = socket.socket(socket.AF_UNIX)
+        sock.bind(str(fs_root / 'sock'))
+        sock.close()
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.pull('/sock')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'can only read a regular file' in excinfo.value.message
+
+    def test_pull_error_messages(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'file').write_text('x')
+        # A path below a regular file.
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.pull('/file/child')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'not a directory' in excinfo.value.message
+
+        # A looping symlink.
+        (fs_root / 'loop').symlink_to('loop')
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.pull('/loop')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'too many levels of symbolic links' in excinfo.value.message
+
+        # A broken symlink.
+        (fs_root / 'broken').symlink_to('missing')
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.pull('/broken')
+        assert excinfo.value.kind == 'not-found'
+        assert 'no such file or directory' in excinfo.value.message
+
+    def test_push_error_messages(self, container: ops.Container, fs_root: pathlib.Path):
+        # Pushing over a directory fails.
+        (fs_root / 'dir').mkdir()
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.push('/dir', 'x')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'file exists' in excinfo.value.message
+
+        # A missing parent directory.
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.push('/missing/child', 'x')
+        assert excinfo.value.kind == 'not-found'
+        assert 'no such file or directory' in excinfo.value.message
+
+        # A path below a regular file, with and without make_dirs.
+        (fs_root / 'file').write_text('x')
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.push('/file/child', 'x')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'not a directory' in excinfo.value.message
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.push('/file/child', 'x', make_dirs=True)
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'not a directory' in excinfo.value.message
+
+    def test_push_replaces_non_directories(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'target').write_text('old')
+        (fs_root / 'dir').mkdir()
+        for name, target in (
+            ('to_file', 'target'),
+            ('to_dir', 'dir'),
+            ('broken', 'missing'),
+        ):
+            (fs_root / name).symlink_to(target)
+        sock = socket.socket(socket.AF_UNIX)
+        sock.bind(str(fs_root / 'sock'))
+        sock.close()
+
+        for name in ('target', 'to_file', 'to_dir', 'broken', 'sock'):
+            container.push(f'/{name}', 'new')
+            # The path itself is replaced, so symlinks do not survive and
+            # their targets are untouched.
+            assert not (fs_root / name).is_symlink()
+            assert (fs_root / name).read_text() == 'new'
+        assert (fs_root / 'dir').is_dir()
+        assert list((fs_root / 'dir').iterdir()) == []
+
+    def test_make_dir_error_messages(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'file').write_text('x')
+        # A path below a regular file.
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.make_dir('/file/child')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'not a directory' in excinfo.value.message
+
+        # A missing parent directory.
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.make_dir('/missing/child')
+        assert excinfo.value.kind == 'not-found'
+        assert 'no such file or directory' in excinfo.value.message
 
 
 class TestFilesystem:

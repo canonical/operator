@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import errno
 import fnmatch
 import http
 import inspect
@@ -29,6 +30,7 @@ import random
 import re
 import shutil
 import signal
+import stat
 import tempfile
 import typing
 import uuid
@@ -3140,6 +3142,20 @@ class _TestingExecProcess:
         raise BrokenPipeError('[Errno 32] Broken pipe')
 
 
+# Reason text that real Pebble's error messages use for these errnos (Go's
+# lower-case syscall error strings). Charm and library error handlers match
+# on these phrases.
+_FS_ERRNO_REASONS: dict[int, str] = {
+    errno.ENOENT: 'no such file or directory',
+    errno.ENOTDIR: 'not a directory',
+    errno.ELOOP: 'too many levels of symbolic links',
+    errno.EEXIST: 'file exists',
+    errno.ENOTEMPTY: 'directory not empty',
+    errno.EACCES: 'permission denied',
+    errno.EPERM: 'permission denied',
+}
+
+
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:
     """This conforms to the interface for pebble.Client but provides canned data.
@@ -3572,6 +3588,31 @@ class _TestingPebbleClient:
         if not path.startswith('/'):
             raise pebble.PathError('generic-file-error', f'paths must be absolute, got {path!r}')
 
+    @staticmethod
+    def _remove_quietly(path: pathlib.Path) -> None:
+        """Remove a leftover temporary file, ignoring errors (as Pebble's Cancel does)."""
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+    @staticmethod
+    def _path_error(op: str, path: str, error: OSError) -> pebble.PathError:
+        """Translate an OSError to the PathError that real Pebble would return.
+
+        Pebble's daemon words filesystem errors as '<op> <path>: <reason>', and
+        reports ENOENT as a not-found error, permission errors as
+        permission-denied, and anything else as a generic file error.
+        """
+        if error.errno == errno.ENOENT:
+            kind = 'not-found'
+        elif error.errno in (errno.EACCES, errno.EPERM):
+            kind = 'permission-denied'
+        else:
+            kind = 'generic-file-error'
+        reason = _FS_ERRNO_REASONS.get(error.errno or 0, error.strerror or str(error))
+        return pebble.PathError(kind, f'{op} {path}: {reason}')
+
     def pull(
         self, path: str | pathlib.PurePath, *, encoding: str | None = 'utf-8'
     ) -> BinaryIO | TextIO:
@@ -3579,19 +3620,21 @@ class _TestingPebbleClient:
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
+        # Real Pebble stats the path (following symlinks) and refuses to read
+        # anything that isn't a regular file.
+        try:
+            info = file_path.stat()
+        except OSError as e:
+            raise self._path_error('stat', path, e) from None
+        if not stat.S_ISREG(info.st_mode):
+            raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
         try:
             return cast(
                 'BinaryIO | TextIO',
                 file_path.open('rb' if encoding is None else 'r', encoding=encoding),
             )
-        except FileNotFoundError:
-            raise pebble.PathError(
-                'not-found', f'stat {path}: no such file or directory'
-            ) from None
-        except IsADirectoryError:
-            raise pebble.PathError(
-                'generic-file-error', f'can only read a regular file: "{path}"'
-            ) from None
+        except OSError as e:
+            raise self._path_error('open', path, e) from None
 
     def push(
         self,
@@ -3615,37 +3658,48 @@ class _TestingPebbleClient:
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if make_dirs and not file_path.parent.exists():
-            self.make_dir(
-                os.path.dirname(path),
-                make_parents=True,
-                permissions=None,
-                user_id=user_id,
-                user=user,
-                group_id=group_id,
-                group=group,
-            )
+            try:
+                self.make_dir(
+                    os.path.dirname(path),
+                    make_parents=True,
+                    permissions=None,
+                    user_id=user_id,
+                    user=user,
+                    group_id=group_id,
+                    group=group,
+                )
+            except pebble.PathError as e:
+                # Real Pebble reports make_dirs failures with this prefix.
+                raise pebble.PathError(e.kind, f'cannot create directory: {e.message}') from None
         permissions = permissions if permissions is not None else 0o644
+        # Real Pebble writes the content to a temporary sibling file and
+        # renames it over the target, so pushing replaces symlinks and other
+        # non-directories, and only fails if the target is a directory.
+        temp_path = file_path.with_name(file_path.name + '.~')
         try:
             if isinstance(source, str):
-                file_path.write_text(source, encoding=encoding)
+                temp_path.write_text(source, encoding=encoding)
             elif isinstance(source, bytes):
-                file_path.write_bytes(source)
+                temp_path.write_bytes(source)
             else:
                 # If source is binary, open file in binary mode and ignore encoding param
                 is_binary = isinstance(source.read(0), bytes)
                 open_mode = 'wb' if is_binary else 'w'
                 open_encoding = None if is_binary else encoding
-                with file_path.open(open_mode, encoding=open_encoding) as f:
+                with temp_path.open(open_mode, encoding=open_encoding) as f:
                     shutil.copyfileobj(cast('IOBase', source), cast('IOBase', f))
-            os.chmod(file_path, permissions)
-        except FileNotFoundError as e:
-            raise pebble.PathError(
-                'not-found', f'parent directory not found: {e.args[0]}'
-            ) from None
-        except NotADirectoryError:
-            raise pebble.PathError(
-                'generic-file-error', f'open {path}.~: not a directory'
-            ) from None
+            os.chmod(temp_path, permissions)
+        except OSError as e:
+            self._remove_quietly(temp_path)
+            raise self._path_error('open', f'{path}.~', e) from None
+        if file_path.is_dir() and not file_path.is_symlink():
+            self._remove_quietly(temp_path)
+            raise pebble.PathError('generic-file-error', f'rename {path}.~ {path}: file exists')
+        try:
+            os.rename(temp_path, file_path)
+        except OSError as e:
+            self._remove_quietly(temp_path)
+            raise self._path_error('rename', f'{path}.~ {path}', e) from None
 
     def list_files(
         self, path: str | pathlib.PurePath, *, pattern: str | None = None, itself: bool = False
@@ -3695,7 +3749,7 @@ class _TestingPebbleClient:
         self._check_absolute_path(path)
         dir_path = self._root / path[1:]
         if not dir_path.parent.exists() and not make_parents:
-            raise pebble.PathError('not-found', f'parent directory not found: {path}')
+            raise pebble.PathError('not-found', f'mkdir {path}: no such file or directory')
         if not dir_path.parent.exists() and make_parents:
             self.make_dir(
                 os.path.dirname(path),
@@ -3715,9 +3769,8 @@ class _TestingPebbleClient:
                 raise pebble.PathError(
                     'generic-file-error', f'mkdir {path}: file exists'
                 ) from None
-        except NotADirectoryError as e:
-            # Attempted to create a subdirectory of a file
-            raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}') from None
+        except OSError as e:
+            raise self._path_error('mkdir', path, e) from None
 
     def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False):
         path = str(path)
