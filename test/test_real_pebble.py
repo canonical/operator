@@ -534,16 +534,10 @@ _FS_OPS: dict[str, Callable[[pebble.Client, str], object]] = {
 # Cases that currently differ between the testing client and real Pebble,
 # mapped to their difference group. Fixing the mock turns a case's strict
 # xfail into an xpass failure, so the table cannot silently become stale.
-_FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
-    # Group 1: the mock succeeds but real Pebble raises an error.
-    ('pattern', '['): 1,
-    ('pattern', 'a\\'): 1,
-    # Group 4: the mock returns a different result than real Pebble.
-    ('pattern', ''): 4,
-    ('pattern', '[!a].txt'): 4,
-    ('pattern', '[^a].txt'): 4,
-    ('pattern', '\\[x\\]'): 4,
-}
+# There are no known differences at the moment; add an entry here when one
+# is found (or intentionally left behind), with its group from
+# _FS_XFAIL_REASONS.
+_FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {}
 
 _FS_XFAIL_REASONS = {
     1: 'group 1: the mock succeeds but real Pebble raises an error',

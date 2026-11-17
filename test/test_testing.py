@@ -45,7 +45,7 @@ import yaml
 import ops
 import ops.testing
 from ops import pebble
-from ops._private.harness import _TestingPebbleClient
+from ops._private.harness import _go_path_match, _TestingPebbleClient
 from ops.jujuversion import JujuVersion
 from ops.log import _get_juju_log_and_app_id
 from ops.model import _ModelBackend
@@ -5605,6 +5605,90 @@ class TestPebbleStorageAPIsUsingMocks(PebbleStorageAPIsTestMixin):
         assert len(files) == 1
         assert files[0].user is None
         assert files[0].group is None
+
+
+class TestGoPathMatch:
+    """The mock Pebble's list_files pattern matching follows Go's path.Match."""
+
+    @pytest.mark.parametrize(
+        ('pattern', 'name', 'expected'),
+        [
+            # A literal match, and the whole name must match.
+            ('abc', 'abc', True),
+            ('abc', 'abd', False),
+            ('abc', 'abcd', False),
+            # '*' matches any sequence of non-'/' characters, including empty.
+            ('*', 'abc', True),
+            ('*', '', True),
+            ('*', 'a/b', False),
+            ('*c', 'abc', True),
+            ('a*', 'a', True),
+            ('a*', 'ab/c', False),
+            ('a*/b', 'abc/b', True),
+            ('a*/b', 'a/c/b', False),
+            ('a*b*c*d*e*/f', 'axbxcxdxe/f', True),
+            ('a*b*c*d*e*/f', 'axbxcxdxexxx/f', True),
+            ('a*b*c*d*e*/f', 'axbxcxdxe/xxx/f', False),
+            ('a*b*c*d*e*/f', 'axbxcxdxexxx/fff', False),
+            ('a*x', 'aaa', False),
+            # '?' matches any single non-'/' character.
+            ('?', 'a', True),
+            ('?', '/', False),
+            ('?', '', False),
+            ('a?c', 'abc', True),
+            # Character classes: ranges, '^' negation, and literal '!'
+            # (fnmatch, which the mock used before, negates with '!' instead).
+            ('[abc]', 'b', True),
+            ('[abc]', 'd', False),
+            ('[^abc]', 'b', False),
+            ('[^abc]', 'd', True),
+            ('[a-c]', 'b', True),
+            ('[a-c]', '-', False),
+            ('[!a]', '!', True),
+            ('[!a]', 'a', True),
+            ('[!a]', 'b', False),
+            ('[[]', '[', True),
+            ('[[]x]', '[x]', True),
+            ('[\\]]', ']', True),
+            # '\\' escapes the next character.
+            ('\\*', '*', True),
+            ('\\*', 'a', False),
+            ('\\[x\\]', '[x]', True),
+            ('a\\b', 'ab', True),
+        ],
+    )
+    def test_matches(self, pattern: str, name: str, expected: bool):
+        assert _go_path_match(pattern, name) == expected
+
+    @pytest.mark.parametrize(
+        'pattern',
+        ['[', 'a\\', '\\', '[]]', '[]a]', '[a-]', '[-a]', 'x[]', 'z*['],
+    )
+    def test_bad_pattern(self, pattern: str):
+        # A malformed pattern is an error even when the name would not match.
+        with pytest.raises(ValueError, match='syntax error in pattern'):
+            _go_path_match(pattern, 'zzz-no-match')
+
+    def test_list_files_pattern_errors(self):
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta='{name: test, containers: {test-container: {}}}',
+        )
+        harness.begin()
+        harness.set_can_connect('test-container', True)
+        try:
+            container = harness.charm.unit.get_container('test-container')
+            container.push('/dir/file', 'x', make_dirs=True)
+            # A malformed pattern is a 400, not an empty result.
+            for pattern in ('[', 'a\\'):
+                with pytest.raises(pebble.APIError) as excinfo:
+                    container.list_files('/dir', pattern=pattern)
+                assert excinfo.value.code == 400
+                assert 'syntax error in pattern' in excinfo.value.message
+            # An empty pattern is no filter.
+            assert len(container.list_files('/dir', pattern='')) == 1
+        finally:
+            harness.cleanup()
 
 
 class TestMockPebbleFileErrors:

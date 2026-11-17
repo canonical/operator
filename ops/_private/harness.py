@@ -19,7 +19,6 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import errno
-import fnmatch
 import http
 import inspect
 import io
@@ -3161,6 +3160,147 @@ def _fs_error_reason(error: OSError) -> str:
     return _FS_ERRNO_REASONS.get(error.errno or 0, error.strerror or str(error))
 
 
+def _go_scan_chunk(pattern: str) -> tuple[bool, str, str]:
+    """Split off the first chunk of a glob pattern (see Go's path.scanChunk)."""
+    star = False
+    while pattern.startswith('*'):
+        pattern = pattern[1:]
+        star = True
+    inrange = False
+    i = 0
+    while i < len(pattern):
+        char = pattern[i]
+        if char == '\\':
+            # The error check for a dangling escape happens in _go_match_chunk.
+            if i + 1 < len(pattern):
+                i += 1
+        elif char == '[':
+            inrange = True
+        elif char == ']':
+            inrange = False
+        elif char == '*' and not inrange:
+            break
+        i += 1
+    return star, pattern[:i], pattern[i:]
+
+
+def _go_get_esc(chunk: str) -> tuple[str, str]:
+    """Take one character from a character class (see Go's path.getEsc)."""
+    if not chunk or chunk[0] in '-]':
+        raise ValueError('syntax error in pattern')
+    if chunk[0] == '\\':
+        chunk = chunk[1:]
+        if not chunk:
+            raise ValueError('syntax error in pattern')
+    char, rest = chunk[0], chunk[1:]
+    if not rest:
+        raise ValueError('syntax error in pattern')
+    return char, rest
+
+
+def _go_match_chunk(chunk: str, name: str) -> tuple[str, bool]:
+    """Match a star-free chunk against the start of name (see Go's path.matchChunk).
+
+    Returns the unmatched rest of name and whether the chunk matched. Like
+    Go, the whole chunk is validated even after the match has failed, so a
+    malformed chunk raises ValueError regardless.
+    """
+    failed = False
+    while chunk:
+        if not failed and not name:
+            failed = True
+        char = chunk[0]
+        if char == '[':
+            r = ''
+            if not failed:
+                r, name = name[0], name[1:]
+            chunk = chunk[1:]
+            negated = False
+            if chunk and chunk[0] == '^':
+                negated = True
+                chunk = chunk[1:]
+            matched = False
+            ranges = 0
+            while True:
+                if chunk and chunk[0] == ']' and ranges > 0:
+                    chunk = chunk[1:]
+                    break
+                lo, chunk = _go_get_esc(chunk)
+                hi = lo
+                if chunk[0] == '-':
+                    hi, chunk = _go_get_esc(chunk[1:])
+                if lo <= r <= hi:
+                    matched = True
+                ranges += 1
+            if matched == negated:
+                failed = True
+        elif char == '?':
+            if not failed:
+                if name[0] == '/':
+                    failed = True
+                name = name[1:]
+            chunk = chunk[1:]
+        else:
+            if char == '\\':
+                chunk = chunk[1:]
+                if not chunk:
+                    raise ValueError('syntax error in pattern')
+                char = chunk[0]
+            if not failed:
+                if char != name[0]:
+                    failed = True
+                name = name[1:]
+            chunk = chunk[1:]
+    if failed:
+        return '', False
+    return name, True
+
+
+def _go_path_match(pattern: str, name: str) -> bool:
+    r"""Match name against pattern, as Go's path.Match does.
+
+    Real Pebble filters list_files results with path.Match: '*', '?' and
+    character classes never match '/', classes use '^' (not '!') for
+    negation, and '\' escapes the next character. A malformed pattern raises
+    ValueError('syntax error in pattern'), even if the name would not match.
+    """
+    while pattern:
+        star, chunk, pattern = _go_scan_chunk(pattern)
+        if star and not chunk:
+            # A trailing '*' matches the rest of the name unless it has a '/'.
+            return '/' not in name
+        # Look for a match at the current position. If this is the last
+        # chunk, the whole name must be consumed; otherwise we'd get a false
+        # result even if we could still match using the star.
+        rest, ok = _go_match_chunk(chunk, name)
+        if ok and (not rest or pattern):
+            name = rest
+            continue
+        if star:
+            # Look for a match skipping i+1 characters.
+            accepted = False
+            for i, char in enumerate(name):
+                if char == '/':
+                    break
+                rest, ok = _go_match_chunk(chunk, name[i + 1 :])
+                if ok:
+                    # If this is the last chunk, it must exhaust the name.
+                    if not pattern and rest:
+                        continue
+                    name = rest
+                    accepted = True
+                    break
+            if accepted:
+                continue
+        # Like Go, validate the rest of the pattern before reporting no
+        # match: a malformed pattern is an error even if nothing would match.
+        while pattern:
+            _, chunk, pattern = _go_scan_chunk(pattern)
+            _go_match_chunk(chunk, '')
+        return False
+    return not name
+
+
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:
     """This conforms to the interface for pebble.Client but provides canned data.
@@ -3745,8 +3885,18 @@ class _TestingPebbleClient:
             except OSError as e:
                 raise self._files_api_error('open', path, e) from None
 
-        if pattern is not None:
-            files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
+        # Real Pebble filters with Go's path.Match and treats an empty
+        # pattern as no filter.
+        if pattern:
+            filtered: list[pathlib.Path] = []
+            for file in files:
+                try:
+                    matched = _go_path_match(pattern, file.name)
+                except ValueError:
+                    raise self._api_error(400, 'syntax error in pattern') from None
+                if matched:
+                    filtered.append(file)
+            files = filtered
 
         file_infos = [
             Container._build_fileinfo(file, follow_symlinks=not is_entry_listing) for file in files
