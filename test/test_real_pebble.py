@@ -543,14 +543,6 @@ _FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
     ('pattern', '['): 1,
     ('pattern', 'a\\'): 1,
     # Group 3: the mock raises a different error type or message than real Pebble.
-    **{
-        ('list', path): 3
-        for path in ('file/child', 'to_file/child', 'fifo/child', 'loop', 'loop/child')
-    },
-    **{
-        ('list_itself', path): 3
-        for path in ('file/child', 'to_file/child', 'fifo/child', 'loop', 'loop/child')
-    },
     **{('push_parents', path): 3 for path in ('loop/child', 'broken/child')},
     **{
         ('make_dir', path): 3

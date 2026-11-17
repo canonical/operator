@@ -5807,6 +5807,31 @@ class TestMockPebbleFileErrors:
         infos = container.list_files('/dir')
         assert [(i.path, i.type) for i in infos] == [('/dir/link', FileType.SYMLINK)]
 
+    def test_list_files_errors(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'file').write_text('x')
+        # A path below a regular file is a 400, not a 404.
+        for itself in (False, True):
+            with pytest.raises(pebble.APIError) as excinfo:
+                container.list_files('/file/child', itself=itself)
+            assert excinfo.value.code == 400
+            assert 'not a directory' in excinfo.value.message
+
+        # A looping symlink, and a path below one, is a 400, not a 404.
+        (fs_root / 'loop').symlink_to('loop')
+        for path in ('/loop', '/loop/child'):
+            with pytest.raises(pebble.APIError) as excinfo:
+                container.list_files(path)
+            assert excinfo.value.code == 400
+            assert 'too many levels of symbolic links' in excinfo.value.message
+
+        # A missing path, and a path below a broken symlink, is a 404.
+        (fs_root / 'broken').symlink_to('missing')
+        for path in ('/missing', '/broken/child'):
+            with pytest.raises(pebble.APIError) as excinfo:
+                container.list_files(path)
+            assert excinfo.value.code == 404
+            assert 'no such file or directory' in excinfo.value.message
+
 
 class TestFilesystem:
     @pytest.fixture

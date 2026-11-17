@@ -3156,6 +3156,11 @@ _FS_ERRNO_REASONS: dict[int, str] = {
 }
 
 
+def _fs_error_reason(error: OSError) -> str:
+    """The reason text that real Pebble's error messages use for an OSError."""
+    return _FS_ERRNO_REASONS.get(error.errno or 0, error.strerror or str(error))
+
+
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:
     """This conforms to the interface for pebble.Client but provides canned data.
@@ -3610,8 +3615,21 @@ class _TestingPebbleClient:
             kind = 'permission-denied'
         else:
             kind = 'generic-file-error'
-        reason = _FS_ERRNO_REASONS.get(error.errno or 0, error.strerror or str(error))
-        return pebble.PathError(kind, f'{op} {path}: {reason}')
+        return pebble.PathError(kind, f'{op} {path}: {_fs_error_reason(error)}')
+
+    def _files_api_error(self, op: str, path: str, error: OSError) -> pebble.APIError:
+        """Translate an OSError to the APIError that real Pebble would return.
+
+        Pebble's daemon reports ENOENT as a 404, permission errors as a 403,
+        and anything else as a 400.
+        """
+        if error.errno == errno.ENOENT:
+            code = 404
+        elif error.errno in (errno.EACCES, errno.EPERM):
+            code = 403
+        else:
+            code = 400
+        return self._api_error(code, f'{op} {path}: {_fs_error_reason(error)}')
 
     def pull(
         self, path: str | pathlib.PurePath, *, encoding: str | None = 'utf-8'
@@ -3708,19 +3726,24 @@ class _TestingPebbleClient:
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
-        if not file_path.exists():
-            raise self._api_error(404, f'stat {path}: no such file or directory')
+        # Real Pebble stats the path (following symlinks) and reports a
+        # missing path as a 404 and anything else (for example a path below a
+        # file, or a looping symlink) as a 400.
+        try:
+            info = file_path.stat()
+        except OSError as e:
+            raise self._files_api_error('stat', path, e) from None
         # The queried path itself is followed and reported as its target's
         # type, but entries within a directory listing are reported
         # unfollowed: a symlink entry stays a symlink, as real Pebble does.
         files = [file_path]
         is_entry_listing = False
-        if not itself:
+        if stat.S_ISDIR(info.st_mode) and not itself:
             try:
-                files = [file_path / file for file in os.listdir(file_path)]
+                files = [file_path / entry for entry in os.listdir(file_path)]
                 is_entry_listing = True
-            except NotADirectoryError:
-                pass
+            except OSError as e:
+                raise self._files_api_error('open', path, e) from None
 
         if pattern is not None:
             files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
