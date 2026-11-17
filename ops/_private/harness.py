@@ -3778,9 +3778,21 @@ class _TestingPebbleClient:
             )
         self._check_absolute_path(path)
         dir_path = self._root / path[1:]
-        if not dir_path.parent.exists() and not make_parents:
-            raise pebble.PathError('not-found', f'mkdir {path}: no such file or directory')
-        if not dir_path.parent.exists() and make_parents:
+        # Real Pebble (osutil.Mkdir) stats the path first: any stat failure
+        # means the path is missing and gets created, an existing directory
+        # is 'file exists' (or a no-op with make_parents), and any other
+        # existing path is 'not a directory'.
+        try:
+            info = dir_path.stat()
+        except OSError:
+            info = None
+        if info is not None:
+            if not stat.S_ISDIR(info.st_mode):
+                raise pebble.PathError('generic-file-error', f'mkdir {path}: not a directory')
+            if make_parents:
+                return
+            raise pebble.PathError('generic-file-error', f'mkdir {path}: file exists')
+        if make_parents and dir_path.parent != dir_path:
             self.make_dir(
                 os.path.dirname(path),
                 make_parents=True,
@@ -3790,17 +3802,22 @@ class _TestingPebbleClient:
                 group_id=group_id,
                 group=group,
             )
+        # Real Pebble creates '<path>.mkdir-new' and renames it into place,
+        # which fails with 'not a directory' when the missing path turns out
+        # to be a symlink (broken or looping). A failed rename leaves the
+        # temporary directory behind, in Pebble as here.
+        temp_path = dir_path.with_name(dir_path.name + '.mkdir-new')
         try:
-            permissions = permissions if permissions else 0o755
-            dir_path.mkdir()
-            os.chmod(dir_path, permissions)
+            temp_path.mkdir()
         except FileExistsError:
-            if not make_parents:
-                raise pebble.PathError(
-                    'generic-file-error', f'mkdir {path}: file exists'
-                ) from None
+            pass
         except OSError as e:
             raise self._path_error('mkdir', path, e) from None
+        os.chmod(temp_path, permissions if permissions is not None else 0o755)
+        try:
+            os.rename(temp_path, dir_path)
+        except OSError as e:
+            raise self._path_error('rename', f'{path}.mkdir-new {path}', e) from None
 
     def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False):
         path = str(path)

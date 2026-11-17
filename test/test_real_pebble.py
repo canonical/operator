@@ -536,20 +536,8 @@ _FS_OPS: dict[str, Callable[[pebble.Client, str], object]] = {
 # xfail into an xpass failure, so the table cannot silently become stale.
 _FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
     # Group 1: the mock succeeds but real Pebble raises an error.
-    **{
-        ('make_dir_parents', path): 1
-        for path in ('file', 'fifo', 'sock', 'to_file', 'to_to_file', 'broken', 'loop')
-    },
     ('pattern', '['): 1,
     ('pattern', 'a\\'): 1,
-    # Group 3: the mock raises a different error type or message than real Pebble.
-    **{('push_parents', path): 3 for path in ('loop/child', 'broken/child')},
-    **{
-        ('make_dir', path): 3
-        for path in ('file', 'fifo', 'sock', 'to_file', 'to_to_file', 'broken', 'loop')
-    },
-    ('make_dir', 'loop/child'): 3,
-    **{('make_dir_parents', path): 3 for path in ('broken/child', 'loop/child')},
     # Group 4: the mock returns a different result than real Pebble.
     **{('list', path): 4 for path in ('fifo', 'sock')},
     **{('list_itself', path): 4 for path in ('fifo', 'sock')},

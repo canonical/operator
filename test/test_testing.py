@@ -5739,6 +5739,51 @@ class TestMockPebbleFileErrors:
         assert excinfo.value.kind == 'not-found'
         assert 'no such file or directory' in excinfo.value.message
 
+    def test_make_dir_existing_paths(self, container: ops.Container, fs_root: pathlib.Path):
+        # An existing directory: 'file exists' without make_parents, a no-op
+        # with it.
+        (fs_root / 'dir').mkdir()
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.make_dir('/dir')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'file exists' in excinfo.value.message
+        container.make_dir('/dir', make_parents=True)
+
+        # An existing non-directory is 'not a directory', with or without
+        # make_parents.
+        (fs_root / 'file').write_text('x')
+        for make_parents in (False, True):
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.make_dir('/file', make_parents=make_parents)
+            assert excinfo.value.kind == 'generic-file-error'
+            assert 'not a directory' in excinfo.value.message
+
+    def test_make_dir_symlinks(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'broken').symlink_to('missing')
+        (fs_root / 'loop').symlink_to('loop')
+
+        # make_parents fails when any existing component is a symlink,
+        # however broken or looping: Pebble creates '<path>.mkdir-new' and
+        # renames it into place, which cannot replace a symlink.
+        for path in ('/broken', '/loop', '/broken/child', '/loop/child'):
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.make_dir(path, make_parents=True)
+            assert excinfo.value.kind == 'generic-file-error'
+            assert 'not a directory' in excinfo.value.message
+
+        # Without make_parents, a symlink in the path reports the errno.
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.make_dir('/loop/child')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'too many levels of symbolic links' in excinfo.value.message
+
+    def test_push_make_dirs_below_symlink(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'broken').symlink_to('missing')
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.push('/broken/child', 'x', make_dirs=True)
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'not a directory' in excinfo.value.message
+
     def test_remove_path_unlinks_symlinks(self, container: ops.Container, fs_root: pathlib.Path):
         (fs_root / 'target').write_text('x')
         (fs_root / 'dir').mkdir()
