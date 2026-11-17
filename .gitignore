@@ -55,3 +55,4 @@ juju-crashdump*.tar.xz
 
 # Workshop
 /.workshop.lock
+.hypothesis/
