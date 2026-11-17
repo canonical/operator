@@ -17,11 +17,11 @@ jobs:
         dir:
           - examples/machine-tinyproxy
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
@@ -29,6 +29,11 @@ jobs:
       - name: Prepare for deploying machine charms
         run: sudo concierge prepare -p machine
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
+      - name: Lock dependencies
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
+        run: |
+          cd ${{ matrix.dir }}
+          if [ ! -f uv.lock ]; then uv lock; fi
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}
@@ -52,11 +57,11 @@ jobs:
           - examples/k8s-4-action
           - examples/k8s-5-observe
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
@@ -70,6 +75,11 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
+      - name: Lock dependencies
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
+        run: |
+          cd ${{ matrix.dir }}
+          if [ ! -f uv.lock ]; then uv lock; fi
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}
