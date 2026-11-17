@@ -5877,6 +5877,31 @@ class TestMockPebbleFileErrors:
             assert excinfo.value.code == 404
             assert 'no such file or directory' in excinfo.value.message
 
+    def test_list_files_file_types(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'file').write_text('x')
+        (fs_root / 'dir').mkdir()
+        (fs_root / 'link').symlink_to('file')
+        os.mkfifo(fs_root / 'fifo')
+        sock = socket.socket(socket.AF_UNIX)
+        sock.bind(str(fs_root / 'sock'))
+        sock.close()
+
+        expected = {
+            '/file': FileType.FILE,
+            '/dir': FileType.DIRECTORY,
+            '/link': FileType.SYMLINK,
+            '/fifo': FileType.NAMED_PIPE,
+            '/sock': FileType.SOCKET,
+        }
+        infos = container.list_files('/')
+        assert {i.path: i.type for i in infos} == expected
+        # The queried path itself is followed: a symlink reports its target's
+        # type.
+        expected['/link'] = FileType.FILE
+        for path, file_type in expected.items():
+            info = container.list_files(path, itself=True)[0]
+            assert info.type == file_type
+
 
 class TestFilesystem:
     @pytest.fixture

@@ -3112,19 +3112,27 @@ class Container:
     def _build_fileinfo(path: str | Path, *, follow_symlinks: bool = False) -> pebble.FileInfo:
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
-        if path.is_symlink() and not follow_symlinks:
-            ftype = pebble.FileType.SYMLINK
-        elif path.is_dir():
-            ftype = pebble.FileType.DIRECTORY
-        elif path.is_file():
+        info = path.stat() if follow_symlinks else path.lstat()
+        # The same classification as Pebble's fileModeToType.
+        mode = info.st_mode
+        if stat.S_ISREG(mode):
             ftype = pebble.FileType.FILE
+        elif stat.S_ISDIR(mode):
+            ftype = pebble.FileType.DIRECTORY
+        elif stat.S_ISLNK(mode):
+            ftype = pebble.FileType.SYMLINK
+        elif stat.S_ISSOCK(mode):
+            ftype = pebble.FileType.SOCKET
+        elif stat.S_ISFIFO(mode):
+            ftype = pebble.FileType.NAMED_PIPE
+        elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+            ftype = pebble.FileType.DEVICE
         else:
             ftype = pebble.FileType.UNKNOWN
 
         import grp
         import pwd
 
-        info = path.stat() if follow_symlinks else path.lstat()
         try:
             pw_name = pwd.getpwuid(info.st_uid).pw_name
         except KeyError:

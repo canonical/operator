@@ -539,8 +539,6 @@ _FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
     ('pattern', '['): 1,
     ('pattern', 'a\\'): 1,
     # Group 4: the mock returns a different result than real Pebble.
-    **{('list', path): 4 for path in ('fifo', 'sock')},
-    **{('list_itself', path): 4 for path in ('fifo', 'sock')},
     ('pattern', ''): 4,
     ('pattern', '[!a].txt'): 4,
     ('pattern', '[^a].txt'): 4,
