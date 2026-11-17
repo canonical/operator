@@ -564,12 +564,16 @@ _FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
         ('pull', path): 3
         for path in ('file/child', 'to_file/child', 'fifo/child', 'loop', 'loop/child', 'sock')
     },
-    **{('push', path): 3 for path in ('dir', 'empty', 'loop/child')},
+    **{
+        ('push', path): 3
+        for path in ('dir', 'empty', 'loop/child', 'missing/child', 'broken/child')
+    },
     **{('push_parents', path): 3 for path in ('dir', 'empty', 'loop/child', 'broken/child')},
     **{
         ('make_dir', path): 3
         for path in ('file', 'fifo', 'sock', 'to_file', 'to_to_file', 'broken', 'loop')
     },
+    **{('make_dir', path): 3 for path in ('missing/child', 'broken/child')},
     ('make_dir', 'loop/child'): 3,
     **{('make_dir_parents', path): 3 for path in ('broken/child', 'loop/child')},
     # Group 4: the mock returns a different result than real Pebble.
@@ -584,19 +588,19 @@ _FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
 _FS_XFAIL_REASONS = {
     1: 'group 1: the mock succeeds but real Pebble raises an error',
     2: 'group 2: the mock raises an error but real Pebble succeeds',
-    3: 'group 3: the mock raises a different error type than real Pebble',
+    3: 'group 3: the mock raises a different error type or message than real Pebble',
     4: 'group 4: the mock returns a different result than real Pebble',
 }
 
 # Phrases in error messages that charms and libraries match on (for example,
-# charmlibs-pathops matches 'not a directory'). 'no such file or directory'
-# is deliberately absent: for missing paths both sides already agree on the
-# not-found kind or 404 code, and the mock words missing-parent errors as
-# 'parent directory not found', which no caller matches on.
+# charmlibs-pathops matches 'not a directory'). The mock must word its errors
+# like Pebble does ('<op> <path>: <reason>'), so the comparison covers the
+# whole set of these phrases found in each message.
 _FS_KEY_PHRASES = (
     'not a directory',
     'too many levels of symbolic links',
     'file exists',
+    'no such file or directory',
     'syntax error in pattern',
     'can only read a regular file',
 )
@@ -640,9 +644,8 @@ def _outcome(
     except pebble.PathError as error:
         return ('PathError', error.kind, _key_phrases(error.message))
     except Exception as error:
-        # The testing client currently lets some OSErrors escape instead of
-        # translating them to PathError, so the bare class name is part of
-        # the comparison.
+        # Errors outside Pebble's API (for example an OSError that the
+        # testing client did not translate) are compared by class name.
         return (type(error).__name__, None, _key_phrases(str(error)))
     if isinstance(value, list):
         file_infos = cast('list[pebble.FileInfo]', value)
@@ -667,7 +670,8 @@ def _case_param(name: str, run: _CaseRun, key: tuple[str, str]):
     if group is None:
         return pytest.param(run, id=name)
     reason = _FS_XFAIL_REASONS[group]
-    return pytest.param(run, marks=pytest.mark.xfail(strict=True, reason=reason), id=name)
+    mark = pytest.mark.xfail(strict=True, raises=AssertionError, reason=reason)
+    return pytest.param(run, marks=mark, id=name)
 
 
 def _path_case_runs():
