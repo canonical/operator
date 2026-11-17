@@ -27,6 +27,9 @@ makes sure the charm's copies can't shadow it.
 Charms that use an extension, such as ``flask-framework``, aren't supported:
 the extension adds parts that aren't in ``charmcraft.yaml``. Nor are charms
 with more than one part that installs Python dependencies.
+
+A part's override scripts, such as ``override-build``, aren't run, so
+anything they install is missing from the environment.
 """
 
 from __future__ import annotations
@@ -43,23 +46,23 @@ from typing import Any, cast
 
 import yaml
 
-#: The build plugins that dependencies can be found for.
+# The build plugins that dependencies can be found for.
 _SUPPORTED_PLUGINS = ('python', 'uv')
-#: Plugins that are charmcraft's, but that dependencies can't be found for.
+# Plugins that are charmcraft's, but that dependencies can't be found for.
 _UNSUPPORTED_PLUGINS = ('poetry', 'reactive')
-#: Plugins that don't install Python dependencies, so are skipped when looking
-#: for the part that does: craft-parts' built-in plugins, apart from the Python
-#: ones above. A part using any other plugin might install Python dependencies,
-#: so the charm is refused rather than given an environment that could be
-#: missing some.
+# Plugins that don't install Python dependencies, so are skipped when looking
+# for the part that does: craft-parts' built-in plugins, apart from the Python
+# ones above and the ones charmcraft unregisters (colcon and ruby). A part using
+# any other plugin might install Python dependencies, so the charm is refused
+# rather than given an environment that could be missing some.
 _OTHER_PLUGINS = (
     'ant', 'autotools', 'bazel', 'cargo-use', 'cmake', 'dotnet', 'dump', 'go', 'go-use',
     'gradle', 'gradle-use', 'jlink', 'make', 'maven', 'maven-use', 'meson', 'nil', 'npm',
-    'npm-use', 'qmake', 'ruby', 'rust', 'scons',
+    'npm-use', 'qmake', 'rust', 'scons',
 )  # fmt: skip
 
-#: The charm's environment never has these installed: the test's own are used.
-#: ops-tracing pins an exact ops version, so it has to match the test's ops too.
+# The charm's environment never has these installed: the test's own are used.
+# ops-tracing pins an exact ops version, so it has to match the test's ops too.
 _OPS_DISTRIBUTIONS = ('ops', 'ops-scenario', 'ops-tracing')
 
 _URL_CREDENTIALS = re.compile(
@@ -85,8 +88,8 @@ class _Requirements:
     check: bool = False
     """Whether to run ``pip check`` after installing, as charmcraft's python plugin does.
 
-    The uv plugin's export leaves out ``ops``, so a locked package that
-    depends on it would fail the check.
+    It isn't run for the uv plugin: our ``uv export`` leaves out ``ops``,
+    and a locked package that depends on it would fail the check.
     """
 
 
@@ -95,9 +98,9 @@ def install_charm_requirements(charm_root: pathlib.Path, python: pathlib.Path) -
 
     The list of dependencies is complete, as it is for charmcraft, so they
     are installed without resolving dependencies. The charm's own ``ops``,
-    ``ops-scenario`` and ``ops-tracing`` are then removed. The uv plugin's
-    export already leaves them out, but removing them whatever the plugin
-    keeps that true without relying on it.
+    ``ops-scenario`` and ``ops-tracing`` are then removed. (Our ``uv export``
+    never includes them, but a python-plugin charm's requirements file
+    usually lists ``ops``, and can list the others.)
 
     Raises:
         _RequirementsError: if the charm's dependencies can't be found (see
@@ -122,8 +125,9 @@ def install_charm_requirements(charm_root: pathlib.Path, python: pathlib.Path) -
 def _prefix(python: pathlib.Path) -> pathlib.Path:
     """The environment that ``python`` runs in.
 
-    A virtual environment's interpreter is usually a symlink to the base one,
-    so the interpreter's own path doesn't say which environment it is.
+    This runs ``python`` to get its ``sys.prefix``. The interpreter's path
+    isn't enough: a virtual environment's interpreter is usually a symlink
+    to the base one, so resolving the path finds the base installation.
     """
     cmd = [str(python), '-c', 'import sys; print(sys.prefix)']
     result = subprocess.run(cmd, capture_output=True, text=True)
