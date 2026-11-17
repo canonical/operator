@@ -3741,6 +3741,36 @@ class _TestingPebbleClient:
         except OSError:
             pass
 
+    def _is_mount_point(self, file_path: pathlib.Path) -> bool:
+        """Whether the path is a mock mount point.
+
+        Harness storage mounts and Scenario mounts are symlinks in the
+        container root whose targets are outside it; they model real mount
+        points. Charms cannot create symlinks through the Pebble API, so only
+        test setup makes these.
+        """
+        if not file_path.is_symlink():
+            return False
+        try:
+            return not file_path.resolve().is_relative_to(self._root.resolve())
+        except (OSError, RuntimeError):
+            # Unresolvable (for example a symlink loop): not a mount point.
+            return False
+
+    @staticmethod
+    def _write_source_to(dest: pathlib.Path, source: ReadableBuffer, encoding: str | None) -> None:
+        if isinstance(source, str):
+            dest.write_text(source, encoding=encoding)
+        elif isinstance(source, bytes):
+            dest.write_bytes(source)
+        else:
+            # If source is binary, open file in binary mode and ignore encoding param
+            is_binary = isinstance(source.read(0), bytes)
+            open_mode = 'wb' if is_binary else 'w'
+            open_encoding = None if is_binary else encoding
+            with dest.open(open_mode, encoding=open_encoding) as f:
+                shutil.copyfileobj(cast('IOBase', source), cast('IOBase', f))
+
     @staticmethod
     def _path_error(op: str, path: str, error: OSError) -> pebble.PathError:
         """Translate an OSError to the PathError that real Pebble would return.
@@ -3830,22 +3860,26 @@ class _TestingPebbleClient:
                 # Real Pebble reports make_dirs failures with this prefix.
                 raise pebble.PathError(e.kind, f'cannot create directory: {e.message}') from None
         permissions = permissions if permissions is not None else 0o644
+        if self._is_mount_point(file_path):
+            # A mount point models a real mount: pushing writes the content
+            # through to the mounted file, keeping its identity, rather than
+            # replacing the path with a new file.
+            if file_path.is_dir():
+                raise pebble.PathError(
+                    'generic-file-error', f'rename {path}.~ {path}: file exists'
+                )
+            try:
+                self._write_source_to(file_path, source, encoding)
+                os.chmod(file_path, permissions)
+            except OSError as e:
+                raise self._path_error('open', path, e) from None
+            return
         # Real Pebble writes the content to a temporary sibling file and
         # renames it over the target, so pushing replaces symlinks and other
         # non-directories, and only fails if the target is a directory.
         temp_path = file_path.with_name(file_path.name + '.~')
         try:
-            if isinstance(source, str):
-                temp_path.write_text(source, encoding=encoding)
-            elif isinstance(source, bytes):
-                temp_path.write_bytes(source)
-            else:
-                # If source is binary, open file in binary mode and ignore encoding param
-                is_binary = isinstance(source.read(0), bytes)
-                open_mode = 'wb' if is_binary else 'w'
-                open_encoding = None if is_binary else encoding
-                with temp_path.open(open_mode, encoding=open_encoding) as f:
-                    shutil.copyfileobj(cast('IOBase', source), cast('IOBase', f))
+            self._write_source_to(temp_path, source, encoding)
             os.chmod(temp_path, permissions)
         except OSError as e:
             self._remove_quietly(temp_path)
@@ -3898,8 +3932,13 @@ class _TestingPebbleClient:
                     filtered.append(file)
             files = filtered
 
+        # A mount point appears as its target's type, like a real mount
+        # point; any other symlink entry stays a symlink.
         file_infos = [
-            Container._build_fileinfo(file, follow_symlinks=not is_entry_listing) for file in files
+            Container._build_fileinfo(
+                file, follow_symlinks=not is_entry_listing or self._is_mount_point(file)
+            )
+            for file in files
         ]
         for file_info in file_infos:
             rel_path = os.path.relpath(file_info.path, start=self._root)
@@ -3988,16 +4027,25 @@ class _TestingPebbleClient:
             ) from None
         except OSError as e:
             raise self._path_error('remove', path, e) from None
+        if self._is_mount_point(file_path):
+            # A mount point cannot be removed, like a real mount point.
+            raise pebble.PathError('generic-file-error', f'remove {path}: device or resource busy')
         if stat.S_ISDIR(info.st_mode):
             if recursive:
-                shutil.rmtree(file_path)
+                try:
+                    shutil.rmtree(file_path)
+                except OSError as e:
+                    raise self._path_error('remove', path, e) from None
             else:
                 try:
                     file_path.rmdir()
                 except OSError as e:
                     raise self._path_error('remove', path, e) from None
         else:
-            file_path.unlink()
+            try:
+                file_path.unlink()
+            except OSError as e:
+                raise self._path_error('remove', path, e) from None
 
     def _find_exec_handler(self, command: list[str]) -> ExecHandler | None:
         for prefix_len in reversed(range(len(command) + 1)):

@@ -6086,6 +6086,44 @@ class TestFilesystem:
         assert root_info.path == '/'
         assert root_info.name == '/'
 
+    def test_storage_mount_point_behaviour(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+        container: ops.Container,
+        container_fs_root: pathlib.Path,
+    ):
+        harness.add_storage('test-storage', 1, attach=True)
+        mount = container_fs_root / 'mounts/foo'
+        # The mock implements the mount as a symlink out of the container
+        # root, but it models a real mount point.
+        assert mount.is_symlink()
+        store_dir = pathlib.Path(str(harness.model.storages['test-storage'][0].location))
+
+        # Pushing inside the mounted directory writes through to the storage.
+        container.push('/mounts/foo/bar', 'bar')
+        assert (store_dir / 'bar').read_text() == 'bar'
+
+        # The mount point itself cannot be removed, like a real mount point.
+        for recursive in (False, True):
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.remove_path('/mounts/foo', recursive=recursive)
+            assert excinfo.value.kind == 'generic-file-error'
+            assert 'device or resource busy' in excinfo.value.message
+        assert mount.is_symlink()
+
+        # Pushing onto a mounted directory fails like pushing onto a
+        # directory does.
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.push('/mounts/foo', 'x')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'file exists' in excinfo.value.message
+
+        # A mount point is listed as its target's type, not as a symlink.
+        infos = container.list_files('/mounts')
+        assert [(info.name, info.type) for info in infos] == [('foo', FileType.DIRECTORY)]
+        info = container.list_files('/mounts/foo', itself=True)[0]
+        assert info.type == FileType.DIRECTORY
+
     def test_storage_mount(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
