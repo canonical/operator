@@ -49,8 +49,12 @@ TREE = {
         '[project]\nname = "ops"\ndependencies = [\n'
         '    "ops-scenario==8.8.2",\n    "ops-tracing==3.8.2",\n]\n'
     ),
+    'testing/src/scenario/_version.py': (
+        '"""Package version."""\n\nfrom __future__ import annotations\n\n'
+        "version: str = '8.8.2'\n"
+    ),
     'testing/pyproject.toml': (
-        '[project]\nname = "ops-scenario"\nversion = "8.8.2"\ndependencies = [\n'
+        '[project]\nname = "ops-scenario"\ndynamic = ["version"]\ndependencies = [\n'
         '    "ops==3.8.2",\n]\n'
     ),
     'tracing/pyproject.toml': (
@@ -91,17 +95,19 @@ class TestPostRelease:
     """update-release-versions.py in its post-release shape."""
 
     def test_it_writes_every_version_file_and_leaves_the_doc(self, tree: pathlib.Path):
-        """The four files it rewrites, and the one it does not."""
+        """The five files it rewrites, and the one it does not."""
         assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 0
 
         assert "version: str = '3.9.0.dev0'" in (tree / 'ops/version.py').read_text()
+        scenario = (tree / 'testing/src/scenario/_version.py').read_text()
+        assert "version: str = '8.9.0.dev0'" in scenario
 
         root = (tree / 'pyproject.toml').read_text()
         assert 'ops-scenario==8.9.0.dev0' in root
         assert 'ops-tracing==3.9.0.dev0' in root
 
         testing = (tree / 'testing/pyproject.toml').read_text()
-        assert 'version = "8.9.0.dev0"' in testing
+        assert 'dynamic = ["version"]' in testing
         assert 'ops==3.9.0.dev0' in testing
 
         tracing = (tree / 'tracing/pyproject.toml').read_text()
@@ -115,10 +121,12 @@ class TestPostRelease:
         )
 
     def test_the_maintenance_shape(self, lts_tree: pathlib.Path):
-        """The LTS branch's patch bump, over the same four files."""
+        """The LTS branch's patch bump, over the same five files."""
         assert update.main(['--version', '2.23.6.dev0', '--post-release']) == 0
         assert "version: str = '2.23.6.dev0'" in (lts_tree / 'ops/version.py').read_text()
-        assert 'version = "7.23.6.dev0"' in (lts_tree / 'testing/pyproject.toml').read_text()
+        scenario = (lts_tree / 'testing/src/scenario/_version.py').read_text()
+        assert "version: str = '7.23.6.dev0'" in scenario
+        assert 'ops==2.23.6.dev0' in (lts_tree / 'testing/pyproject.toml').read_text()
         assert (lts_tree / 'docs/explanation/versions.md').read_text() == (
             TREE['docs/explanation/versions.md']
         )
@@ -151,9 +159,10 @@ class TestPostRelease:
             for path, content in before.items()
             if path.read_text() != content
         }
-        # uv.lock is the fifth, and the workflow writes it in its own step.
+        # uv.lock is the sixth, and the workflow writes it in its own step.
         assert changed == {
             'ops/version.py',
+            'testing/src/scenario/_version.py',
             'pyproject.toml',
             'testing/pyproject.toml',
             'tracing/pyproject.toml',

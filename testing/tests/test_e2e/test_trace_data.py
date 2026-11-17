@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import pytest
 from scenario import Context, State
 
 import ops
+
+pytest.importorskip('ops_tracing')
 
 META = {
     'name': 'traced_charm',

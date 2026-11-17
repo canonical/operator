@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import pathlib
 from collections.abc import Generator
 from typing import Any
 
@@ -19,8 +20,8 @@ def secrets_context(secrets_charm_meta: dict[str, Any]):
 
 
 @pytest.fixture
-def secrets_charm_meta(pytestconfig: pytest.Config) -> Generator[dict[str, Any]]:
+def secrets_charm_meta() -> Generator[dict[str, Any]]:
     """Metadata for the secret test charm."""
-    return yaml.safe_load(
-        (pytestconfig.rootpath / 'test/charms/test_secrets/charmcraft.yaml').read_text()
-    )
+    # The repository root, so the path doesn't depend on pytest's rootdir.
+    root = pathlib.Path(__file__).parents[3]
+    return yaml.safe_load((root / 'test/charms/test_secrets/charmcraft.yaml').read_text())
