@@ -102,7 +102,8 @@ This API for testing was previously called 'Scenario'.
 .. autoclass:: ops.testing.DeferredEvent
 .. autoclass:: ops.testing.ErrorStatus
 .. The empty parentheses give Event an empty signature, so that the docs don't
-   advertise its constructor, which isn't public: get an Event from ctx.on.
+   advertise its constructor, which isn't public.
+   Charm tests should get Events from ctx.on.
 .. autoclass:: ops.testing.Event()
 .. autoclass:: ops.testing.Exec
 .. autoclass:: ops.testing.ICMPPort
