@@ -14,6 +14,7 @@ from scenario import Context
 from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
 
 import ops
+import ops.testing
 from ops import CharmBase, Framework, pebble
 from ops.log import _get_juju_log_and_app_id
 
@@ -157,6 +158,41 @@ def test_fs_pull(tmp_path: pathlib.Path, make_dirs: bool):
         # nothing has changed
         out_purged = dataclasses.replace(out, stored_states=state.stored_states)
         assert not state_delta(out_purged, state)
+
+
+def test_fs_errors_match_real_pebble(tmp_path: pathlib.Path):
+    # _MockPebbleClient inherits the filesystem behaviour of
+    # _TestingPebbleClient, which mirrors real Pebble: a path below a
+    # regular file raises a PathError rather than a raw OSError, and
+    # removing a symlink unlinks it instead of failing or following it.
+    (tmp_path / 'child').mkdir()
+
+    def callback(self: ops.CharmBase):
+        container = self.unit.get_container('foo')
+        container.push('/file', 'x')
+
+        with pytest.raises(ops.pebble.PathError) as excinfo:
+            container.pull('/file/child')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'not a directory' in excinfo.value.message
+
+        # Mounts are symlinks into the scenario tmp dir.
+        container.remove_path('/link')
+        assert not container.exists('/link')
+        assert (tmp_path / 'child').is_dir()
+
+    container = ops.testing.Container(
+        name='foo',
+        can_connect=True,
+        mounts={'link': ops.testing.Mount(location='/link', source=tmp_path)},
+    )
+    ctx = ops.testing.Context(
+        charm_type=Charm,
+        meta={'name': 'foo', 'containers': {'foo': {}}},
+    )
+    with ctx(ctx.on.start(), state=ops.testing.State(containers={container})) as mgr:
+        mgr.run()
+        callback(mgr.charm)
 
 
 LS = """
