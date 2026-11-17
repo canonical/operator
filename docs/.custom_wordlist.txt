@@ -8,6 +8,7 @@ callables
 Canonical's
 Charmlibs
 configurator
+cooldown
 cosl
 databag
 databags
@@ -25,12 +26,14 @@ liveness
 manpages
 misconfiguration
 mitigations
+OAuth
 pathops
 Parca
 protobuf
 pydantic
 pytest
 README
+Renovate's
 reinstantiate
 replan
 repo
@@ -51,6 +54,7 @@ uniter
 untyped
 unpatched
 uv
+Valkey
 VM
 websockets
 Wordpress

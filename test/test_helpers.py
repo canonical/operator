@@ -93,7 +93,7 @@ def create_framework(request: pytest.FixtureRequest, *, meta: ops.CharmMeta | No
 
     # Relations events are defined dynamically and modify the class attributes.
     # We use a subclass temporarily to prevent these side effects from leaking.
-    ops.CharmBase.on = TestCharmEvents()  # type: ignore
+    ops.CharmBase.on = TestCharmEvents()
 
     if meta is None:
         meta = ops.CharmMeta()
@@ -111,7 +111,7 @@ def create_framework(request: pytest.FixtureRequest, *, meta: ops.CharmMeta | No
         os.environ.clear()
         os.environ.update(env_backup)
         shutil.rmtree(tmpdir)
-        ops.CharmBase.on = ops.CharmEvents()  # type: ignore
+        ops.CharmBase.on = ops.CharmEvents()
         framework.close()
 
     request.addfinalizer(finalizer)

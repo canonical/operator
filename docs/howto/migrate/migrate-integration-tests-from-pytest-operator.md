@@ -113,7 +113,7 @@ commands =
 
 The `pytest-jubilant` plugin provides a module-scoped `juju` fixture that creates a temporary model, destroys it after the tests, and dumps debug logs on failure. It also provides CLI options such as `--no-juju-teardown` (to keep models) and `--juju-model` (to set a custom model name prefix).
 
-`pytest-jubilant` expects that a Juju controller has already been set up, either using [Concierge](https://github.com/canonical/concierge) or a manual approach. The plugin automatically creates a temporary model per test module and tears it down afterward.
+`pytest-jubilant` expects that a Juju controller has already been set up, either using {external+concierge:doc}`Concierge <index>` or a manual approach. The plugin automatically creates a temporary model per test module and tears it down afterward.
 
 In your tests, use the fixture like this:
 
