@@ -47,9 +47,9 @@ env:
   # release should be reproducible, and these decide what the changelog and
   # the drafted notes say.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@61b97db7d2b1e985b0e2bf9150cb5a69a5650591#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@3448471e74d1c99aa9e0425c198c1afba3a17350#subdirectory=changelog
   DRAFT_RELEASE_NOTES: >-
-    git+https://github.com/canonical/charm-tech-code@61b97db7d2b1e985b0e2bf9150cb5a69a5650591#subdirectory=draft-release-notes
+    git+https://github.com/canonical/charm-tech-code@3448471e74d1c99aa9e0425c198c1afba3a17350#subdirectory=draft-release-notes
 
 jobs:
   propose:
@@ -60,13 +60,13 @@ jobs:
       contents: write  # To push the release-prep branch.
       pull-requests: write  # To open the pull request.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ inputs.branch }}
           fetch-depth: 0  # The whole history and its tags: the release is counted from the tag.
           persist-credentials: false
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # This workflow's own .github/release/, beside the branch being
           # released: the version script, the release-note exemplars and
@@ -77,7 +77,7 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           enable-cache: false
 
@@ -115,6 +115,7 @@ jobs:
         env:
           VERSION: ${{ steps.propose.outputs.version }}
           PREVIOUS: ${{ steps.propose.outputs.previous }}
+          NEWEST: ${{ steps.propose.outputs.newest }}
           BRANCH: ${{ inputs.branch }}
           # The model is a repository variable rather than something pinned
           # here, so that changing it is a settings edit and not a pull
@@ -124,6 +125,11 @@ jobs:
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
         run: |
           set -euo pipefail
+          # The commit messages are the pull request descriptions, which say
+          # what a change means rather than only what it is, and name the docs
+          # pages it changed so the notes can link them.
+          git log --reverse --no-merges --name-only --format='%x1e%s%x1f%b%x1f' \
+            "$PREVIOUS..HEAD" > "$RUNNER_TEMP/commits.txt"
           uvx --from "$DRAFT_RELEASE_NOTES" draft-release-notes \
             --repo "$GITHUB_REPOSITORY" \
             --version "$VERSION" \
@@ -132,6 +138,9 @@ jobs:
             --changelog "$RUNNER_TEMP/changes-entry.md" \
             --exemplars release-tools/.github/release/release-note-exemplars.md \
             --compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS...$VERSION" \
+            --commits "$RUNNER_TEMP/commits.txt" \
+            --docs-url https://canonical.com/juju/docs/ops/latest \
+            --newest-release "$NEWEST" \
             --output "$RUNNER_TEMP/release-notes.md" \
             --title-output "$RUNNER_TEMP/release-title.md"
 
@@ -155,6 +164,15 @@ jobs:
           notes = (temp / 'release-notes.md').read_text()
           changes_entry = (temp / 'changes-entry.md').read_text()
           template = pathlib.Path('release-tools/.github/release/release-pr-body.md').read_text()
+          # GitHub ticks "Set as the latest release" on every draft, whatever
+          # it was created with, so the person publishing has to untick it.
+          if branch == 'main':
+              latest_advice = 'Leave "Set as the latest release" ticked.'
+          else:
+              latest_advice = (
+                  'Untick "Set as the latest release" first: GitHub ticks it on every draft,'
+                  f' and a release from `{branch}` is not the latest.'
+              )
           body = string.Template(template).substitute(
               version=version,
               branch=branch,
@@ -162,6 +180,7 @@ jobs:
               repo_url=repo_url,
               title=title,
               notes=notes,
+              latest_advice=latest_advice,
           )
           (temp / 'pr-body.md').write_text(body)
 
@@ -204,9 +223,17 @@ jobs:
           git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY" \
             "HEAD:refs/heads/$head_branch"
 
-          url=$(gh pr create --repo "$GITHUB_REPOSITORY" \
+          # A draft, so that whoever ran this can resolve the Unsure notes and
+          # tidy the title and notes before asking anyone else to look.
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" --draft \
             --base "$BRANCH" --head "$head_branch" \
             --title "chore: update changelog and versions for $VERSION release" \
             --body-file "$RUNNER_TEMP/pr-body.md")
+          # The next steps name this pull request's number, since it is the
+          # input to the next workflow, and the number only exists now.
+          number=${url##*/}
+          sed "s/@PR_NUMBER@/$number/g" "$RUNNER_TEMP/pr-body.md" > "$RUNNER_TEMP/pr-body-numbered.md"
+          gh pr edit "$url" --body-file "$RUNNER_TEMP/pr-body-numbered.md" \
+            || echo "::warning::Couldn't put $number into the next steps; use this pull request's own number."
           echo "Opened $url"
           printf '\n### Pull request\n\n%s\n' "$url" >> "$GITHUB_STEP_SUMMARY"

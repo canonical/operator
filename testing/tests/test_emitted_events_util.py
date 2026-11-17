@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from scenario import Context, State
-from scenario.state import _Event
+from scenario.state import Event
 
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, Framework, PreCommitEvent
@@ -62,7 +62,7 @@ def test_capture_juju_evt():
 
 def test_capture_deferred_evt():
     ctx = Context(MyCharm, meta=dict(MyCharm.META), capture_deferred_events=True)
-    deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
+    deferred = [Event('foo').deferred(handler=MyCharm._on_foo)]
     ctx.run(ctx.on.start(), State(deferred=deferred))
 
     emitted = ctx.emitted_events
@@ -74,7 +74,7 @@ def test_capture_deferred_evt():
 
 def test_capture_no_deferred_evt():
     ctx = Context(MyCharm, meta=dict(MyCharm.META))
-    deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
+    deferred = [Event('foo').deferred(handler=MyCharm._on_foo)]
     ctx.run(ctx.on.start(), State(deferred=deferred))
 
     emitted = ctx.emitted_events

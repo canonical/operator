@@ -35,7 +35,7 @@ permissions: {}
 env:
   # The team's release tools, pinned to a commit rather than a branch.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@61b97db7d2b1e985b0e2bf9150cb5a69a5650591#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@3448471e74d1c99aa9e0425c198c1afba3a17350#subdirectory=changelog
 
 # One run per pull request at a time. Drafts don't reserve their tag name, so
 # two runs of this could each create a draft for the same release.
@@ -86,7 +86,7 @@ jobs:
             echo "target=$target"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # The squash commit the merge made, which is the release. Its parent
           # is the branch before the merge, which is what the version is
@@ -95,7 +95,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           enable-cache: false
 
@@ -141,7 +141,7 @@ jobs:
           if previous=$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' HEAD); then
             compare=(--compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$previous...$VERSION")
           else
-            echo "::warning::No earlier release tag to compare $VERSION with; the body has no Full Changelog link."
+            echo "::warning::No earlier release tag to compare $VERSION with; the body has no "All commits" link."
           fi
           uvx --from "$CHANGELOG" changelog release-body --version "$VERSION" --changes CHANGES.md \
             "${compare[@]}" < "$RUNNER_TEMP/pr-description.md" > "$RUNNER_TEMP/release-body.md"
@@ -195,6 +195,7 @@ jobs:
           TITLE: ${{ steps.assemble.outputs.title }}
           NUMBER: ${{ inputs.pr }}
           URL: ${{ steps.release.outputs.url }}
+          BRANCH: ${{ steps.pr.outputs.branch }}
         shell: python
         run: |
           import os
@@ -207,6 +208,15 @@ jobs:
               f' Nothing is published and the `{version}` tag does not exist yet:'
               ' publishing the draft is a human step, and it is what creates the tag.'
           )
+          # GitHub ticks "Set as the latest release" on every draft, and
+          # ignores what the draft was created with, so this is a reminder
+          # rather than something the draft can carry.
+          if os.environ['BRANCH'] != 'main':
+              explanation += (
+                  '\n\n**Untick "Set as the latest release" before publishing.** This is a'
+                  f" release from `{os.environ['BRANCH']}`, and GitHub ticks the box on every"
+                  ' draft. If it is missed, mark the newest release as the latest again by hand.'
+              )
           summary = f"""\
           ## Draft release: {os.environ['TITLE']}
 
@@ -237,7 +247,7 @@ jobs:
       contents: write  # To push the post-release branch.
       pull-requests: write  # To open the pull request.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # The tip of the release branch rather than the release commit: the
           # branch may have moved on since, and the bump belongs on top of
@@ -245,7 +255,7 @@ jobs:
           ref: ${{ needs.draft.outputs.branch }}
           persist-credentials: false
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # The version script, from the default branch, which is where this
           # workflow runs from. A maintenance branch doesn't have to carry it.
@@ -255,7 +265,7 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           enable-cache: false
 

@@ -220,6 +220,16 @@ class Model:
         """The version of Juju that is running the model."""
         return self._backend._juju_context.version
 
+    @property
+    def proxy_config(self) -> ProxyConfig:
+        """The model's proxy configuration as found in the Juju model config."""
+        context = self._backend._juju_context
+        return ProxyConfig(
+            http=context.http_proxy,
+            https=context.https_proxy,
+            no=context.no_proxy,
+        )
+
     def get_unit(self, unit_name: str) -> Unit:
         """Get a unit by name.
 
@@ -2562,8 +2572,9 @@ class MultiPushPullError(Exception):
     errors: list[tuple[str, Exception]]
     """The list of errors.
 
-    Each error is represented by a tuple of (<source_path>, <exception>),
-    where source_path is the path being pushed to or pulled from.
+    Each error is represented by a tuple of (<path>, <exception>). The path is
+    the file that failed to copy, or the source path given to the method if
+    listing it failed.
     """
 
     def __init__(self, message: str, errors: list[tuple[str, Exception]]):
@@ -2913,10 +2924,12 @@ class Container:
     ):
         """Recursively push a local path or files to the remote system.
 
-        Only regular files and directories are copied; symbolic links, device files, etc. are
-        skipped.  Pushing is attempted to completion even if errors occur during the process.  All
-        errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single :class:`MultiPushPullError` is raised containing details for each error.
+        Regular files, directories, and symbolic links to files are copied. Symbolic links to
+        directories found within a directory, dangling links, device files, etc. are skipped.
+        A dangling link named in ``source_path`` is an error.  Pushing is attempted to completion
+        even if errors occur during the process.  All errors are collected incrementally. After
+        copying has completed, if any errors occurred, a single :class:`MultiPushPullError` is
+        raised containing details for each error.
 
         Assuming the following files exist locally:
 
@@ -2965,31 +2978,52 @@ class Container:
         dest_dir = Path(dest_dir)
 
         def local_list(source_path: Path) -> list[pebble.FileInfo]:
-            paths = source_path.iterdir() if source_path.is_dir() else [source_path]
-            files = [self._build_fileinfo(f) for f in paths]
-            return files
+            if source_path.is_dir():
+                # is_file() follows links, so this is only false for a link to a directory or a
+                # dangling link, which are skipped.
+                return [
+                    self._build_fileinfo(f, follow_symlinks=f.is_file())
+                    for f in source_path.iterdir()
+                ]
+            # Only a path the caller named gets here, so always follow it if it's a link.
+            return [self._build_fileinfo(source_path, follow_symlinks=True)]
 
         errors: list[tuple[str, Exception]] = []
         for source_path in source_paths:
+            skipped_links = 0
             try:
                 for info in Container._list_recursive(local_list, source_path):
-                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
-                    if info.type is pebble.FileType.DIRECTORY:
-                        self.make_dir(dstpath, make_parents=True)
+                    if info.type is pebble.FileType.SYMLINK:
+                        logger.debug('skipped symlink in Container.push_path: %s', info.path)
+                        skipped_links += 1
                         continue
-                    with open(info.path, 'rb') as src:
-                        self.push(
-                            dstpath,
-                            src,
-                            make_dirs=True,
-                            permissions=info.permissions,
-                            user_id=info.user_id,
-                            user=info.user,
-                            group_id=info.group_id,
-                            group=info.group,
-                        )
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    # Carry on with the rest of the tree if one file fails.
+                    try:
+                        if info.type is pebble.FileType.DIRECTORY:
+                            self.make_dir(dstpath, make_parents=True)
+                            continue
+                        with open(info.path, 'rb') as src:
+                            self.push(
+                                dstpath,
+                                src,
+                                make_dirs=True,
+                                permissions=info.permissions,
+                                user_id=info.user_id,
+                                user=info.user,
+                                group_id=info.group_id,
+                                group=info.group,
+                            )
+                    except (OSError, pebble.Error) as err:
+                        errors.append((info.path, err))
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
+            if skipped_links:
+                logger.info(
+                    'Container.push_path skipped %d symbolic link(s) under %s',
+                    skipped_links,
+                    source_path,
+                )
         if errors:
             raise MultiPushPullError('failed to push one or more files', errors)
 
@@ -3000,10 +3034,11 @@ class Container:
     ):
         """Recursively pull a remote path or files to the local system.
 
-        Only regular files and directories are copied; symbolic links, device files, etc. are
-        skipped.  Pulling is attempted to completion even if errors occur during the process.  All
-        errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single :class:`MultiPushPullError` is raised containing details for each error.
+        Regular files and directories are copied, and symbolic links are followed. Device files,
+        etc. are skipped.  Pulling is attempted to completion even if errors occur during the
+        process.  All errors are collected incrementally. After copying has completed, if any
+        errors occurred, a single :class:`MultiPushPullError` is raised containing details for each
+        error.
 
         Assuming the following files exist remotely:
 
@@ -3057,23 +3092,27 @@ class Container:
             try:
                 for info in Container._list_recursive(self.list_files, source_path):
                     dstpath = self._build_destpath(info.path, source_path, dest_dir)
-                    if info.type is pebble.FileType.DIRECTORY:
-                        dstpath.mkdir(parents=True, exist_ok=True)
-                        continue
-                    dstpath.parent.mkdir(parents=True, exist_ok=True)
-                    with self.pull(info.path, encoding=None) as src:
-                        with dstpath.open(mode='wb') as dst:
-                            shutil.copyfileobj(src, dst)
+                    # Carry on with the rest of the tree if one file fails.
+                    try:
+                        if info.type is pebble.FileType.DIRECTORY:
+                            dstpath.mkdir(parents=True, exist_ok=True)
+                            continue
+                        dstpath.parent.mkdir(parents=True, exist_ok=True)
+                        with self.pull(info.path, encoding=None) as src:
+                            with dstpath.open(mode='wb') as dst:
+                                shutil.copyfileobj(src, dst)
+                    except (OSError, pebble.Error) as err:
+                        errors.append((info.path, err))
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: str | Path) -> pebble.FileInfo:
+    def _build_fileinfo(path: str | Path, *, follow_symlinks: bool = False) -> pebble.FileInfo:
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
-        if path.is_symlink():
+        if path.is_symlink() and not follow_symlinks:
             ftype = pebble.FileType.SYMLINK
         elif path.is_dir():
             ftype = pebble.FileType.DIRECTORY
@@ -3085,7 +3124,7 @@ class Container:
         import grp
         import pwd
 
-        info = path.lstat()
+        info = path.stat() if follow_symlinks else path.lstat()
         try:
             pw_name = pwd.getpwuid(info.st_uid).pw_name
         except KeyError:
@@ -4569,3 +4608,51 @@ class CloudSpec:
             skip_tls_verify=o.skip_tls_verify,
             is_controller_cloud=o.is_controller_cloud,
         )
+
+
+class ProxyConfig:
+    """Proxy settings from the model's ``juju-*-proxy`` config.
+
+    The ``http`` and ``https`` attributes are ``None`` if the corresponding model config
+    is not available (either its env var is unset, or its value is empty). ``no`` is
+    an empty tuple in that case.
+    """
+
+    def __init__(
+        self,
+        *,
+        http: str | None = None,
+        https: str | None = None,
+        no: tuple[str, ...] = (),
+    ):
+        self._http = http
+        self._https = https
+        self._no = no
+
+    @property
+    def http(self) -> str | None:
+        """The HTTP proxy, from the ``juju-http-proxy`` model config."""
+        return self._http
+
+    @property
+    def https(self) -> str | None:
+        """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
+        return self._https
+
+    @property
+    def no(self) -> tuple[str, ...]:
+        """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config.
+
+        This is the comma-separated model config split into its entries, and is an
+        empty tuple if the model config is not available. Entries can contain '*',
+        and a '*' entry excludes all destinations.
+        """
+        return self._no
+
+    def __repr__(self) -> str:
+        return f'ProxyConfig(http={self._http!r}, https={self._https!r}, no={self._no!r})'
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ProxyConfig):
+            return False
+        return (self._http, self._https, self._no) == (other._http, other._https, other._no)

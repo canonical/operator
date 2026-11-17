@@ -89,7 +89,7 @@ class _ContainerBaseDict(TypedDict):
     architectures: list[str]
 
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class HookEvent(EventBase):
@@ -132,7 +132,7 @@ class ActionEvent(EventBase):
     params: dict[str, Any]
     """The parameters passed to the action."""
 
-    def __init__(self, handle: Handle, id: str | None = None):
+    def __init__(self, handle: Handle, id: str | None = None) -> None:
         super().__init__(handle)
         self.id = id  # type: ignore (for backwards compatibility)
 
@@ -147,7 +147,7 @@ class ActionEvent(EventBase):
         """
         raise RuntimeError('cannot defer action events')
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to record the action.
 
         Not meant to be called directly by charm code.
@@ -164,7 +164,7 @@ class ActionEvent(EventBase):
         """
         return {'id': self.id}
 
-    def set_results(self, results: dict[str, Any]):
+    def set_results(self, results: dict[str, Any]) -> None:
         """Report the result of the action.
 
         Juju eventually only accepts a str:str mapping, so we will attempt
@@ -211,7 +211,7 @@ class ActionEvent(EventBase):
         """
         self.framework.model._backend.action_set(results)
 
-    def log(self, message: str):
+    def log(self, message: str) -> None:
         """Send a message that a user will see while the action is running.
 
         Args:
@@ -219,7 +219,7 @@ class ActionEvent(EventBase):
         """
         self.framework.model._backend.action_log(message)
 
-    def fail(self, message: str = ''):
+    def fail(self, message: str = '') -> None:
         """Report that this action has failed.
 
         Args:
@@ -297,7 +297,7 @@ class ActionEvent(EventBase):
 
             raise _Abort(0) from e
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
 
 
@@ -451,7 +451,7 @@ class PreSeriesUpgradeEvent(HookEvent):
     .. jujuremoved:: 4.0
     """
 
-    def __init__(self, handle: Handle):
+    def __init__(self, handle: Handle) -> None:
         warnings.warn(
             'pre-series-upgrade events will not be emitted from Juju 4.0 onwards',
             DeprecationWarning,
@@ -477,7 +477,7 @@ class PostSeriesUpgradeEvent(HookEvent):
     .. jujuremoved:: 4.0
     """
 
-    def __init__(self, handle: Handle):
+    def __init__(self, handle: Handle) -> None:
         warnings.warn(
             'post-series-upgrade events will not be emitted from Juju 4.0 onwards',
             DeprecationWarning,
@@ -526,7 +526,7 @@ class CollectMetricsEvent(HookEvent):
     .. jujuremoved:: 3.6.11
     """
 
-    def __init__(self, handle: Handle):
+    def __init__(self, handle: Handle) -> None:
         warnings.warn(
             'collect-metrics events are not be emitted from Juju 3.6.11 onwards - '
             'consider using the Canonical Observability Stack',
@@ -537,7 +537,7 @@ class CollectMetricsEvent(HookEvent):
 
     def add_metrics(
         self, metrics: Mapping[str, int | float], labels: Mapping[str, str] | None = None
-    ):
+    ) -> None:
         """Record metrics that have been gathered by the charm for this unit.
 
         Args:
@@ -580,7 +580,7 @@ class RelationEvent(HookEvent):
         relation: model.Relation,
         app: model.Application | None = None,
         unit: model.Unit | None = None,
-    ):
+    ) -> None:
         super().__init__(handle)
 
         if unit is not None and unit.app != app:
@@ -614,7 +614,7 @@ class RelationEvent(HookEvent):
             snapshot['unit_name'] = self.unit.name
         return snapshot
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -643,7 +643,7 @@ class RelationEvent(HookEvent):
         else:
             self.unit = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         app = None if self.app is None else self.app.name
         unit = None if self.unit is None else self.unit.name
         return f'<{self.__class__.__name__} {app=} {unit=} on {self.relation!r} via {self.handle}>'
@@ -735,7 +735,7 @@ class RelationDepartedEvent(RelationEvent):
         app: model.Application | None = None,
         unit: model.Unit | None = None,
         departing_unit_name: str | None = None,
-    ):
+    ) -> None:
         super().__init__(handle, relation, app=app, unit=unit)
 
         self._departing_unit_name = departing_unit_name
@@ -763,7 +763,7 @@ class RelationDepartedEvent(RelationEvent):
             return None
         return self.framework.model.get_unit(self._departing_unit_name)
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -805,7 +805,7 @@ class StorageEvent(HookEvent):
     storage: model.Storage
     """Storage instance this event refers to."""
 
-    def __init__(self, handle: Handle, storage: model.Storage):
+    def __init__(self, handle: Handle, storage: model.Storage) -> None:
         super().__init__(handle)
         self.storage = storage
 
@@ -821,7 +821,7 @@ class StorageEvent(HookEvent):
             snapshot['storage_location'] = str(self.storage.location)
         return snapshot
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -846,7 +846,7 @@ class StorageEvent(HookEvent):
 
             self.storage.location = storage_location
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<{self.__class__.__name__} on {self.storage!r} via {self.handle}>'
 
 
@@ -899,7 +899,7 @@ class WorkloadEvent(HookEvent):
     for example a machine.
     """
 
-    def __init__(self, handle: Handle, workload: model.Container):
+    def __init__(self, handle: Handle, workload: model.Container) -> None:
         super().__init__(handle)
 
         self.workload = workload
@@ -914,7 +914,7 @@ class WorkloadEvent(HookEvent):
             snapshot['container_name'] = self.workload.name
         return snapshot
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -925,7 +925,7 @@ class WorkloadEvent(HookEvent):
         else:
             self.workload = None  # type: ignore
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<{self.__class__.__name__} on {self.workload!r} via {self.handle}>'
 
 
@@ -957,7 +957,7 @@ class PebbleNoticeEvent(WorkloadEvent):
         notice_id: str,
         notice_type: str,
         notice_key: str,
-    ):
+    ) -> None:
         super().__init__(handle, workload)
         self.notice = model.LazyNotice(workload, notice_id, notice_type, notice_key)
 
@@ -974,7 +974,7 @@ class PebbleNoticeEvent(WorkloadEvent):
         d['notice_key'] = self.notice.key
         return d
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1006,7 +1006,7 @@ class PebbleCheckEvent(WorkloadEvent):
         handle: Handle,
         workload: model.Container,
         check_name: str,
-    ):
+    ) -> None:
         super().__init__(handle, workload)
         self.info = model.LazyCheckInfo(workload, check_name)
 
@@ -1019,7 +1019,7 @@ class PebbleCheckEvent(WorkloadEvent):
         d['check_name'] = self.info.name
         return d
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1060,7 +1060,7 @@ class PebbleCheckRecoveredEvent(PebbleCheckEvent):
 class SecretEvent(HookEvent):
     """Base class for all secret events."""
 
-    def __init__(self, handle: Handle, id: str, label: str | None):
+    def __init__(self, handle: Handle, id: str, label: str | None) -> None:
         super().__init__(handle)
         self._id = id
         self._label = label
@@ -1086,7 +1086,7 @@ class SecretEvent(HookEvent):
         """
         return {'id': self._id, 'label': self._label}
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1154,7 +1154,7 @@ class SecretRemoveEvent(SecretEvent):
     .. jujuadded:: 3.0
     """
 
-    def __init__(self, handle: Handle, id: str, label: str | None, revision: int):
+    def __init__(self, handle: Handle, id: str, label: str | None, revision: int) -> None:
         super().__init__(handle, id, label)
         self._revision = revision
 
@@ -1163,7 +1163,7 @@ class SecretRemoveEvent(SecretEvent):
         """The secret revision this event refers to."""
         return self._revision
 
-    def remove_revision(self):
+    def remove_revision(self) -> None:
         """Remove the revision this event refers to.
 
         Call this method after any required cleanup to inform Juju that the
@@ -1180,7 +1180,7 @@ class SecretRemoveEvent(SecretEvent):
         data['revision'] = self._revision
         return data
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1202,7 +1202,7 @@ class SecretExpiredEvent(SecretEvent):
     .. jujuadded:: 3.0
     """
 
-    def __init__(self, handle: Handle, id: str, label: str | None, revision: int):
+    def __init__(self, handle: Handle, id: str, label: str | None, revision: int) -> None:
         super().__init__(handle, id, label)
         self._revision = revision
 
@@ -1211,7 +1211,7 @@ class SecretExpiredEvent(SecretEvent):
         """The secret revision this event refers to."""
         return self._revision
 
-    def remove_revision(self):
+    def remove_revision(self) -> None:
         """Remove the revision this event refers to.
 
         Call this method after any required cleanup to inform Juju that the
@@ -1228,7 +1228,7 @@ class SecretExpiredEvent(SecretEvent):
         data['revision'] = self._revision
         return data
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1308,7 +1308,7 @@ class CollectStatusEvent(LifecycleEvent):
                 event.add_status(ops.ActiveStatus())
     """  # ruff: ignore[non-capitalized-section-name, overindented-section, no-blank-line-before-section, missing-section-name-colon]  Final return confuses docstyle.
 
-    def add_status(self, status: model.StatusBase):
+    def add_status(self, status: model.StatusBase) -> None:
         """Add a status for evaluation.
 
         See :class:`CollectStatusEvent` for a description of how to use this.
@@ -1487,7 +1487,7 @@ class CharmBase(Object):
     and can be one of the events listed at :class:`CharmEvents`.
     """
 
-    def __init__(self, framework: Framework):
+    def __init__(self, framework: Framework) -> None:
         super().__init__(framework, None)
 
         for relation_name in self.framework.meta.relations:
@@ -1638,7 +1638,7 @@ class CharmBase(Object):
             raise _Abort(0) from e
 
 
-def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
+def _evaluate_status(charm: CharmBase) -> None:  # pyright: ignore[reportUnusedFunction]
     """Trigger collect-status events and evaluate and set the highest-priority status.
 
     See :class:`CollectStatusEvent` for details.
@@ -1802,7 +1802,7 @@ class CharmMeta:
         raw: dict[str, Any] | None = None,
         actions_raw: dict[str, Any] | None = None,
         config_raw: dict[str, Any] | None = None,
-    ):
+    ) -> None:
         raw_: dict[str, Any] = raw or {}
         actions_raw_: dict[str, Any] = actions_raw or {}
         # config_raw might be {'options': None} - this is accepted by
@@ -1893,7 +1893,7 @@ class CharmMeta:
         }
 
     @staticmethod
-    def from_charm_root(charm_root: pathlib.Path | str):
+    def from_charm_root(charm_root: pathlib.Path | str) -> CharmMeta:
         """Initialise CharmMeta from the path to a charm repository root folder."""
         charm_root = pathlib.Path(charm_root)
         metadata_path = charm_root / 'metadata.yaml'
@@ -1915,7 +1915,7 @@ class CharmMeta:
 
         return CharmMeta(meta, actions, options)
 
-    def _load_links(self, raw: dict[str, Any]):
+    def _load_links(self, raw: dict[str, Any]) -> None:
         websites = raw.get('website', [])
         if not websites and 'links' in raw:
             websites = raw['links'].get('website', [])
@@ -2031,7 +2031,7 @@ class RelationMeta:
 
     VALID_SCOPES: ClassVar[list[str]] = ['global', 'container']
 
-    def __init__(self, role: RelationRole, relation_name: str, raw: _RelationMetaDict):
+    def __init__(self, role: RelationRole, relation_name: str, raw: _RelationMetaDict) -> None:
         assert isinstance(role, RelationRole), (
             f'role should be one of {list(RelationRole)}, not {role!r}'
         )
@@ -2085,7 +2085,7 @@ class StorageMeta:
     properties: list[str]
     """List of additional characteristics of the storage."""
 
-    def __init__(self, name: str, raw: _StorageMetaDict):
+    def __init__(self, name: str, raw: _StorageMetaDict) -> None:
         self.storage_name = name
         self.type = raw['type']
         self.description = raw.get('description', '')
@@ -2124,7 +2124,7 @@ class ResourceMeta:
     This will be empty string (rather than None) if not set in ``metadata.yaml``.
     """
 
-    def __init__(self, name: str, raw: _ResourceMetaDict):
+    def __init__(self, name: str, raw: _ResourceMetaDict) -> None:
         self.resource_name = name
         self.type = raw['type']
         self.filename = raw.get('filename', None)
@@ -2140,7 +2140,7 @@ class PayloadMeta:
     type: str
     """Payload type."""
 
-    def __init__(self, name: str, raw: dict[str, Any]):
+    def __init__(self, name: str, raw: dict[str, Any]) -> None:
         self.payload_name = name
         self.type = raw['type']
 
@@ -2207,7 +2207,25 @@ class JujuAssumes:
 class ActionMeta:
     """Object containing metadata about an action's definition."""
 
-    def __init__(self, name: str, raw: dict[str, Any] | None = None):
+    name: str
+    """Name of the action (key in the YAML)."""
+
+    title: str
+    """Human-readable title of the action."""
+
+    description: str
+    """Description of the action."""
+
+    parameters: dict[str, Any]
+    """Mapping of parameter names to their JSON Schema definitions."""
+
+    required: list[str]
+    """Names of the parameters that must be provided."""
+
+    additional_properties: bool
+    """Whether parameters not listed in :attr:`parameters` are allowed."""
+
+    def __init__(self, name: str, raw: dict[str, Any] | None = None) -> None:
         raw = raw or {}
         self.name = name
         self.title = raw.get('title', '')
@@ -2285,7 +2303,7 @@ class ContainerMeta:
     resource is specified.
     """
 
-    def __init__(self, name: str, raw: dict[str, Any]):
+    def __init__(self, name: str, raw: dict[str, Any]) -> None:
         self.name = name
         self._mounts: dict[str, ContainerStorageMeta] = {}
         self.bases = None
@@ -2320,7 +2338,7 @@ class ContainerMeta:
         """
         return self._mounts
 
-    def _populate_mounts(self, mounts: list[_MountDict]):
+    def _populate_mounts(self, mounts: list[_MountDict]) -> None:
         """Populate a list of container mountpoints.
 
         Since Charm Metadata v2 specifies the mounts as a List, do a little data manipulation
@@ -2353,11 +2371,11 @@ class ContainerStorageMeta:
     :class:`StorageMeta`.
     """
 
-    def __init__(self, storage: str, location: str):
+    def __init__(self, storage: str, location: str) -> None:
         self.storage = storage
         self._locations: list[str] = [location]
 
-    def add_location(self, location: str):
+    def add_location(self, location: str) -> None:
         """Add an additional mount point to a known storage."""
         self._locations.append(location)
 

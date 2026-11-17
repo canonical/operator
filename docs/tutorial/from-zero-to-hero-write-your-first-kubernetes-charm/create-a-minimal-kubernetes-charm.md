@@ -42,7 +42,15 @@ Charmcraft created several files, including:
 - `src/charm.py` - The Python file that will contain the logic of your charm.
 - `src/fastapi_demo.py` - A helper module that will contain functions for interacting with your workload application.
 
-These files currently contain placeholder code and configuration.
+These files currently contain placeholder code and configuration. It's possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
+
+Charmcraft didn't create a lock file. Create one now:
+
+```text
+uv lock
+```
+
+This creates a file called `uv.lock`, which specifies the exact dependency versions that will be installed when you test and build your charm. When you commit your charm to source control, include `uv.lock`.
 
 ## Write your charm
 
@@ -63,7 +71,7 @@ In `charmcraft.yaml`, replace the `containers` and `resources` blocks with:
 ```{literalinclude} ../../../examples/k8s-1-minimal/charmcraft.yaml
 :language: yaml
 :start-at: 'containers:'
-:end-at: 'upstream-source: ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0'
+:end-at: 'upstream-source: ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0'
 ```
 
 ### Write a helper module
@@ -184,8 +192,6 @@ services:
     summary: FastAPI demo server
     command: /bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000
     startup: enabled
-    environment:
-      DEMO_SERVER_LOGFILE: /tmp/demo_server.log
     ...
 ```
 
@@ -240,7 +246,7 @@ Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` 
 
 ```text
 juju deploy ./fastapi-demo_amd64.charm --resource \
-     demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
+     demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0
 ```
 
 
@@ -264,7 +270,7 @@ Model    Controller     Cloud/Region  Version  SLA          Timestamp
 testing  concierge-k8s  k8s           3.6.13   unsupported  13:38:19+01:00
 
 App           Version  Status  Scale  Charm         Channel  Rev  Address         Exposed  Message
-fastapi-demo  2.1.0    active      1  fastapi-demo             0  10.152.183.215  no
+fastapi-demo  3.0.0    active      1  fastapi-demo             0  10.152.183.215  no
 
 Unit             Workload  Agent  Address      Ports  Message
 fastapi-demo/0*  active    idle   10.1.157.73
@@ -281,7 +287,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"2.1.0"}
+{"version":"3.0.0"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!
@@ -358,23 +364,15 @@ The result should be similar to the following output:
 
 ```text
 ...
-============================================ test session starts =============================================
-platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python3
-cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/fastapi-demo
-configfile: pyproject.toml
-collected 1 item
 
-tests/unit/test_charm.py::test_pebble_layer PASSED
-
-============================================= 1 passed in 0.54s ==============================================
+============================= 1 passed in 0.54s ==============================
 unit: commands[1]> coverage report
 Name                  Stmts   Miss Branch BrPart  Cover   Missing
 -----------------------------------------------------------------
-src/charm.py             20      0      0      0   100%
+src/charm.py             25      5      4      2    76%   34, 38-42
 src/fastapi_demo.py       8      3      0      0    62%   35-37
 -----------------------------------------------------------------
-TOTAL                    28      3      0      0    89%
+TOTAL                    33      8      4      2    73%
   unit: OK (1.91=setup[0.09]+cmd[1.54,0.28] seconds)
   congratulations :) (1.93 seconds)
 ```

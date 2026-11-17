@@ -1,0 +1,7 @@
+# make runs the docs build, and killall (from psmisc) stops Pebble after
+# `tox -e pebble`. Neither is in the base image.
+apt-get update -qq
+apt-get install -yqq make psmisc
+
+# `tox -e pebble` runs the tests against a real Pebble.
+snap install pebble --classic
