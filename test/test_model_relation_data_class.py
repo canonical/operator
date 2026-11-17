@@ -22,6 +22,7 @@ import functools
 import ipaddress
 import json
 import sys
+import traceback
 import typing
 import urllib.parse
 from collections.abc import Callable, Iterable
@@ -802,6 +803,26 @@ def test_relation_load_union_no_member_fits():
         testing.errors.UncaughtCharmError, match='expected a value matching one of'
     ):
         _load_into(Data, {'inner': json.dumps('oops')})
+
+
+_SENTINEL = 's3cr3t-sentinel'
+
+
+@pytest.mark.parametrize(
+    'annotation',
+    [
+        pytest.param(list[str], id='shape'),
+        pytest.param(Nested | list[Nested], id='union'),
+        pytest.param(_Colour, id='enum'),
+    ],
+)
+def test_relation_load_error_does_not_include_value(annotation: Any):
+    """Relation data may hold secrets, so a rejected value must not reach the traceback."""
+    data_class = dataclasses.make_dataclass('Data', [('field', annotation)])
+    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+        _load_into(data_class, {'field': json.dumps(_SENTINEL)})
+    # Format the whole exception chain, as it would appear in the logs.
+    assert _SENTINEL not in ''.join(traceback.format_exception(exc_info.value))
 
 
 def test_relation_load_variable_length_tuple():

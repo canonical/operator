@@ -168,7 +168,7 @@ def _check_shape(tp: Any, value: Any) -> None:
         return
     expected = 'sequence' if 'sequence' in _accepted_shapes(tp) else 'mapping'
     name = tp.__name__ if isinstance(tp, type) else tp
-    raise TypeError(f'expected a {expected} for {name}, got {type(value).__name__}: {value!r}')
+    raise TypeError(f'expected a {expected} for {name}, got {type(value).__name__}')
 
 
 def _coerce_field(tp: Any, value: Any) -> Any:
@@ -220,7 +220,11 @@ def _coerce_class(tp: type[_T], value: Any) -> _T:
     through as-is.
     """
     if issubclass(tp, enum.Enum):
-        return tp(value)
+        try:
+            return tp(value)
+        except ValueError:
+            # The stdlib message includes the value, which may be sensitive.
+            raise ValueError(f'invalid value for {tp.__name__}') from None
     if '__pydantic_validator__' in tp.__dict__:
         # A Pydantic model or Pydantic dataclass does its own coercion and
         # validation, including aliases.
@@ -268,9 +272,7 @@ def _coerce_union(tp: Any, args: tuple[Any, ...], value: Any) -> Any:
     if len(members) > 1:
         fits = [m for m in members if _shape_fits(m, value)]
         if not fits:
-            raise TypeError(
-                f'expected a value matching one of {tp}, got {type(value).__name__}: {value!r}'
-            )
+            raise TypeError(f'expected a value matching one of {tp}, got {type(value).__name__}')
         members = fits
     if len(members) == 1:
         return _coerce_field(members[0], value)
