@@ -14,7 +14,7 @@ jobs:
       k8s-charms: ${{ steps.k8s.outputs.charms }}
       machine-charms: ${{ steps.machine.outputs.charms }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0  # Need full history to diff against the base branch.
@@ -55,11 +55,11 @@ jobs:
       matrix:
         dir: ${{ fromJSON(needs.selection.outputs.k8s-charms) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - name: Install tox, tox-uv, and Concierge
         run: |
           uv tool install tox --with tox-uv
@@ -91,11 +91,11 @@ jobs:
       matrix:
         dir: ${{ fromJSON(needs.selection.outputs.machine-charms) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - name: Install tox, tox-uv, and Concierge
         run: |
           uv tool install tox --with tox-uv
