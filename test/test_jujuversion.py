@@ -101,10 +101,10 @@ def test_equality_with_other_types():
     assert ops.JujuVersion('3.6.0') != (3, 6, 0)
 
 
-def test_hashable():
-    versions = {ops.JujuVersion('3.6.0'), ops.JujuVersion('3.6.0'), ops.JujuVersion('3.6-beta1')}
-    assert len(versions) == 2
-    assert ops.JujuVersion('3.6.0') in versions
+def test_not_hashable():
+    # JujuVersion compares equal to strings, so no hash can be consistent with equality.
+    with pytest.raises(TypeError):
+        hash(ops.JujuVersion('3.6.0'))
 
 
 def test_supports_open_port_on_k8s():

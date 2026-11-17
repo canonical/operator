@@ -29,9 +29,9 @@ recreated with every charm update.
 ```
 
 ```{note}
-When the `use_juju_for_storage` option is set, this data will be stored in Juju
-instead, and will persist for the life of the application. Avoid using
-`StoredState` objects in this situation.
+When `ops.main` is called with `use_juju_for_storage=True`, this data will be
+stored in Juju instead, and will persist for the life of the application. Avoid
+using `StoredState` objects in this situation.
 ```
 
 A `StoredState` object is capable of persisting simple data types, such as

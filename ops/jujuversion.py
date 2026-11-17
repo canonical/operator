@@ -77,9 +77,6 @@ class JujuVersion:
             and self.patch == other.patch
         )
 
-    def __hash__(self) -> int:
-        return hash((self.major, self.minor, self.tag, self.patch, self.build))
-
     def __lt__(self, other: str | JujuVersion) -> bool:
         if self is other:
             return False
