@@ -18,10 +18,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0  # Need full history to diff against the base branch.
-      - name: Select the Kubernetes example charms changed in this pull request
+      - name: Select the K8s charms that changed
         id: k8s
         run: |
-          base="origin/$GITHUB_BASE_REF"
           charms=$(
             for charm in \
               examples/k8s-1-minimal \
@@ -31,23 +30,18 @@ jobs:
               examples/k8s-5-observe \
               examples/httpbin-demo
             do
-              if [ "$(git diff --name-only "$base...HEAD" -- "$charm/")" ]; then
-                printf '"%s"\n' "$charm"
-              fi
+              git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- "$charm/" || printf '"%s"\n' "$charm"
             done | jq --slurp --compact-output .
           )
           echo "charms=$charms" >> "$GITHUB_OUTPUT"
-      - name: Select the machine example charms changed in this pull request
+      - name: Select the machine charms that changed
         id: machine
         run: |
-          base="origin/$GITHUB_BASE_REF"
           charms=$(
             for charm in \
               examples/machine-tinyproxy
             do
-              if [ "$(git diff --name-only "$base...HEAD" -- "$charm/")" ]; then
-                printf '"%s"\n' "$charm"
-              fi
+              git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- "$charm/" || printf '"%s"\n' "$charm"
             done | jq --slurp --compact-output .
           )
           echo "charms=$charms" >> "$GITHUB_OUTPUT"
