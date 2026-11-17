@@ -40,6 +40,7 @@ import dataclasses
 import datetime
 import email.message
 import email.parser
+import email.utils
 import enum
 import http.client
 import io
@@ -3760,8 +3761,10 @@ class _FilesParser:
         self._parser.feed(b'\r\n')
 
     def _process_header(self, data: bytearray):
-        parser = email.parser.BytesFeedParser()
-        parser.feed(data)
+        # The bytes parser replaces anything outside ASCII in a header value,
+        # which loses a non-ASCII path. Pebble sends the headers as UTF-8.
+        parser = email.parser.FeedParser()
+        parser.feed(data.decode('utf-8', 'replace'))
         self._headers = parser.close()
 
         content_disposition = self._headers.get_content_disposition()
@@ -3770,7 +3773,11 @@ class _FilesParser:
 
         name = self._headers.get_param('name', header='content-disposition')
         if name == 'files':
-            filename = self._headers.get_filename()
+            # Not get_filename(), because that strips leading and trailing
+            # whitespace, which can be part of the path.
+            filename = self._headers.get_param('filename', header='content-disposition')
+            if isinstance(filename, tuple):
+                filename = email.utils.collapse_rfc2231_value(filename)
             if filename is None:
                 raise ProtocolError('multipart "files" part missing filename')
             self._prepare_tempfile(filename)
