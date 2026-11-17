@@ -25,11 +25,9 @@ import sys
 import types
 import typing
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal, TypeVar, cast, get_type_hints
+from typing import Any, Literal, cast, get_type_hints
 
 logger = logging.getLogger(__name__)
-
-_T = TypeVar('_T')
 
 
 # Builtin collections other than the mappings, which are built separately.
@@ -190,7 +188,7 @@ def _coerce_field(tp: Any, value: Any) -> Any:
         ):
             origin = tp
         elif isinstance(tp, type):
-            return _coerce_class(tp, value)  # pyright: ignore[reportUnknownVariableType]
+            return _coerce_class(tp, value)
         else:
             # Any, TypeVars, NewTypes and the like aren't classes, so there is
             # nothing to build.
@@ -213,7 +211,7 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     return value
 
 
-def _coerce_class(tp: type[_T], value: Any) -> _T:
+def _coerce_class(tp: type[Any], value: Any) -> Any:
     """Coerce ``value`` against a class ``tp`` with no type arguments.
 
     Builds a dataclass, enum, or Pydantic model; any other class is passed
