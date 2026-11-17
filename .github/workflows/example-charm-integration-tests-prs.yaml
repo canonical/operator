@@ -2,217 +2,112 @@ name: Selected Example Charm Integration Tests
 
 on:
   pull_request:
+    paths:
+      - examples/**
 
 permissions: {}
 
-concurrency:
-  # Cancel in-flight runs when new commits are pushed to the same PR.
-  group: example-charm-integration-tests-prs-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  # Detect which example directories have changed on this PR.
-  detect-changes:
+  selection:
     runs-on: ubuntu-latest
     outputs:
-      machine-tinyproxy: ${{ steps.check.outputs.machine-tinyproxy }}
-      k8s-1-minimal: ${{ steps.check.outputs.k8s-1-minimal }}
-      k8s-2-configurable: ${{ steps.check.outputs.k8s-2-configurable }}
-      k8s-3-postgresql: ${{ steps.check.outputs.k8s-3-postgresql }}
-      k8s-4-action: ${{ steps.check.outputs.k8s-4-action }}
-      k8s-5-observe: ${{ steps.check.outputs.k8s-5-observe }}
-      httpbin-demo: ${{ steps.check.outputs.httpbin-demo }}
+      k8s-charms: ${{ steps.k8s.outputs.charms }}
+      machine-charms: ${{ steps.machine.outputs.charms }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
           fetch-depth: 0  # Need full history to diff against the base branch.
-      - id: check
+      - name: Select the Kubernetes example charms changed in this pull request
+        id: k8s
         run: |
-          examples='machine-tinyproxy k8s-1-minimal k8s-2-configurable k8s-3-postgresql k8s-4-action k8s-5-observe httpbin-demo'
-          # GITHUB_BASE_REF is a default env var set by GitHub Actions.
           base="origin/$GITHUB_BASE_REF"
-          for dir in $examples; do
-            if git diff --name-only "$base...HEAD" -- "examples/$dir/" | grep -q .; then
-              echo "$dir=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "$dir=false" >> "$GITHUB_OUTPUT"
-            fi
-          done
+          charms=$(
+            for charm in \
+              examples/k8s-1-minimal \
+              examples/k8s-2-configurable \
+              examples/k8s-3-postgresql \
+              examples/k8s-4-action \
+              examples/k8s-5-observe \
+              examples/httpbin-demo
+            do
+              if [ "$(git diff --name-only "$base...HEAD" -- "$charm/")" ]; then
+                printf '"%s"\n' "$charm"
+              fi
+            done | jq --slurp --compact-output .
+          )
+          echo "charms=$charms" >> "$GITHUB_OUTPUT"
+      - name: Select the machine example charms changed in this pull request
+        id: machine
+        run: |
+          base="origin/$GITHUB_BASE_REF"
+          charms=$(
+            for charm in \
+              examples/machine-tinyproxy
+            do
+              if [ "$(git diff --name-only "$base...HEAD" -- "$charm/")" ]; then
+                printf '"%s"\n' "$charm"
+              fi
+            done | jq --slurp --compact-output .
+          )
+          echo "charms=$charms" >> "$GITHUB_OUTPUT"
 
-  machine-tinyproxy:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.machine-tinyproxy == 'true' }}
+  k8s-examples-integration:
+    needs: selection
+    if: ${{ needs.selection.outputs.k8s-charms != '[]' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.selection.outputs.k8s-charms) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
       - name: Set up uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
+      - name: Install tox, tox-uv, and Concierge
+        run: |
+          uv tool install tox --with tox-uv
+          sudo snap install --classic concierge
+      - name: Prepare for deploying K8s charms
+        run: sudo concierge prepare -p k8s
+        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
+      - name: Fetch libs and pack the charm
+        working-directory: ${{ matrix.dir }}
+        run: |
+          if grep -Eq "^charm-libs:" charmcraft.yaml; then
+            charmcraft fetch-libs
+          fi
+          charmcraft pack
+      - name: Run integration tests
+        working-directory: ${{ matrix.dir }}
+        run: tox -e integration
+
+  machine-examples-integration:
+    needs: selection
+    if: ${{ needs.selection.outputs.machine-charms != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.selection.outputs.machine-charms) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+      - name: Install tox, tox-uv, and Concierge
+        run: |
+          uv tool install tox --with tox-uv
+          sudo snap install --classic concierge
       - name: Prepare for deploying machine charms
         run: sudo concierge prepare -p machine
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
       - name: Pack charm
-        working-directory: examples/machine-tinyproxy
+        working-directory: ${{ matrix.dir }}
         run: charmcraft pack
       - name: Run integration tests
-        working-directory: examples/machine-tinyproxy
-        run: tox -e integration
-
-  k8s-1-minimal:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.k8s-1-minimal == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p k8s
-        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
-      - name: Pack charm
-        working-directory: examples/k8s-1-minimal
-        run: charmcraft pack
-      - name: Run integration tests
-        working-directory: examples/k8s-1-minimal
-        run: tox -e integration
-
-  k8s-2-configurable:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.k8s-2-configurable == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p k8s
-        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
-      - name: Pack charm
-        working-directory: examples/k8s-2-configurable
-        run: charmcraft pack
-      - name: Run integration tests
-        working-directory: examples/k8s-2-configurable
-        run: tox -e integration
-
-  k8s-3-postgresql:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.k8s-3-postgresql == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p k8s
-        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
-      - name: Fetch charmlibs
-        working-directory: examples/k8s-3-postgresql
-        run: charmcraft fetch-libs
-      - name: Pack charm
-        working-directory: examples/k8s-3-postgresql
-        run: charmcraft pack
-      - name: Run integration tests
-        working-directory: examples/k8s-3-postgresql
-        run: tox -e integration
-
-  k8s-4-action:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.k8s-4-action == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p k8s
-        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
-      - name: Fetch charmlibs
-        working-directory: examples/k8s-4-action
-        run: charmcraft fetch-libs
-      - name: Pack charm
-        working-directory: examples/k8s-4-action
-        run: charmcraft pack
-      - name: Run integration tests
-        working-directory: examples/k8s-4-action
-        run: tox -e integration
-
-  k8s-5-observe:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.k8s-5-observe == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p k8s
-        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
-      - name: Fetch charmlibs
-        working-directory: examples/k8s-5-observe
-        run: charmcraft fetch-libs
-      - name: Pack charm
-        working-directory: examples/k8s-5-observe
-        run: charmcraft pack
-      - name: Run integration tests
-        working-directory: examples/k8s-5-observe
-        run: tox -e integration
-
-  httpbin-demo:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.httpbin-demo == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p k8s
-        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
-      - name: Pack charm
-        working-directory: examples/httpbin-demo
-        run: charmcraft pack
-      - name: Run integration tests
-        working-directory: examples/httpbin-demo
+        working-directory: ${{ matrix.dir }}
         run: tox -e integration
