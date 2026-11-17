@@ -1832,8 +1832,8 @@ class Relation:
         - The value for any other type annotation is passed through
           unchanged. This includes ``Literal``, scalar types such as ``int``
           and ``str``, and classes that are not dataclasses, enums, or
-          Pydantic models. Values keep their decoded type: a ``'1'`` in the
-          databag stays a string for an ``int`` field.
+          Pydantic models. Values keep their decoded type: a JSON string
+          such as ``"1"`` stays a ``str`` for an ``int`` field.
         - A type alias defined with the ``type`` statement, such as
           ``type Pets = list[Pet]``, is coerced as the type it aliases. If the
           alias can't be evaluated (for example, it refers to a name that
