@@ -44,9 +44,12 @@ jobs:
           set -euo pipefail
           marker="<!-- ai-failure-notifications:run=$RUN_ID:origin="
 
-          # Search for the workflow name in issue bodies or titles.
+          # Search for the "Workflow: <name>" footer rather than the bare
+          # workflow name, which for a short name like "CI" also matches
+          # unrelated issues. Enrichment rewrites the title and body but
+          # always keeps this footer, and the issue this job opens has it too.
           match=$(gh issue list --repo "$REPO" --state open \
-            --search "\"$WORKFLOW_NAME\"" \
+            --search "\"Workflow: $WORKFLOW_NAME\"" \
             --json number --limit 1 -q '.[0].number // empty')
 
           if [[ -n "$match" ]]; then
@@ -55,7 +58,7 @@ jobs:
             echo "issue=$match" >> "$GITHUB_OUTPUT"
             echo "origin=comment" >> "$GITHUB_OUTPUT"
           else
-            issue_body="Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"$'\n\n'"${marker}new -->"
+            issue_body="Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"$'\n\n'"Workflow: $WORKFLOW_NAME"$'\n\n'"${marker}new -->"
             # `gh issue create` prints the new issue's URL; the number is its
             # last path segment.
             issue_url=$(gh issue create --repo "$REPO" \
