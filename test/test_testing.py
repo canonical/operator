@@ -4149,7 +4149,7 @@ class TestTestingPebbleClient:
                   KEY3: VALUE3
                 on-failure: thing2
                 on-success: thing2
-                override: merge
+                override: replace
                 requires:
                 - thing1
                 - thing2
@@ -4334,12 +4334,10 @@ class TestTestingPebbleClient:
                     header2: value2
                   url: https://example.com:3100/health
                 level: ready
-                override: merge
                 period: 30s
                 threshold: 1
               ready-tcp:
                 level: ready
-                override: merge
                 period: 30s
                 tcp:
                   host: localhost
@@ -4352,7 +4350,6 @@ class TestTestingPebbleClient:
                     key1: value1
                     key2: value2
                 level: alive
-                override: merge
                 period: 30s
                 threshold: 1
             """)
@@ -4442,7 +4439,6 @@ class TestTestingPebbleClient:
                 labels:
                   key1: value1
                 location: https://example123.com:3100/loki/api/v1/push
-                override: merge
                 services:
                 - foo
                 - foo1
@@ -4639,7 +4635,6 @@ class TestTestingPebbleClient:
                 summary: Bar
               foo:
                 command: /bin/echo foob
-                override: merge
                 summary: Foo
             """)
             == client.get_plan().to_yaml()
@@ -7334,7 +7329,7 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert service.description == 'desc'
     # Service.startup is always a string, even though we have the enum.
     assert service.startup == pebble.ServiceStartup.ENABLED.value
-    assert service.override == 'merge'
+    assert service.override == 'replace'
     assert service.command == '/bin/sleep 20'
 
     check = plan.checks['server-ready']
@@ -7342,7 +7337,7 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert check.threshold == 10
     assert check.period == '1s'
     assert check.timeout == '28s'
-    assert check.override == 'merge'
+    assert check.override == 'replace'
     assert check.level == pebble.CheckLevel.ALIVE
     assert check.http is not None
     assert check.http.get('url') == 'http://localhost:5050/version'
@@ -7351,7 +7346,7 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert log_target.type == 'loki'
     assert log_target.services == ['server']
     assert log_target.labels == {'foo': 'bar'}
-    assert log_target.override == 'merge'
+    assert log_target.override == 'replace'
     assert log_target.location == 'https://loki2.example.com'
 
 

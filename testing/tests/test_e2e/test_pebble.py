@@ -834,7 +834,7 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert service.description == 'desc'
     # Service.startup is always a string, even though we have the enum.
     assert service.startup == pebble.ServiceStartup.ENABLED.value
-    assert service.override == 'merge'
+    assert service.override == 'replace'
     assert service.command == '/bin/sleep 20'
 
     check = plan.checks['server-ready']
@@ -842,7 +842,7 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert check.threshold == 10
     assert check.period == 1
     assert check.timeout == 28
-    assert check.override == 'merge'
+    assert check.override == 'replace'
     assert check.level == pebble.CheckLevel.ALIVE
     assert check.http['url'] == 'http://localhost:5050/version'
 
@@ -850,7 +850,7 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert log_target.type == 'loki'
     assert log_target.services == ['server']
     assert log_target.labels == {'foo': 'bar'}
-    assert log_target.override == 'merge'
+    assert log_target.override == 'replace'
     assert log_target.location == 'https://loki2.example.com'
 
 
