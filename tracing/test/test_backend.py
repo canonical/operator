@@ -178,3 +178,22 @@ def test_exporter_invalid_ca_is_reported_once(
     assert errors[0].exc_info is None
     # The data is kept until a usable CA list is provided.
     assert exporter.buffer.pushpop() == rv
+
+
+def test_exporter_retries_after_ca_change(tmp_path: pathlib.Path):
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    url = 'https://collector.example/v1/traces'
+    exporter.buffer.save_destination(Destination(url, 'not a CA list'))
+    rv = exporter.buffer.pushpop((b'\x00', 'application/json'))
+    assert rv
+
+    with patch('urllib.request.urlopen') as urlopen:
+        exporter.do_export(*rv)
+        urlopen.assert_not_called()
+
+        exporter.buffer.save_destination(Destination(url, 'a different CA list'))
+        with patch.object(exporter, 'ssl_context', return_value=ssl.create_default_context()):
+            exporter.do_export(*rv)
+
+    urlopen.assert_called_once()
+    assert exporter.buffer.pushpop() is None
