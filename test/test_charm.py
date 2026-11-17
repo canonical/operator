@@ -409,7 +409,7 @@ storage:
     fake_script.write('storage-list', "echo '[]'")
     fake_script.write('storage-get', 'exit 1')
     # The model caches the storage list, so forget it as a fresh dispatch would.
-    charm.model.storages._storage_map['stor'] = None
+    charm.model.storages._invalidate('stor')
     framework.reemit()
     assert len(charm.seen) == 2
     assert charm.seen[1].name == 'stor'
