@@ -3710,17 +3710,24 @@ class _TestingPebbleClient:
         file_path = self._root / path[1:]
         if not file_path.exists():
             raise self._api_error(404, f'stat {path}: no such file or directory')
+        # The queried path itself is followed and reported as its target's
+        # type, but entries within a directory listing are reported
+        # unfollowed: a symlink entry stays a symlink, as real Pebble does.
         files = [file_path]
+        is_entry_listing = False
         if not itself:
             try:
                 files = [file_path / file for file in os.listdir(file_path)]
+                is_entry_listing = True
             except NotADirectoryError:
                 pass
 
         if pattern is not None:
             files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
 
-        file_infos = [Container._build_fileinfo(file) for file in files]
+        file_infos = [
+            Container._build_fileinfo(file, follow_symlinks=not is_entry_listing) for file in files
+        ]
         for file_info in file_infos:
             rel_path = os.path.relpath(file_info.path, start=self._root)
             rel_path = '/' if rel_path == '.' else '/' + rel_path
@@ -3777,21 +3784,28 @@ class _TestingPebbleClient:
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
-        if not file_path.exists():
+        # Real Pebble removes the path itself: a symlink is unlinked, never
+        # followed, however broken or looping its target is. lstat, rather
+        # than exists(), so that broken links and loops are not 'not found',
+        # and so that paths below a non-directory report their real errno.
+        try:
+            info = file_path.lstat()
+        except FileNotFoundError:
             if recursive:
                 return
-            raise pebble.PathError('not-found', f'remove {path}: no such file or directory')
-        if file_path.is_dir():
+            raise pebble.PathError(
+                'not-found', f'remove {path}: no such file or directory'
+            ) from None
+        except OSError as e:
+            raise self._path_error('remove', path, e) from None
+        if stat.S_ISDIR(info.st_mode):
             if recursive:
                 shutil.rmtree(file_path)
             else:
                 try:
                     file_path.rmdir()
                 except OSError as e:
-                    raise pebble.PathError(
-                        'generic-file-error',
-                        'cannot remove non-empty directory without recursive=True',
-                    ) from e
+                    raise self._path_error('remove', path, e) from None
         else:
             file_path.unlink()
 

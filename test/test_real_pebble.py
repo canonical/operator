@@ -540,12 +540,8 @@ _FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
         ('make_dir_parents', path): 1
         for path in ('file', 'fifo', 'sock', 'to_file', 'to_to_file', 'broken', 'loop')
     },
-    **{('remove_rec', path): 1 for path in ('file/child', 'to_file/child', 'loop/child')},
     ('pattern', '['): 1,
     ('pattern', 'a\\'): 1,
-    # Group 2: the mock raises an error but real Pebble succeeds.
-    **{('remove', path): 2 for path in ('to_dir', 'broken', 'loop')},
-    ('remove_rec', 'to_dir'): 2,
     # Group 3: the mock raises a different error type or message than real Pebble.
     **{
         ('list', path): 3
@@ -555,9 +551,6 @@ _FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
         ('list_itself', path): 3
         for path in ('file/child', 'to_file/child', 'fifo/child', 'loop', 'loop/child')
     },
-    **{
-        ('remove', path): 3 for path in ('file/child', 'to_file/child', 'fifo/child', 'loop/child')
-    },
     **{('push_parents', path): 3 for path in ('loop/child', 'broken/child')},
     **{
         ('make_dir', path): 3
@@ -566,8 +559,8 @@ _FS_XFAIL_GROUPS: dict[tuple[str, str], int] = {
     ('make_dir', 'loop/child'): 3,
     **{('make_dir_parents', path): 3 for path in ('broken/child', 'loop/child')},
     # Group 4: the mock returns a different result than real Pebble.
-    **{('list', path): 4 for path in ('to_file', 'to_to_file', 'fifo', 'sock')},
-    **{('list_itself', path): 4 for path in ('to_file', 'to_to_file', 'to_dir', 'fifo', 'sock')},
+    **{('list', path): 4 for path in ('fifo', 'sock')},
+    **{('list_itself', path): 4 for path in ('fifo', 'sock')},
     ('pattern', ''): 4,
     ('pattern', '[!a].txt'): 4,
     ('pattern', '[^a].txt'): 4,

@@ -5739,6 +5739,74 @@ class TestMockPebbleFileErrors:
         assert excinfo.value.kind == 'not-found'
         assert 'no such file or directory' in excinfo.value.message
 
+    def test_remove_path_unlinks_symlinks(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'target').write_text('x')
+        (fs_root / 'dir').mkdir()
+        (fs_root / 'to_file').symlink_to('target')
+        (fs_root / 'to_dir').symlink_to('dir')
+        (fs_root / 'broken').symlink_to('missing')
+        (fs_root / 'loop').symlink_to('loop')
+
+        # A symlink is removed itself, whatever it points to.
+        for name in ('to_file', 'to_dir', 'broken', 'loop'):
+            container.remove_path(f'/{name}')
+            assert not os.path.lexists(fs_root / name)
+        assert (fs_root / 'target').read_text() == 'x'
+        assert (fs_root / 'dir').is_dir()
+
+    def test_remove_path_errors(self, container: ops.Container, fs_root: pathlib.Path):
+        (fs_root / 'file').write_text('x')
+        # A path below a regular file, with and without recursive.
+        for recursive in (False, True):
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.remove_path('/file/child', recursive=recursive)
+            assert excinfo.value.kind == 'generic-file-error'
+            assert 'not a directory' in excinfo.value.message
+
+        # A path below a looping symlink, with and without recursive.
+        (fs_root / 'loop').symlink_to('loop')
+        for recursive in (False, True):
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.remove_path('/loop/child', recursive=recursive)
+            assert excinfo.value.kind == 'generic-file-error'
+            assert 'too many levels of symbolic links' in excinfo.value.message
+
+        # A non-empty directory without recursive.
+        (fs_root / 'dir' / 'child').mkdir(parents=True)
+        with pytest.raises(pebble.PathError) as excinfo:
+            container.remove_path('/dir')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'directory not empty' in excinfo.value.message
+
+    def test_remove_path_recursive_symlink_to_dir(
+        self, container: ops.Container, fs_root: pathlib.Path
+    ):
+        (fs_root / 'dir' / 'child').mkdir(parents=True)
+        (fs_root / 'link').symlink_to('dir')
+        container.remove_path('/link', recursive=True)
+        assert not (fs_root / 'link').exists()
+        assert (fs_root / 'dir' / 'child').is_dir()
+
+    def test_list_files_follows_the_queried_path(
+        self, container: ops.Container, fs_root: pathlib.Path
+    ):
+        (fs_root / 'target').write_text('x')
+        (fs_root / 'dir').mkdir()
+        (fs_root / 'dir' / 'link').symlink_to('../target')
+        (fs_root / 'to_file').symlink_to('target')
+        (fs_root / 'to_dir').symlink_to('dir')
+
+        info = container.list_files('/to_file')[0]
+        assert (info.path, info.name, info.type) == ('/to_file', 'to_file', FileType.FILE)
+        info = container.list_files('/to_file', itself=True)[0]
+        assert info.type == FileType.FILE
+        info = container.list_files('/to_dir', itself=True)[0]
+        assert info.type == FileType.DIRECTORY
+
+        # A symlink within a directory listing is still reported as a symlink.
+        infos = container.list_files('/dir')
+        assert [(i.path, i.type) for i in infos] == [('/dir/link', FileType.SYMLINK)]
+
 
 class TestFilesystem:
     @pytest.fixture
