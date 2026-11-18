@@ -89,16 +89,13 @@ def _go_timestamp(dt: datetime.datetime, frac_ns: int, sep: str) -> str:
 # ── strategies ──────────────────────────────────────────────────────────────
 
 # Go durations are int64 nanoseconds; timedelta can hold all of them.
-_durations_ns = st.integers(min_value=-(2**63) + 1, max_value=2**63 - 1)
+_durations_ns = st.integers(min_value=-(2**63), max_value=2**63 - 1)
 
 _offsets = st.integers(min_value=-(23 * 60 + 59), max_value=23 * 60 + 59).map(
     lambda m: datetime.timezone(datetime.timedelta(minutes=m))
 )
 
-_timestamps = st.datetimes(
-    min_value=datetime.datetime(1, 1, 2),
-    max_value=datetime.datetime(9999, 12, 30),
-).map(lambda dt: dt.replace(microsecond=0))
+_timestamps = st.datetimes().map(lambda dt: dt.replace(microsecond=0))
 
 # ── tests ───────────────────────────────────────────────────────────────────
 
