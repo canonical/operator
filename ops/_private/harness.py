@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-import errno
+import fnmatch
 import http
 import inspect
 import io
@@ -29,7 +29,6 @@ import random
 import re
 import shutil
 import signal
-import stat
 import tempfile
 import typing
 import uuid
@@ -3141,166 +3140,6 @@ class _TestingExecProcess:
         raise BrokenPipeError('[Errno 32] Broken pipe')
 
 
-# Reason text that real Pebble's error messages use for these errnos (Go's
-# lower-case syscall error strings). Charm and library error handlers match
-# on these phrases.
-_FS_ERRNO_REASONS: dict[int, str] = {
-    errno.ENOENT: 'no such file or directory',
-    errno.ENOTDIR: 'not a directory',
-    errno.ELOOP: 'too many levels of symbolic links',
-    errno.EEXIST: 'file exists',
-    errno.ENOTEMPTY: 'directory not empty',
-    errno.EACCES: 'permission denied',
-    errno.EPERM: 'permission denied',
-}
-
-
-def _fs_error_reason(error: OSError) -> str:
-    """The reason text that real Pebble's error messages use for an OSError."""
-    return _FS_ERRNO_REASONS.get(error.errno or 0, error.strerror or str(error))
-
-
-def _go_scan_chunk(pattern: str) -> tuple[bool, str, str]:
-    """Split off the first chunk of a glob pattern (see Go's path.scanChunk)."""
-    star = False
-    while pattern.startswith('*'):
-        pattern = pattern[1:]
-        star = True
-    inrange = False
-    i = 0
-    while i < len(pattern):
-        char = pattern[i]
-        if char == '\\':
-            # The error check for a dangling escape happens in _go_match_chunk.
-            if i + 1 < len(pattern):
-                i += 1
-        elif char == '[':
-            inrange = True
-        elif char == ']':
-            inrange = False
-        elif char == '*' and not inrange:
-            break
-        i += 1
-    return star, pattern[:i], pattern[i:]
-
-
-def _go_get_esc(chunk: str) -> tuple[str, str]:
-    """Take one character from a character class (see Go's path.getEsc)."""
-    if not chunk or chunk[0] in '-]':
-        raise ValueError('syntax error in pattern')
-    if chunk[0] == '\\':
-        chunk = chunk[1:]
-        if not chunk:
-            raise ValueError('syntax error in pattern')
-    char, rest = chunk[0], chunk[1:]
-    if not rest:
-        raise ValueError('syntax error in pattern')
-    return char, rest
-
-
-def _go_match_chunk(chunk: str, name: str) -> tuple[str, bool]:
-    """Match a star-free chunk against the start of name (see Go's path.matchChunk).
-
-    Returns the unmatched rest of name and whether the chunk matched. Like
-    Go, the whole chunk is validated even after the match has failed, so a
-    malformed chunk raises ValueError regardless.
-    """
-    failed = False
-    while chunk:
-        if not failed and not name:
-            failed = True
-        char = chunk[0]
-        if char == '[':
-            r = ''
-            if not failed:
-                r, name = name[0], name[1:]
-            chunk = chunk[1:]
-            negated = False
-            if chunk and chunk[0] == '^':
-                negated = True
-                chunk = chunk[1:]
-            matched = False
-            ranges = 0
-            while True:
-                if chunk and chunk[0] == ']' and ranges > 0:
-                    chunk = chunk[1:]
-                    break
-                lo, chunk = _go_get_esc(chunk)
-                hi = lo
-                if chunk[0] == '-':
-                    hi, chunk = _go_get_esc(chunk[1:])
-                if lo <= r <= hi:
-                    matched = True
-                ranges += 1
-            if matched == negated:
-                failed = True
-        elif char == '?':
-            if not failed:
-                if name[0] == '/':
-                    failed = True
-                name = name[1:]
-            chunk = chunk[1:]
-        else:
-            if char == '\\':
-                chunk = chunk[1:]
-                if not chunk:
-                    raise ValueError('syntax error in pattern')
-                char = chunk[0]
-            if not failed:
-                if char != name[0]:
-                    failed = True
-                name = name[1:]
-            chunk = chunk[1:]
-    if failed:
-        return '', False
-    return name, True
-
-
-def _go_path_match(pattern: str, name: str) -> bool:
-    r"""Match name against pattern, as Go's path.Match does.
-
-    Real Pebble filters list_files results with path.Match: '*', '?' and
-    character classes never match '/', classes use '^' (not '!') for
-    negation, and '\' escapes the next character. A malformed pattern raises
-    ValueError('syntax error in pattern'), even if the name would not match.
-    """
-    while pattern:
-        star, chunk, pattern = _go_scan_chunk(pattern)
-        if star and not chunk:
-            # A trailing '*' matches the rest of the name unless it has a '/'.
-            return '/' not in name
-        # Look for a match at the current position. If this is the last
-        # chunk, the whole name must be consumed; otherwise we'd get a false
-        # result even if we could still match using the star.
-        rest, ok = _go_match_chunk(chunk, name)
-        if ok and (not rest or pattern):
-            name = rest
-            continue
-        if star:
-            # Look for a match skipping i+1 characters.
-            accepted = False
-            for i, char in enumerate(name):
-                if char == '/':
-                    break
-                rest, ok = _go_match_chunk(chunk, name[i + 1 :])
-                if ok:
-                    # If this is the last chunk, it must exhaust the name.
-                    if not pattern and rest:
-                        continue
-                    name = rest
-                    accepted = True
-                    break
-            if accepted:
-                continue
-        # Like Go, validate the rest of the pattern before reporting no
-        # match: a malformed pattern is an error even if nothing would match.
-        while pattern:
-            _, chunk, pattern = _go_scan_chunk(pattern)
-            _go_match_chunk(chunk, '')
-        return False
-    return not name
-
-
 @_copy_docstrings(pebble.Client)
 class _TestingPebbleClient:
     """This conforms to the interface for pebble.Client but provides canned data.
@@ -3733,74 +3572,6 @@ class _TestingPebbleClient:
         if not path.startswith('/'):
             raise pebble.PathError('generic-file-error', f'paths must be absolute, got {path!r}')
 
-    @staticmethod
-    def _remove_quietly(path: pathlib.Path) -> None:
-        """Remove a leftover temporary file, ignoring errors (as Pebble's Cancel does)."""
-        try:
-            path.unlink()
-        except OSError:
-            pass
-
-    def _is_mount_point(self, file_path: pathlib.Path) -> bool:
-        """Whether the path is a mock mount point.
-
-        Harness storage mounts and Scenario mounts are symlinks in the
-        container root whose targets are outside it; they model real mount
-        points. Charms cannot create symlinks through the Pebble API, so only
-        test setup makes these.
-        """
-        if not file_path.is_symlink():
-            return False
-        try:
-            return not file_path.resolve().is_relative_to(self._root.resolve())
-        except (OSError, RuntimeError):
-            # Unresolvable (for example a symlink loop): not a mount point.
-            return False
-
-    @staticmethod
-    def _write_source_to(dest: pathlib.Path, source: ReadableBuffer, encoding: str | None) -> None:
-        if isinstance(source, str):
-            dest.write_text(source, encoding=encoding)
-        elif isinstance(source, bytes):
-            dest.write_bytes(source)
-        else:
-            # If source is binary, open file in binary mode and ignore encoding param
-            is_binary = isinstance(source.read(0), bytes)
-            open_mode = 'wb' if is_binary else 'w'
-            open_encoding = None if is_binary else encoding
-            with dest.open(open_mode, encoding=open_encoding) as f:
-                shutil.copyfileobj(cast('IOBase', source), cast('IOBase', f))
-
-    @staticmethod
-    def _path_error(op: str, path: str, error: OSError) -> pebble.PathError:
-        """Translate an OSError to the PathError that real Pebble would return.
-
-        Pebble's daemon words filesystem errors as '<op> <path>: <reason>', and
-        reports ENOENT as a not-found error, permission errors as
-        permission-denied, and anything else as a generic file error.
-        """
-        if error.errno == errno.ENOENT:
-            kind = 'not-found'
-        elif error.errno in (errno.EACCES, errno.EPERM):
-            kind = 'permission-denied'
-        else:
-            kind = 'generic-file-error'
-        return pebble.PathError(kind, f'{op} {path}: {_fs_error_reason(error)}')
-
-    def _files_api_error(self, op: str, path: str, error: OSError) -> pebble.APIError:
-        """Translate an OSError to the APIError that real Pebble would return.
-
-        Pebble's daemon reports ENOENT as a 404, permission errors as a 403,
-        and anything else as a 400.
-        """
-        if error.errno == errno.ENOENT:
-            code = 404
-        elif error.errno in (errno.EACCES, errno.EPERM):
-            code = 403
-        else:
-            code = 400
-        return self._api_error(code, f'{op} {path}: {_fs_error_reason(error)}')
-
     def pull(
         self, path: str | pathlib.PurePath, *, encoding: str | None = 'utf-8'
     ) -> BinaryIO | TextIO:
@@ -3808,21 +3579,19 @@ class _TestingPebbleClient:
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
-        # Real Pebble stats the path (following symlinks) and refuses to read
-        # anything that isn't a regular file.
-        try:
-            info = file_path.stat()
-        except OSError as e:
-            raise self._path_error('stat', path, e) from None
-        if not stat.S_ISREG(info.st_mode):
-            raise pebble.PathError('generic-file-error', f'can only read a regular file: "{path}"')
         try:
             return cast(
                 'BinaryIO | TextIO',
                 file_path.open('rb' if encoding is None else 'r', encoding=encoding),
             )
-        except OSError as e:
-            raise self._path_error('open', path, e) from None
+        except FileNotFoundError:
+            raise pebble.PathError(
+                'not-found', f'stat {path}: no such file or directory'
+            ) from None
+        except IsADirectoryError:
+            raise pebble.PathError(
+                'generic-file-error', f'can only read a regular file: "{path}"'
+            ) from None
 
     def push(
         self,
@@ -3846,52 +3615,37 @@ class _TestingPebbleClient:
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         if make_dirs and not file_path.parent.exists():
-            try:
-                self.make_dir(
-                    os.path.dirname(path),
-                    make_parents=True,
-                    permissions=None,
-                    user_id=user_id,
-                    user=user,
-                    group_id=group_id,
-                    group=group,
-                )
-            except pebble.PathError as e:
-                # Real Pebble reports make_dirs failures with this prefix.
-                raise pebble.PathError(e.kind, f'cannot create directory: {e.message}') from None
+            self.make_dir(
+                os.path.dirname(path),
+                make_parents=True,
+                permissions=None,
+                user_id=user_id,
+                user=user,
+                group_id=group_id,
+                group=group,
+            )
         permissions = permissions if permissions is not None else 0o644
-        if self._is_mount_point(file_path):
-            # A mount point models a real mount: pushing writes the content
-            # through to the mounted file, keeping its identity, rather than
-            # replacing the path with a new file.
-            if file_path.is_dir():
-                raise pebble.PathError(
-                    'generic-file-error', f'rename {path}.~ {path}: file exists'
-                )
-            try:
-                self._write_source_to(file_path, source, encoding)
-                os.chmod(file_path, permissions)
-            except OSError as e:
-                raise self._path_error('open', path, e) from None
-            return
-        # Real Pebble writes the content to a temporary sibling file and
-        # renames it over the target, so pushing replaces symlinks and other
-        # non-directories, and only fails if the target is a directory.
-        temp_path = file_path.with_name(file_path.name + '.~')
         try:
-            self._write_source_to(temp_path, source, encoding)
-            os.chmod(temp_path, permissions)
-        except OSError as e:
-            self._remove_quietly(temp_path)
-            raise self._path_error('open', f'{path}.~', e) from None
-        if file_path.is_dir() and not file_path.is_symlink():
-            self._remove_quietly(temp_path)
-            raise pebble.PathError('generic-file-error', f'rename {path}.~ {path}: file exists')
-        try:
-            os.rename(temp_path, file_path)
-        except OSError as e:
-            self._remove_quietly(temp_path)
-            raise self._path_error('rename', f'{path}.~ {path}', e) from None
+            if isinstance(source, str):
+                file_path.write_text(source, encoding=encoding)
+            elif isinstance(source, bytes):
+                file_path.write_bytes(source)
+            else:
+                # If source is binary, open file in binary mode and ignore encoding param
+                is_binary = isinstance(source.read(0), bytes)
+                open_mode = 'wb' if is_binary else 'w'
+                open_encoding = None if is_binary else encoding
+                with file_path.open(open_mode, encoding=open_encoding) as f:
+                    shutil.copyfileobj(cast('IOBase', source), cast('IOBase', f))
+            os.chmod(file_path, permissions)
+        except FileNotFoundError as e:
+            raise pebble.PathError(
+                'not-found', f'parent directory not found: {e.args[0]}'
+            ) from None
+        except NotADirectoryError:
+            raise pebble.PathError(
+                'generic-file-error', f'open {path}.~: not a directory'
+            ) from None
 
     def list_files(
         self, path: str | pathlib.PurePath, *, pattern: str | None = None, itself: bool = False
@@ -3900,46 +3654,19 @@ class _TestingPebbleClient:
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
-        # Real Pebble stats the path (following symlinks) and reports a
-        # missing path as a 404 and anything else (for example a path below a
-        # file, or a looping symlink) as a 400.
-        try:
-            info = file_path.stat()
-        except OSError as e:
-            raise self._files_api_error('stat', path, e) from None
-        # The queried path itself is followed and reported as its target's
-        # type, but entries within a directory listing are reported
-        # unfollowed: a symlink entry stays a symlink, as real Pebble does.
+        if not file_path.exists():
+            raise self._api_error(404, f'stat {path}: no such file or directory')
         files = [file_path]
-        is_entry_listing = False
-        if stat.S_ISDIR(info.st_mode) and not itself:
+        if not itself:
             try:
-                files = [file_path / entry for entry in os.listdir(file_path)]
-                is_entry_listing = True
-            except OSError as e:
-                raise self._files_api_error('open', path, e) from None
+                files = [file_path / file for file in os.listdir(file_path)]
+            except NotADirectoryError:
+                pass
 
-        # Real Pebble filters with Go's path.Match and treats an empty
-        # pattern as no filter.
-        if pattern:
-            filtered: list[pathlib.Path] = []
-            for file in files:
-                try:
-                    matched = _go_path_match(pattern, file.name)
-                except ValueError:
-                    raise self._api_error(400, 'syntax error in pattern') from None
-                if matched:
-                    filtered.append(file)
-            files = filtered
+        if pattern is not None:
+            files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
 
-        # A mount point appears as its target's type, like a real mount
-        # point; any other symlink entry stays a symlink.
-        file_infos = [
-            Container._build_fileinfo(
-                file, follow_symlinks=not is_entry_listing or self._is_mount_point(file)
-            )
-            for file in files
-        ]
+        file_infos = [Container._build_fileinfo(file) for file in files]
         for file_info in file_infos:
             rel_path = os.path.relpath(file_info.path, start=self._root)
             rel_path = '/' if rel_path == '.' else '/' + rel_path
@@ -3967,21 +3694,9 @@ class _TestingPebbleClient:
             )
         self._check_absolute_path(path)
         dir_path = self._root / path[1:]
-        # Real Pebble (osutil.Mkdir) stats the path first: any stat failure
-        # means the path is missing and gets created, an existing directory
-        # is 'file exists' (or a no-op with make_parents), and any other
-        # existing path is 'not a directory'.
-        try:
-            info = dir_path.stat()
-        except OSError:
-            info = None
-        if info is not None:
-            if not stat.S_ISDIR(info.st_mode):
-                raise pebble.PathError('generic-file-error', f'mkdir {path}: not a directory')
-            if make_parents:
-                return
-            raise pebble.PathError('generic-file-error', f'mkdir {path}: file exists')
-        if make_parents and dir_path.parent != dir_path:
+        if not dir_path.parent.exists() and not make_parents:
+            raise pebble.PathError('not-found', f'parent directory not found: {path}')
+        if not dir_path.parent.exists() and make_parents:
             self.make_dir(
                 os.path.dirname(path),
                 make_parents=True,
@@ -3991,61 +3706,41 @@ class _TestingPebbleClient:
                 group_id=group_id,
                 group=group,
             )
-        # Real Pebble creates '<path>.mkdir-new' and renames it into place,
-        # which fails with 'not a directory' when the missing path turns out
-        # to be a symlink (broken or looping). A failed rename leaves the
-        # temporary directory behind, in Pebble as here.
-        temp_path = dir_path.with_name(dir_path.name + '.mkdir-new')
         try:
-            temp_path.mkdir()
+            permissions = permissions if permissions else 0o755
+            dir_path.mkdir()
+            os.chmod(dir_path, permissions)
         except FileExistsError:
-            pass
-        except OSError as e:
-            raise self._path_error('mkdir', path, e) from None
-        os.chmod(temp_path, permissions if permissions is not None else 0o755)
-        try:
-            os.rename(temp_path, dir_path)
-        except OSError as e:
-            raise self._path_error('rename', f'{path}.mkdir-new {path}', e) from None
+            if not make_parents:
+                raise pebble.PathError(
+                    'generic-file-error', f'mkdir {path}: file exists'
+                ) from None
+        except NotADirectoryError as e:
+            # Attempted to create a subdirectory of a file
+            raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}') from None
 
     def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False):
         path = str(path)
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
-        # Real Pebble removes the path itself: a symlink is unlinked, never
-        # followed, however broken or looping its target is. lstat, rather
-        # than exists(), so that broken links and loops are not 'not found',
-        # and so that paths below a non-directory report their real errno.
-        try:
-            info = file_path.lstat()
-        except FileNotFoundError:
+        if not file_path.exists():
             if recursive:
                 return
-            raise pebble.PathError(
-                'not-found', f'remove {path}: no such file or directory'
-            ) from None
-        except OSError as e:
-            raise self._path_error('remove', path, e) from None
-        if self._is_mount_point(file_path):
-            # A mount point cannot be removed, like a real mount point.
-            raise pebble.PathError('generic-file-error', f'remove {path}: device or resource busy')
-        if stat.S_ISDIR(info.st_mode):
+            raise pebble.PathError('not-found', f'remove {path}: no such file or directory')
+        if file_path.is_dir():
             if recursive:
-                try:
-                    shutil.rmtree(file_path)
-                except OSError as e:
-                    raise self._path_error('remove', path, e) from None
+                shutil.rmtree(file_path)
             else:
                 try:
                     file_path.rmdir()
                 except OSError as e:
-                    raise self._path_error('remove', path, e) from None
+                    raise pebble.PathError(
+                        'generic-file-error',
+                        'cannot remove non-empty directory without recursive=True',
+                    ) from e
         else:
-            try:
-                file_path.unlink()
-            except OSError as e:
-                raise self._path_error('remove', path, e) from None
+            file_path.unlink()
 
     def _find_exec_handler(self, command: list[str]) -> ExecHandler | None:
         for prefix_len in reversed(range(len(command) + 1)):

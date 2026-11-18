@@ -40,7 +40,6 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-import warnings
 from collections.abc import Callable, Generator
 from typing import cast
 
@@ -474,10 +473,11 @@ class TestNoticesUsingRealPebble(PebbleNoticesMixin):
 
 
 # A callable that performs one filesystem operation. Its arguments are a
-# Pebble client and a resolver that turns a path relative to the tree root
-# into a path that client understands (an absolute path for real Pebble, a
-# container path for the testing client).
-_CaseRun = Callable[[pebble.Client, Callable[[str], str]], object]
+# Pebble client (or a charm's Container, which exposes the same methods
+# over the mock client) and a resolver that turns a path relative to the
+# tree root into a path that side understands (an absolute path for real
+# Pebble, a container path for the mock).
+_CaseRun = Callable[[pebble.Client | ops.Container, Callable[[str], str]], object]
 
 _FS_PATHS = (
     'file',
@@ -514,12 +514,12 @@ _FS_PATTERNS = (
 )
 
 
-def _pull_file(client: pebble.Client, path: str) -> None:
+def _pull_file(client: pebble.Client | ops.Container, path: str) -> None:
     with client.pull(path) as file:
         file.read()
 
 
-_FS_OPS: dict[str, Callable[[pebble.Client, str], object]] = {
+_FS_OPS: dict[str, Callable[[pebble.Client | ops.Container, str], object]] = {
     'list': lambda client, path: client.list_files(path),
     'list_itself': lambda client, path: client.list_files(path, itself=True),
     'pull': _pull_file,
@@ -589,7 +589,10 @@ def _key_phrases(message: str) -> frozenset[str]:
 
 
 def _outcome(
-    root: pathlib.Path, run: _CaseRun, client: pebble.Client, resolve: Callable[[str], str]
+    root: pathlib.Path,
+    run: _CaseRun,
+    client: pebble.Client | ops.Container,
+    resolve: Callable[[str], str],
 ) -> tuple[object, ...]:
     try:
         value = run(client, resolve)
@@ -655,15 +658,8 @@ def _fs_cases():
 
 
 @pytest.fixture(scope='module')
-def mock_client_and_root() -> Generator[tuple[pebble.Client, pathlib.Path]]:
-    """The testing Pebble client behind a Harness container, and its filesystem root."""
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', PendingDeprecationWarning)
-        harness = ops.testing.Harness(ops.CharmBase, meta='{name: charm, containers: {c: {}}}')
-    harness.begin()
-    harness.set_can_connect('c', True)
-    yield harness.model.unit.get_container('c').pebble, harness.get_filesystem_root('c')
-    harness.cleanup()
+def scenario_context() -> Generator[ops.testing.Context[ops.CharmBase]]:
+    yield ops.testing.Context(ops.CharmBase, meta={'name': 'charm', 'containers': {'c': {}}})
 
 
 @pytest.mark.skipif(
@@ -671,10 +667,11 @@ def mock_client_and_root() -> Generator[tuple[pebble.Client, pathlib.Path]]:
     reason='RUN_REAL_PEBBLE_TESTS not set',
 )
 class TestMockPebbleFilesystemMatchesRealPebble:
-    """Compare the Harness mock Pebble client's filesystem behaviour with real Pebble.
+    """Compare the ops.testing mock Pebble client's filesystem behaviour with real Pebble.
 
     Each case runs the same operation against a real Pebble server and against
-    the testing client behind a Harness container, on identical freshly built
+    the mock client behind a Scenario container (through the charm's
+    Container, the public API charms use), on identical freshly built
     filesystem trees, and compares the outcome: for successes, the result; for
     errors, the exception class, the APIError code or PathError kind, and the
     key phrases in the message that charms match on. Cases that currently
@@ -685,20 +682,25 @@ class TestMockPebbleFilesystemMatchesRealPebble:
     def test_fs_case(
         self,
         client: pebble.Client,
-        mock_client_and_root: tuple[pebble.Client, pathlib.Path],
+        scenario_context: ops.testing.Context[ops.CharmBase],
         tmp_path: pathlib.Path,
         run: _CaseRun,
     ):
-        mock_client, mock_root = mock_client_and_root
-        # The mock client's root persists between cases, so reset it by hand;
-        # tmp_path is already fresh.
-        for child in mock_root.iterdir():
-            if child.is_dir() and not child.is_symlink():
-                shutil.rmtree(child)
-            else:
-                child.unlink()
-        _build_fs_tree(mock_root)
-        _build_fs_tree(tmp_path)
-        real = _outcome(tmp_path, run, client, lambda path: str(tmp_path / path))
-        mock = _outcome(mock_root, run, mock_client, lambda path: f'/{path}')
+        state = ops.testing.State(containers={ops.testing.Container(name='c', can_connect=True)})
+        with scenario_context(scenario_context.on.start(), state=state) as mgr:
+            mgr.run()
+            # Creating the container also creates the mock client; its
+            # filesystem root persists between cases, so reset it by hand.
+            # tmp_path is already fresh.
+            mock_container = mgr.charm.unit.get_container('c')
+            mock_root = state.get_container('c').get_filesystem(scenario_context)
+            for child in mock_root.iterdir():
+                if child.is_dir() and not child.is_symlink():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+            _build_fs_tree(mock_root)
+            _build_fs_tree(tmp_path)
+            real = _outcome(tmp_path, run, client, lambda path: str(tmp_path / path))
+            mock = _outcome(mock_root, run, mock_container, lambda path: f'/{path}')
         assert mock == real
