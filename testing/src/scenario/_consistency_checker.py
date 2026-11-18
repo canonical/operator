@@ -24,7 +24,7 @@ import marshal
 import os
 import re
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
@@ -127,17 +127,19 @@ def check_consistency(
         )
 
 
-def _duplicates(kind: str, field: str, keys: Iterable[object]) -> list[str]:
-    """Describe any key that appears more than once."""
-    # The State entities hash by their identifier but compare by every field,
-    # so a set can hold two with the same identifier.
-    seen: set[object] = set()
-    errors: list[str] = []
-    for key in keys:
-        if key in seen:
-            errors.append(f'duplicate {kind} in State: {field} {key!r} appears more than once.')
-        seen.add(key)
-    return errors
+def _duplicates(kind: str, field: str, keys: Iterable[Hashable]) -> list[str]:
+    """Describe each key that appears more than once.
+
+    Call this for each State collection whose entities must have unique identifiers,
+    such as ``(c.name for c in state.containers)``. The entities compare by every field,
+    so a State's frozenset can hold two that share an identifier but differ elsewhere,
+    which isn't possible with a real Juju.
+    """
+    return [
+        f'duplicate {kind} in State: {field} {key!r} appears {n} times.'
+        for key, n in Counter(keys).items()
+        if n > 1
+    ]
 
 
 def check_resource_consistency(

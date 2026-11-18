@@ -646,6 +646,23 @@ def test_duplicate_container_names():
         Event('start'),
         _CharmSpec(MyCharm, meta=meta),
     )
+    # Three containers sharing a name are reported once, with the count.
+    with pytest.raises(InconsistentScenarioError) as exc_info:
+        check_consistency(
+            State(
+                containers={
+                    Container('bar'),
+                    Container('bar', can_connect=True),
+                    Container('bar', layers={'base': ops.pebble.Layer()}),
+                }
+            ),
+            Event('start'),
+            _CharmSpec(MyCharm, meta=meta),
+            '3.0',
+            0,
+        )
+    assert str(exc_info.value).count("container in State: name 'bar'") == 1
+    assert 'appears 3 times' in str(exc_info.value)
 
 
 def test_duplicate_network_bindings():
