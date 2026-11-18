@@ -25,7 +25,7 @@ from scenario import (
     Storage,
     UnknownStatus,
 )
-from scenario._deployment import App, CharmSpec, Dispatch, Juju
+from scenario._deployment import App, CharmSpec, Dispatch, Juju, Unit
 from scenario._juju_errors import JujuError
 from scenario.errors import InconsistentScenarioError, UncaughtCharmError
 
@@ -51,6 +51,78 @@ class MyCharm(ops.CharmBase):
 
     def _on_any(self, event: ops.EventBase):
         self.unit.status = ops.ActiveStatus(f'{event.handle.kind}:{self.config["log_level"]}')
+
+
+PEER_META: dict[str, Any] = {
+    'name': 'myapp',
+    'peers': {'replicas': {'interface': 'myapp-peer'}},
+}
+
+
+class PeerCharm(MyCharm):
+    """Also lists its peers on a change."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['replicas'].relation_changed, self._on_peer_changed)
+
+    def _on_peer_changed(self, _: ops.EventBase):
+        relation = self.model.get_relation('replicas')
+        assert relation is not None
+        names = sorted(unit.name for unit in relation.units)
+        self.unit.status = ops.ActiveStatus(f'peers={names}')
+
+
+class PublishingCharm(ops.CharmBase):
+    """Writes to its peer databags on start, so peers have something to observe."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on['replicas'].relation_changed, self._on_changed)
+
+    def _on_start(self, _: ops.EventBase):
+        relation = self.model.get_relation('replicas')
+        assert relation is not None
+        relation.data[self.unit]['ready'] = 'yes'
+        if self.unit.is_leader():
+            relation.data[self.app]['cluster'] = 'formed'
+
+    def _on_changed(self, _: ops.EventBase):
+        relation = self.model.get_relation('replicas')
+        assert relation is not None
+        ready = sorted(u.name for u in relation.units if relation.data[u].get('ready') == 'yes')
+        self.unit.status = ops.ActiveStatus(f'ready={ready}')
+
+
+class ChattyCharm(ops.CharmBase):
+    """Writes a new value to its databag on every change: never converges."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['replicas'].relation_changed, self._on_changed)
+        framework.observe(self.on.start, self._on_changed)
+
+    def _on_changed(self, _: ops.EventBase):
+        relation = self.model.get_relation('replicas')
+        assert relation is not None
+        previous = int(relation.data[self.unit].get('counter', '0'))
+        relation.data[self.unit]['counter'] = str(previous + 1)
+
+
+class FlipFlopCharm(ops.CharmBase):
+    """Flips its published flag whenever a peer changes: loops between two states."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_changed)
+        framework.observe(self.on['replicas'].relation_changed, self._on_changed)
+
+    def _on_changed(self, _: ops.EventBase):
+        relation = self.model.get_relation('replicas')
+        assert relation is not None
+        flag = relation.data[self.unit].get('flag')
+        relation.data[self.unit]['flag'] = 'off' if flag == 'on' else 'on'
 
 
 class SecretCharm(ops.CharmBase):
@@ -158,6 +230,12 @@ def spec(
 
 def deploy_mycharm(juju: Juju, *, config_schema: dict[str, Any] = CONFIG, **kwargs: Any) -> App:
     return juju.deploy(spec(MyCharm, config=config_schema), app='myapp', **kwargs)
+
+
+def peer_relation(unit: Unit) -> PeerRelation:
+    relation = unit.state.get_relations('replicas')[0]
+    assert isinstance(relation, PeerRelation)
+    return relation
 
 
 def events(trace: Sequence[Dispatch], unit: str) -> list[str]:
@@ -707,6 +785,85 @@ def test_add_unit_rejects_an_app_from_another_juju(juju: Juju):
             juju.add_unit(app)
 
 
+# Peers
+
+
+def test_a_peer_relation_adds_relation_created_and_each_unit_sees_the_others_join(juju: Juju):
+    app = juju.deploy(spec(PeerCharm, PEER_META), num_units=2)
+    trace = juju.settle()
+    assert events(trace, 'myapp/1') == [
+        'install',
+        'replicas_relation_created',
+        'leader_settings_changed',
+        'config_changed',
+        'start',
+        'replicas_relation_joined',
+        'replicas_relation_changed',
+    ]
+    assert app.units[0].state.unit_status == ActiveStatus("peers=['myapp/1']")
+    assert app.units[1].state.unit_status == ActiveStatus("peers=['myapp/0']")
+
+
+def test_a_unit_has_its_peer_relation_from_its_relation_created(juju: Juju):
+    juju.deploy(spec(PeerCharm, PEER_META))
+    install, created = juju.settle()[:2]
+    assert install.state_out.relations == frozenset()
+    assert created.event.name == 'replicas_relation_created'
+    (relation,) = created.state_in.relations
+    assert isinstance(relation, PeerRelation)
+    assert relation.peers_data == {}
+
+
+def test_peers_see_a_new_unit_join_only_after_its_relation_created(juju: Juju):
+    app = juju.deploy(spec(PeerCharm, PEER_META))
+    juju.settle()
+    juju.add_unit(app)
+    trace = juju.settle()
+    assert events(trace, 'myapp/0') == ['replicas_relation_joined', 'replicas_relation_changed']
+    names = [(d.unit_id, d.event.name) for d in trace]
+    created = names.index((1, 'replicas_relation_created'))
+    assert names.index((0, 'replicas_relation_joined')) > created
+
+
+def test_peer_databag_writes_reach_the_other_units_and_cause_relation_changed(juju: Juju):
+    app = juju.deploy(spec(PublishingCharm, PEER_META, config=None), num_units=2)
+    juju.settle()
+    assert peer_relation(app.units[0]).peers_data[1]['ready'] == 'yes'
+    assert peer_relation(app.units[1]).peers_data[0]['ready'] == 'yes'
+    for unit in app.units.values():
+        assert peer_relation(unit).local_app_data['cluster'] == 'formed'
+    # Each unit saw the other ready, which needs the write to have reached it
+    # and caused a relation-changed after the write.
+    assert app.units[0].state.unit_status == ActiveStatus("ready=['myapp/1']")
+    assert app.units[1].state.unit_status == ActiveStatus("ready=['myapp/0']")
+
+
+def test_only_relations_change_between_a_unit_s_dispatches(juju: Juju):
+    # Other units' writes reach a unit's relations between its own dispatches.
+    app = juju.deploy(spec(PublishingCharm, PEER_META, config=None), num_units=2)
+    trace = juju.settle()
+    for unit in app.units.values():
+        dispatches = [d for d in trace if d.unit_id == unit.id]
+        for before, after in itertools.pairwise(dispatches):
+            expected = dataclasses.replace(before.state_out, relations=after.state_in.relations)
+            assert after.state_in == expected
+
+
+def test_settle_raises_when_the_model_does_not_converge(juju: Juju):
+    juju.deploy(spec(ChattyCharm, PEER_META, config=None), num_units=2)
+    with pytest.raises(JujuError, match='Did not converge after 200 events') as exc_info:
+        juju.settle()
+    assert 'replicas_relation_changed on myapp/' in str(exc_info.value)
+
+
+def test_settle_reports_the_same_dispatch_twice_as_a_loop(juju: Juju):
+    juju.deploy(spec(FlipFlopCharm, PEER_META, config=None), num_units=2)
+    with pytest.raises(JujuError, match='with the same State it had the last time') as exc_info:
+        juju.settle()
+    # Long before the convergence limit.
+    assert str(exc_info.value).count(' on myapp/') <= 10
+
+
 # settle
 
 
@@ -768,7 +925,7 @@ def test_the_next_settle_starts_from_the_unit_after_the_last_turn(juju: Juju):
 def test_settle_is_deterministic():
     def run() -> list[Dispatch]:
         with Juju() as j:
-            deploy_mycharm(j, num_units=3)
+            j.deploy(spec(PublishingCharm, PEER_META, config=None), num_units=3)
             j.deploy(spec(SecretCharm, {'name': 'secrets'}, config=None), num_units=2)
             return list(j.settle())
 

@@ -6,7 +6,7 @@
 A :class:`Juju` holds applications, each with units that have their own
 :class:`State`. Operations such as :meth:`Juju.deploy` change the model
 straight away, and :meth:`Juju.settle` runs the events that Juju would run
-for them.
+for them, along with whatever the charms' own changes cause on their peers.
 """
 
 from __future__ import annotations
@@ -33,6 +33,8 @@ from .state import (
     Container,
     Event,
     Model,
+    PeerRelation,
+    RelationBase,
     State,
     Storage,
     _CharmSpec,
@@ -40,6 +42,13 @@ from .state import (
 
 if TYPE_CHECKING:
     from ops.charm import CharmBase
+
+# How many dispatches per unit Juju.settle() allows before it decides the
+# model will not converge.
+_SETTLE_DISPATCHES_PER_UNIT = 100
+
+# How many dispatches from the end of the trace a settle error shows.
+_TRACE_TAIL = 10
 
 # The model identity a Juju has when the test doesn't give one. Fixed, so that
 # everything derived from it (such as secret IDs) is the same on every run.
@@ -53,6 +62,10 @@ _K8S_CLOUD_SPEC_JUJU_VERSION = '3.6.10'
 # Juju runs leader-settings-changed on non-leaders before this version, and
 # not from it on (Juju 4 removed leader settings).
 _NO_LEADER_SETTINGS_JUJU_VERSION = '4.0.0'
+
+# Events that only say "look again". One already waiting for a unit, about the
+# same thing, covers a second.
+_COALESCED_SUFFIXES = ('_relation_changed',)
 
 # State fields that describe a unit's place in the model. Juju sets these
 # itself, so a state_template may not.
@@ -127,7 +140,12 @@ class Dispatch:
     """The unit's ID, as in ``myapp/2``."""
 
     state_in: State
-    """The :class:`State` the unit was given."""
+    """The :class:`State` the unit was given.
+
+    That's the state after :class:`Juju` wrote in the shared changes from other
+    units, so it's what the charm actually saw, rather than the previous
+    dispatch's :attr:`state_out`.
+    """
 
     state_out: State
     """The :class:`State` the charm produced."""
@@ -220,6 +238,7 @@ class App:
 
     def __init__(
         self,
+        juju: Juju,
         charm: _Charm,
         *,
         config: dict[str, Any],
@@ -227,6 +246,7 @@ class App:
         state_template: State,
         order: int,
     ):
+        self._juju = juju
         self._charm = charm
         self._config = config
         # How many instances of each store a new unit gets.
@@ -243,6 +263,9 @@ class App:
         self._leader_id = 0
         self._units: dict[int, Unit] = {}
         self._next_unit_id = 0
+        # A peer relation is one relation that every unit is a member of, so
+        # its ID is shared, though each unit holds its own view of it.
+        self._peer_ids = {endpoint: juju._new_relation_id() for endpoint in self._peer_endpoints}
 
     @property
     def name(self) -> str:
@@ -278,6 +301,10 @@ class App:
         return self._units[self._leader_id]
 
     @property
+    def _peer_endpoints(self) -> tuple[str, ...]:
+        return tuple(self._charm.metadata.get('peers') or {})
+
+    @property
     def _container_names(self) -> tuple[str, ...]:
         return tuple(self._charm.metadata.get('containers') or {})
 
@@ -309,13 +336,14 @@ class App:
 class _Rebind(NamedTuple):
     """Which object in the unit's state an event should be bound to when it's dispatched.
 
-    The consistency checker requires an event's container to equal the one in
-    the state it runs against, and the state moves on while the event waits.
+    The consistency checker requires an event's relation or container to
+    equal the one in the state it runs against, and the state moves on while
+    the event waits.
     """
 
-    kind: Literal['container']
-    key: str
-    """The container name."""
+    kind: Literal['relation', 'container']
+    key: int | str
+    """The relation ID or the container name."""
 
 
 class _Queued(NamedTuple):
@@ -335,9 +363,9 @@ class Juju:
         web = juju.deploy(CharmSpec(WebCharm, meta=WEB_META), num_units=2)
 
     Each operation changes the model straight away. Nothing runs until
-    :meth:`settle` runs the events Juju would emit for the operations, so
-    most tests are a sequence of operations, a ``settle()``, and then
-    assertions::
+    :meth:`settle` runs the events Juju would emit for the operations, along
+    with whatever the charms' own changes cause on their peers, so most
+    tests are a sequence of operations, a ``settle()``, and then assertions::
 
         juju.settle()
         assert web.leader.state.unit_status == ActiveStatus('ready')
@@ -377,6 +405,12 @@ class Juju:
         # The round-robin position, (application order, unit ID), of the last
         # unit that had a turn.
         self._turn: tuple[int, int] | None = None
+        # Relation IDs are per model in Juju, so they are per Juju here,
+        # rather than from the process-wide counter Relation uses.
+        self._next_relation_id = 0
+        # The units in scope of each peer relation, as (application name,
+        # unit ID, relation ID).
+        self._in_scope: set[tuple[str, int, int]] = set()
         self._trace: list[Dispatch] = []
         # Juju numbers storage instances from one sequence across the model.
         self._next_storage_id = 0
@@ -402,10 +436,10 @@ class Juju:
         """Deploy a charm, as ``juju deploy`` would.
 
         :meth:`settle` runs each unit's startup events: ``install``,
-        ``leader-elected`` on the leader and, before Juju 4,
-        ``leader-settings-changed`` on the other units, ``config-changed``,
-        ``start``, and, in a Kubernetes
-        model, ``pebble-ready`` for each container. Each unit also gets a
+        ``relation-created`` for each peer relation, ``leader-elected`` on the
+        leader and, before Juju 4, ``leader-settings-changed`` on the other
+        units, ``config-changed``, ``start``, and, in a Kubernetes model,
+        ``pebble-ready`` for each container. Each unit also gets a
         ``storage-attached`` for each storage instance. As in Juju, these
         come before ``install`` in a machine model, and after ``start`` in a
         Kubernetes model.
@@ -466,6 +500,7 @@ class Juju:
         _check_config(app_name, config_schema, config or {})
         storage_counts = _storage_counts(app_name, metadata, storage or {})
         new_app = App(
+            self,
             _Charm(charm_type, app_name, metadata, config_schema, actions, juju_version, trust),
             config={**_default_config(config_schema), **(config or {})},
             storage=storage_counts,
@@ -481,7 +516,9 @@ class Juju:
         """Add a unit to an application, as ``juju add-unit`` would.
 
         :meth:`settle` runs the new unit's startup events, as for
-        :meth:`deploy`.
+        :meth:`deploy`. Once its ``relation-created`` for a peer relation has
+        run, it sees each other unit join that relation, with
+        ``relation-joined`` then ``relation-changed``, and they see it join.
 
         Returns:
             The new :class:`Unit`.
@@ -494,7 +531,8 @@ class Juju:
         """Run events until the model converges.
 
         The model has converged when no unit has an event left to run: every
-        event an operation caused has been dispatched.
+        event an operation caused has been dispatched, along with every event
+        those dispatches caused in turn.
 
         The order is fixed, so the same operations on the same starting states
         settle the same way on every run, as long as the charms themselves are
@@ -504,15 +542,42 @@ class Juju:
         Returns:
             The events dispatched, in order, each with the unit it went to and
             that unit's :class:`State` before and after.
+
+        Raises:
+            JujuError: if the model does not converge. The same event reaching
+                the same unit with the same :class:`State` twice is a loop,
+                and is reported as soon as it happens; otherwise, the limit
+                grows with the number of units in the model. The message ends
+                with the last events dispatched.
         """
         self._check_open()
         self._trace = []
+        seen: dict[tuple[str, int, str], list[tuple[Event, State]]] = {}
         while (next_unit := self._next_unit()) is not None:
+            limit = _SETTLE_DISPATCHES_PER_UNIT * sum(len(a._units) for a in self._apps.values())
+            if len(self._trace) >= limit:
+                raise JujuError(
+                    f'Did not converge after {len(self._trace)} events. Check for charms '
+                    'that write a new value to a databag on every event.'
+                    f'{self._trace_tail()}'
+                )
             app = self._apps[next_unit[0]]
             unit = app._units[next_unit[1]]
             queued = self._queues[app.name, unit.id].popleft()
             self._turn = (app._order, unit.id)
-            self._dispatch(app, unit, self._bind(unit, queued))
+            event = self._bind(app, unit, queued)
+            if event is None:
+                continue
+            key, compared = _dispatch_key(app, unit, event)
+            earlier_dispatches = seen.setdefault(key, [])
+            if compared in earlier_dispatches:
+                raise JujuError(
+                    f'{unit.name} was about to handle {event.name} with the same '
+                    'State it had the last time it handled it, so settling would '
+                    f'never end.{self._trace_tail()}'
+                )
+            earlier_dispatches.append(compared)
+            self._dispatch(app, unit, event)
         return list(self._trace)
 
     def close(self) -> None:
@@ -543,8 +608,8 @@ class Juju:
         )
         return app_name, unit_id
 
-    def _bind(self, unit: Unit, queued: _Queued) -> Event:
-        """The event to dispatch for a queue entry, bound to the unit's current state."""
+    def _bind(self, app: App, unit: Unit, queued: _Queued) -> Event | None:
+        """The event to dispatch for a queue entry, or ``None`` if it no longer applies."""
         event, rebind = queued
         if rebind is None:
             return event
@@ -552,10 +617,46 @@ class Juju:
             # Juju runs pebble-ready once it has seen the container's Pebble
             # come up. Pebble may be up a little before that, but a charm
             # can't rely on it, so the model only connects it here.
-            unit._state = _with_connectable(unit._state, rebind.key)
+            unit._state = _with_connectable(unit._state, str(rebind.key))
+        if rebind.kind == 'relation' and not self._enter_peer_event(
+            app, unit, event, int(rebind.key)
+        ):
+            return None
         bound = _bound_object(unit._state, rebind)
-        assert bound is not None  # A charm can't remove its own containers.
+        # _enter_peer_event has checked the relation is there, and a charm can't
+        # remove its own containers.
+        assert bound is not None
         return dataclasses.replace(event, **{f'_{rebind.kind}': bound})
+
+    def _enter_peer_event(self, app: App, unit: Unit, event: Event, relation_id: int) -> bool:
+        """Bring a unit's view of a peer relation up to the moment of a peer event.
+
+        Returns whether the event should still be dispatched. A unit has the
+        relation in its ``State`` from its ``relation-created``, and each peer
+        is in its view from that peer's ``relation-joined``.
+        """
+        view = _relation_by_id(unit._state, relation_id)
+        if event.name.endswith('_relation_created'):
+            if view is None:
+                endpoint = next(e for e, i in app._peer_ids.items() if i == relation_id)
+                unit._state = _with_relation(unit._state, self._peer_view(app, endpoint))
+            return True
+        if not isinstance(view, PeerRelation):
+            return False
+        peer_id = event._relation_remote_unit_id
+        if event.name.endswith('_relation_joined'):
+            assert peer_id is not None
+            peer_view = _relation_by_id(app._units[peer_id]._state, relation_id)
+            data = dict(peer_view.local_unit_data) if peer_view is not None else {}
+            peers_data = dict(sorted({**view.peers_data, peer_id: data}.items()))
+            unit._state = _with_relation(
+                unit._state, dataclasses.replace(view, peers_data=peers_data)
+            )
+            return True
+        # A peer's relation-changed can outlive its place in the unit's view
+        # once units can depart; until then it's always queued after the
+        # peer's relation-joined.
+        return peer_id is None or peer_id in view.peers_data
 
     def _dispatch(self, app: App, unit: Unit, event: Event) -> None:
         state_in = unit._state
@@ -565,6 +666,74 @@ class Juju:
         unit._dispatches += 1
         unit._state = app._run(unit.id, event, state_in, seed)
         self._trace.append(Dispatch(event, app.name, unit.id, state_in, unit._state))
+        self._propagate_peers(app, unit)
+        if event.name.endswith('_relation_created') and isinstance(event._relation, PeerRelation):
+            self._enter_peer_scope(app, unit, event._relation.endpoint)
+
+    def _enter_peer_scope(self, app: App, unit: Unit, endpoint: str) -> None:
+        """Put a unit in its peer relation's scope, once its ``relation-created`` has run.
+
+        The entering unit sees each peer already in scope join, and each of
+        them sees it join.
+        """
+        relation_id = app._peer_ids[endpoint]
+        self._in_scope.add((app.name, unit.id, relation_id))
+        for peer in app._units.values():
+            if peer is unit or (app.name, peer.id, relation_id) not in self._in_scope:
+                continue
+            self._enqueue_peer_joined(app, unit, endpoint, peer.id)
+            self._enqueue_peer_joined(app, peer, endpoint, unit.id)
+
+    def _enqueue_peer_joined(self, app: App, unit: Unit, endpoint: str, peer_id: int) -> None:
+        relation_id = app._peer_ids[endpoint]
+        view = _relation_by_id(unit._state, relation_id) or self._peer_view(app, endpoint)
+        for suffix in ('relation_joined', 'relation_changed'):
+            self._enqueue(
+                app,
+                unit.id,
+                Event(f'{endpoint}_{suffix}', _relation=view, _relation_remote_unit_id=peer_id),
+                _Rebind('relation', relation_id),
+            )
+
+    def _propagate_peers(self, app: App, source: Unit) -> None:
+        """Carry a unit's peer databag writes to the units that can see them.
+
+        What the unit wrote to its own databag reaches each peer that has seen
+        it join, and what the leader wrote to the application databag reaches
+        every peer. A peer whose view changed gets ``relation-changed``.
+        """
+        for endpoint, relation_id in app._peer_ids.items():
+            written = _relation_by_id(source._state, relation_id)
+            if written is None:
+                continue
+            for peer in app._units.values():
+                view = _relation_by_id(peer._state, relation_id)
+                if peer is source or not isinstance(view, PeerRelation):
+                    continue
+                peers_data = dict(view.peers_data)
+                app_data = view.local_app_data
+                if source.id in peers_data and peers_data[source.id] != written.local_unit_data:
+                    peers_data[source.id] = dict(written.local_unit_data)
+                # Only the leader can write the app databag, but a unit that
+                # has lost leadership still holds the copy it had.
+                if source.is_leader and app_data != written.local_app_data:
+                    app_data = dict(written.local_app_data)
+                if peers_data == view.peers_data and app_data == view.local_app_data:
+                    continue
+                peer._state = _with_relation(
+                    peer._state,
+                    dataclasses.replace(view, peers_data=peers_data, local_app_data=app_data),
+                )
+                self._enqueue(
+                    app,
+                    peer.id,
+                    Event(
+                        f'{endpoint}_relation_changed',
+                        _relation=view,
+                        _relation_remote_unit_id=source.id if source.id in peers_data else None,
+                    ),
+                    _Rebind('relation', relation_id),
+                )
 
     def _add_unit(self, app: App) -> Unit:
         unit_id = app._next_unit_id
@@ -591,6 +760,14 @@ class Juju:
         for other in app._units.values():
             other._state = dataclasses.replace(other._state, planned_units=len(app._units))
         self._queues[app.name, unit_id] = deque()
+        startup = [_Queued(Event('install'))]
+        startup.extend(
+            _Queued(
+                Event(f'{endpoint}_relation_created', _relation=self._peer_view(app, endpoint)),
+                _Rebind('relation', relation_id),
+            )
+            for endpoint, relation_id in app._peer_ids.items()
+        )
         if unit.is_leader:
             leadership = [_Queued(Event('leader_elected'))]
         elif _has_leader_settings(app._charm.juju_version):
@@ -608,13 +785,13 @@ class Juju:
         # pebble-ready, every time. Juju can also run pebble-ready any time
         # after install, whenever the workload's Pebble comes up. Putting
         # both after start is deliberate, so that every run is the same.
-        startup = [] if is_k8s else attached
-        startup += [
-            _Queued(Event('install')),
+        if not is_k8s:
+            startup[:0] = attached
+        startup.extend((
             *leadership,
             _Queued(Event('config_changed')),
             _Queued(Event('start')),
-        ]
+        ))
         if is_k8s:
             startup += attached
             startup.extend(
@@ -636,11 +813,44 @@ class Juju:
             return dataclasses.replace(self._model, cloud_spec=None)
         return self._model
 
+    def _peer_view(self, app: App, endpoint: str) -> PeerRelation:
+        """A unit's view of a peer relation before any other unit joins it.
+
+        The application databag is already readable, so it starts as the
+        leader has it.
+        """
+        relation_id = app._peer_ids[endpoint]
+        leader = app._units.get(app._leader_id)
+        existing = _relation_by_id(leader._state, relation_id) if leader is not None else None
+        return PeerRelation(
+            endpoint=endpoint,
+            id=relation_id,
+            local_app_data=dict(existing.local_app_data) if existing is not None else {},
+        )
+
     def _enqueue(
         self, app: App, unit_id: int, event: Event, rebind: _Rebind | None = None
     ) -> None:
-        """Queue an event for a unit."""
-        self._queues[app.name, unit_id].append(_Queued(event, rebind))
+        """Queue an event for a unit.
+
+        A ``*-changed`` event that is already waiting for the same unit, about
+        the same thing, isn't queued twice: the one waiting sees the latest
+        data when it runs. Juju coalesces these the same way.
+        """
+        queue = self._queues[app.name, unit_id]
+        if event.name.endswith(_COALESCED_SUFFIXES) and any(
+            waiting.event.name == event.name
+            and waiting.rebind == rebind
+            and waiting.event._relation_remote_unit_id == event._relation_remote_unit_id
+            for waiting in queue
+        ):
+            return
+        queue.append(_Queued(event, rebind))
+
+    def _new_relation_id(self) -> int:
+        relation_id = self._next_relation_id
+        self._next_relation_id += 1
+        return relation_id
 
     def _check_open(self) -> None:
         if self._closed:
@@ -649,6 +859,17 @@ class Juju:
     def _check_deployed(self, app: App) -> None:
         if self._apps.get(app.name) is not app:
             raise JujuError(f'{app.name} is not deployed in this Juju.')
+
+    def _trace_tail(self) -> str:
+        lines = [f'  {d.event.name} on {d.unit_name}' for d in self._trace[-_TRACE_TAIL:]]
+        return '\nLast events dispatched:\n' + '\n'.join(lines) if lines else ''
+
+
+def _dispatch_key(
+    app: App, unit: Unit, event: Event
+) -> tuple[tuple[str, int, str], tuple[Event, State]]:
+    """What identifies a dispatch for loop detection, and what's compared within that."""
+    return (app.name, unit.id, event.name), (event, unit._state)
 
 
 @contextlib.contextmanager
@@ -824,9 +1045,22 @@ def _check_state_template(template: State) -> None:
         )
 
 
-def _bound_object(state: State, rebind: _Rebind) -> Container | None:
+def _bound_object(state: State, rebind: _Rebind) -> RelationBase | Container | None:
     """The object an event should carry, from the state it will run against."""
+    if rebind.kind == 'relation':
+        return _relation_by_id(state, int(rebind.key))
     return next((c for c in state.containers if c.name == rebind.key), None)
+
+
+def _relation_by_id(state: State, relation_id: int) -> RelationBase | None:
+    return next((r for r in state.relations if r.id == relation_id), None)
+
+
+def _with_relation(state: State, relation: RelationBase) -> State:
+    """A copy of ``state`` with ``relation`` replacing the one with its ID."""
+    relations = [r for r in state.relations if r.id != relation.id]
+    relations.append(relation)
+    return dataclasses.replace(state, relations=frozenset(relations))
 
 
 def _with_connectable(state: State, container_name: str) -> State:
