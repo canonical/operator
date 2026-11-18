@@ -73,6 +73,23 @@ class PeerCharm(MyCharm):
         self.unit.status = ops.ActiveStatus(f'peers={names}')
 
 
+class AppWriterCharm(ops.CharmBase):
+    """The leader writes its latest event to the app databag of both peer relations."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.config_changed, self._on_event)
+        framework.observe(self.on.start, self._on_event)
+
+    def _on_event(self, event: ops.EventBase):
+        if not self.unit.is_leader():
+            return
+        for endpoint in ('replicas', 'cluster'):
+            relation = self.model.get_relation(endpoint)
+            assert relation is not None
+            relation.data[self.app]['last'] = event.handle.kind
+
+
 class PublishingCharm(ops.CharmBase):
     """Writes to its peer databags on start, so peers have something to observe."""
 
@@ -823,6 +840,67 @@ def test_peers_see_a_new_unit_join_only_after_its_relation_created(juju: Juju):
     names = [(d.unit_id, d.event.name) for d in trace]
     created = names.index((1, 'replicas_relation_created'))
     assert names.index((0, 'replicas_relation_joined')) > created
+
+
+def test_a_unit_sees_the_peer_s_data_when_it_joins(juju: Juju):
+    app = juju.deploy(spec(PublishingCharm, PEER_META, config=None), num_units=2)
+    trace = juju.settle()
+    for unit in app.units.values():
+        joined = next(
+            d for d in trace if d.unit_id == unit.id and d.event.name == 'replicas_relation_joined'
+        )
+        (relation,) = joined.state_in.relations
+        assert isinstance(relation, PeerRelation)
+        assert relation.peers_data[1 - unit.id]['ready'] == 'yes'
+
+
+def test_a_new_unit_reads_the_app_databag_from_its_relation_created(juju: Juju):
+    app = juju.deploy(spec(PublishingCharm, PEER_META, config=None))
+    juju.settle()
+    juju.add_unit(app)
+    trace = juju.settle()
+    created = next(d for d in trace if d.event.name == 'replicas_relation_created')
+    (relation,) = created.state_in.relations
+    assert relation.local_app_data == {'cluster': 'formed'}
+
+
+def test_each_unit_sees_each_peer_join_and_change(juju: Juju):
+    juju.deploy(spec(PeerCharm, PEER_META), num_units=3)
+    trace = juju.settle()
+    changed = [
+        d.event._relation_remote_unit_id
+        for d in trace
+        if d.unit_name == 'myapp/1' and d.event.name == 'replicas_relation_changed'
+    ]
+    assert len(changed) == 2
+    assert set(changed) == {0, 2}
+
+
+def test_app_databag_changes_waiting_for_a_unit_are_coalesced_per_relation(juju: Juju):
+    meta = {
+        'name': 'myapp',
+        'peers': {'replicas': {'interface': 'a'}, 'cluster': {'interface': 'b'}},
+    }
+    app = juju.deploy(spec(AppWriterCharm, meta, config=None), num_units=2)
+    trace = juju.settle()
+    app_changes = [
+        d
+        for d in trace
+        if d.unit_name == 'myapp/1'
+        and d.event.name.endswith('_relation_changed')
+        and d.event._relation_remote_unit_id is None
+    ]
+    # The leader wrote twice to each relation, but each change sees the second.
+    assert sorted(d.event.name for d in app_changes) == [
+        'cluster_relation_changed',
+        'replicas_relation_changed',
+    ]
+    for dispatch in app_changes:
+        assert dispatch.event._relation is not None
+        relation = dispatch.state_in.get_relation(dispatch.event._relation.id)
+        assert relation.local_app_data == {'last': 'start'}
+    relation_ids = {r.id for r in app.units[1].state.relations}
+    assert len(relation_ids) == 2
 
 
 def test_peer_databag_writes_reach_the_other_units_and_cause_relation_changed(juju: Juju):

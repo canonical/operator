@@ -637,10 +637,11 @@ class Juju:
         """
         view = _relation_by_id(unit._state, relation_id)
         if event.name.endswith('_relation_created'):
-            if view is None:
-                endpoint = next(e for e, i in app._peer_ids.items() if i == relation_id)
-                unit._state = _with_relation(unit._state, self._peer_view(app, endpoint))
+            endpoint = next(e for e, i in app._peer_ids.items() if i == relation_id)
+            unit._state = _with_relation(unit._state, self._peer_view(app, endpoint))
             return True
+        # A unit only has peer events queued once it's in the relation, until
+        # units can leave it.
         if not isinstance(view, PeerRelation):
             return False
         peer_id = event._relation_remote_unit_id
@@ -840,6 +841,7 @@ class Juju:
         queue = self._queues[app.name, unit_id]
         if event.name.endswith(_COALESCED_SUFFIXES) and any(
             waiting.event.name == event.name
+            # The same endpoint can have several relations once apps can be integrated.
             and waiting.rebind == rebind
             and waiting.event._relation_remote_unit_id == event._relation_remote_unit_id
             for waiting in queue
