@@ -190,6 +190,11 @@ class Dispatch:
             ctx = dispatch.to_context()
             state_out = ctx.run(dispatch.event, dispatch.state_in)
 
+        The rerun isn't always identical to the original. A secret the charm
+        creates gets a different ID, and the new ``Context`` has none of the
+        files the unit wrote to its containers or storage, so a charm that
+        reads them back can behave differently.
+
         Like :meth:`Unit.to_context`, it's new on every call.
 
         Raises:
