@@ -176,6 +176,7 @@ class Tracing(ops.Object):
                     break
 
             if not base_url:
+                logger.debug("The tracing provider doesn't offer an 'otlp_http' receiver")
                 return Destination(None, None)
 
             if not base_url.startswith(('http://', 'https://')):
