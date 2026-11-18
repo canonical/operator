@@ -39,5 +39,11 @@ def test_get_missing_resource():
         meta={'name': 'resource-charm', 'resources': {'foo': {'type': 'file'}}},
     )
     with ctx(ctx.on.update_status(), state=State()) as mgr:
-        with pytest.raises(ops.ModelError, match='foo'):
+        with pytest.raises(ops.ModelError) as exc_info:
             mgr.charm.model.resources.fetch('foo')
+        uuid = mgr.charm.model.uuid
+    assert str(exc_info.value) == (
+        'ERROR could not download resource: HTTP request failed: '
+        f'Get https://.../model/{uuid}/units/unit-resource-charm-0/resources/foo: '
+        'resource#resource-charm/foo not found'
+    )

@@ -837,7 +837,13 @@ class _MockModelBackend(_ModelBackend):
         # Ops raises NameError before getting here if the resource isn't in the
         # metadata. A declared resource with nothing attached is valid in Juju,
         # for example a local deploy without --resource, and resource-get fails.
-        raise ModelError(f'could not download resource: {resource_name!r} not found')
+        # The message matches Juju's, apart from the controller address.
+        unit_tag = 'unit-' + self.unit_name.replace('/', '-')
+        url = f'https://.../model/{self._state.model.uuid}/units/{unit_tag}/resources/{resource_name}'
+        raise ModelError(
+            f'ERROR could not download resource: HTTP request failed: '
+            f'Get {url}: resource#{self.app_name}/{resource_name} not found'
+        )
 
     @_hook_command('credential-get')
     def credential_get(self) -> CloudSpec_Ops:
