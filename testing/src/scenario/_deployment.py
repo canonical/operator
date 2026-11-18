@@ -70,8 +70,10 @@ _K8S_CLOUD_SPEC_JUJU_VERSION = '3.6.10'
 _NO_LEADER_SETTINGS_JUJU_VERSION = '4.0.0'
 
 # Events that only say "look again". One already waiting for a unit, about the
-# same thing, covers a second.
-_COALESCED_SUFFIXES = ('_relation_changed', 'config_changed')
+# same thing, covers a second: config-changed, and relation-changed on any
+# endpoint.
+_COALESCED_EVENT = 'config_changed'
+_COALESCED_SUFFIX = '_relation_changed'
 
 # State fields that describe a unit's place in the model. Juju sets these
 # itself, so a state_template may not.
@@ -1002,7 +1004,8 @@ class Juju:
         data when it runs. Juju coalesces these the same way.
         """
         queue = self._queues[app.name, unit_id]
-        if event.name.endswith(_COALESCED_SUFFIXES) and any(
+        coalesced = event.name == _COALESCED_EVENT or event.name.endswith(_COALESCED_SUFFIX)
+        if coalesced and any(
             waiting.event.name == event.name
             # The same endpoint can have several relations once apps can be integrated.
             and waiting.rebind == rebind
