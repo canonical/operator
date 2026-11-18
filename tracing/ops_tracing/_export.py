@@ -92,14 +92,18 @@ class BufferingSpanExporter(SpanExporter):
             assert spans  # ruff: ignore[assert]  # The BatchSpanProcessor won't call us if there's no data.
             rv = self.buffer.pushpop((_otlp_json.encode_spans(spans), _otlp_json.CONTENT_TYPE))
             assert rv  # ruff: ignore[assert]  # We've just pushed something in.
-            self.do_export(*rv)
+            # A chunk that wasn't sent stays at the front of the buffer, so stop rather
+            # than offer it again: the collector is down, throttling us, or not set up yet.
+            if not self.do_export(*rv):
+                return SpanExportResult.SUCCESS
 
             for _ in range(SENDOUT_FACTOR - 1):
                 if time.monotonic() > deadline:
                     break
                 if not (rv := self.buffer.pushpop()):
                     break
-                self.do_export(*rv)
+                if not self.do_export(*rv):
+                    break
 
             return SpanExportResult.SUCCESS
         except Exception:
@@ -130,11 +134,16 @@ class BufferingSpanExporter(SpanExporter):
         context.verify_flags &= ~ssl.VERIFY_X509_STRICT
         return context
 
-    def do_export(self, buffered_id: int, data: bytes, mime: str) -> None:
-        """Export buffered data and remove it from the buffer on success."""
+    def do_export(self, buffered_id: int, data: bytes, mime: str) -> bool:
+        """Export buffered data and remove it from the buffer on success.
+
+        Returns:
+            Whether the data left the buffer, either because the collector accepted it
+            or because the collector will never accept it.
+        """
         config = self.buffer.load_destination()
         if not config.url:
-            return
+            return False
 
         if not config.url.startswith(('http://', 'https://')):
             raise ValueError(f'{config.url=} must be an HTTP or HTTPS URL')
@@ -142,7 +151,7 @@ class BufferingSpanExporter(SpanExporter):
         context = None
         if config.url.startswith('https://'):
             if config.ca is not None and config.ca == self.bad_ca:
-                return
+                return False
             try:
                 context = self.ssl_context(config.ca)
             except (ssl.SSLError, TypeError, ValueError) as e:
@@ -151,7 +160,7 @@ class BufferingSpanExporter(SpanExporter):
                 logger.error(
                     'Cannot load the CA list for the tracing collector at %s: %s', config.url, e
                 )
-                return
+                return False
 
         try:
             with urllib.request.urlopen(  # ruff: ignore[suspicious-url-open-usage]
@@ -166,8 +175,9 @@ class BufferingSpanExporter(SpanExporter):
             ):
                 pass
         except urllib.error.HTTPError as e:
-            with e.fp:
-                resp = e.fp.read(1000)
+            # Close the error itself, not only its body, so that it doesn't leak a ResourceWarning.
+            with e:
+                resp = e.read(1000)
             logger.error(
                 'Tracing collector at %s rejected our data, e.code=%r resp=%r',
                 config.url,
@@ -178,14 +188,17 @@ class BufferingSpanExporter(SpanExporter):
                 # The buffer always offers the oldest important chunk first, so a chunk
                 # that is never going to be accepted would block everything behind it.
                 self.buffer.remove(buffered_id)
+                return True
+            return False
         except OSError:
             # URLError, TimeoutError, SSLError, socket.error
             # We silence these errors, as a misconfigured system would produce too many.
-            pass
+            return False
         except Exception:
             logger.exception('Failed to send trace data out')
-        else:
-            self.buffer.remove(buffered_id)
+            return False
+        self.buffer.remove(buffered_id)
+        return True
 
     def shutdown(self) -> None:
         """Shut down the exporter."""

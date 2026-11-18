@@ -20,7 +20,8 @@ import logging
 import pathlib
 import ssl
 import urllib.error
-from unittest.mock import ANY, patch
+import urllib.request
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from opentelemetry.trace import get_tracer_provider
@@ -196,4 +197,62 @@ def test_exporter_retries_after_ca_change(tmp_path: pathlib.Path):
             exporter.do_export(*rv)
 
     urlopen.assert_called_once()
+    assert exporter.buffer.pushpop() is None
+
+
+def _exporter_with_backlog(tmp_path: pathlib.Path, chunks: int) -> BufferingSpanExporter:
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    exporter.buffer.save_destination(Destination('http://collector.example/v1/traces', None))
+    for _ in range(chunks):
+        exporter.buffer.pushpop((b'{}', 'application/json'))
+    return exporter
+
+
+@pytest.mark.parametrize('code', [503, 429, None])
+def test_export_stops_at_the_first_chunk_not_sent(tmp_path: pathlib.Path, code: int | None):
+    """A chunk that wasn't sent is the oldest, so trying again would only resend it."""
+    exporter = _exporter_with_backlog(tmp_path, 3)
+
+    def urlopen_result(request: urllib.request.Request, **kwargs: object) -> MagicMock:
+        if code is None:
+            raise urllib.error.URLError('unreachable')
+        raise _http_error(request.full_url, code)
+
+    with patch('urllib.request.urlopen', side_effect=urlopen_result) as urlopen, patch(
+        'ops_tracing._otlp_json.encode_spans', return_value=b'{}'
+    ):
+        exporter.export([ANY])
+
+    urlopen.assert_called_once()
+
+
+def test_export_without_destination_sends_nothing(tmp_path: pathlib.Path):
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    exporter.buffer.pushpop((b'{}', 'application/json'))
+
+    with patch('urllib.request.urlopen') as urlopen, patch(
+        'ops_tracing._otlp_json.encode_spans', return_value=b'{}'
+    ):
+        exporter.export([ANY])
+
+    urlopen.assert_not_called()
+
+
+@pytest.mark.parametrize('code', [None, 400])
+def test_export_sends_the_backlog(tmp_path: pathlib.Path, code: int | None):
+    """Chunks that leave the buffer, sent or rejected for good, let the next one go out."""
+    exporter = _exporter_with_backlog(tmp_path, 2)
+
+    def urlopen_result(request: urllib.request.Request, **kwargs: object) -> MagicMock:
+        if code is None:
+            return MagicMock()
+        # Each response needs its own error, because the exporter closes the body.
+        raise _http_error(request.full_url, code)
+
+    with patch('urllib.request.urlopen', side_effect=urlopen_result) as urlopen, patch(
+        'ops_tracing._otlp_json.encode_spans', return_value=b'{}'
+    ):
+        exporter.export([ANY])
+
+    assert urlopen.call_count == 3
     assert exporter.buffer.pushpop() is None
