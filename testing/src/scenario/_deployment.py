@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import hashlib
+import re
 import types
 import unittest.mock
 from collections import deque
@@ -33,6 +34,7 @@ from .state import (
     Event,
     Model,
     State,
+    Storage,
     _CharmSpec,
 )
 
@@ -50,7 +52,18 @@ _K8S_CLOUD_SPEC_JUJU_VERSION = '3.6.10'
 
 # State fields that describe a unit's place in the model. Juju sets these
 # itself, so a state_template may not.
-_JUJU_OWNED_FIELDS = ('leader', 'planned_units', 'model', 'config', 'relations', 'secrets')
+_JUJU_OWNED_FIELDS = (
+    'leader',
+    'planned_units',
+    'model',
+    'config',
+    'relations',
+    'secrets',
+    'storages',
+)
+
+# A storage ``multiple.range`` in charm metadata: 'm', 'm-n', 'm-' or 'm+'.
+_STORAGE_RANGE_RE = re.compile(r'^([0-9]+)([-+]|-[0-9]+)$')
 
 # The Python types each config option type accepts, as Context checks them.
 _CONFIG_TYPES: dict[str, type | tuple[type, ...]] = {
@@ -206,11 +219,14 @@ class App:
         charm: _Charm,
         *,
         config: dict[str, Any],
+        storage: dict[str, int],
         state_template: State,
         order: int,
     ):
         self._charm = charm
         self._config = config
+        # How many instances of each store a new unit gets.
+        self._storage = storage
         self._state_template = state_template
         # Where the application comes in the round-robin: its place in
         # deploy order.
@@ -352,6 +368,8 @@ class Juju:
         # unit that had a turn.
         self._turn: tuple[int, int] | None = None
         self._trace: list[Dispatch] = []
+        # Juju numbers storage instances from one sequence across the model.
+        self._next_storage_id = 0
         self._closed = False
 
     @property
@@ -365,6 +383,7 @@ class Juju:
         app: str | None = None,
         *,
         config: Mapping[str, Any] | None = None,
+        storage: Mapping[str, int] | None = None,
         state_template: State | None = None,
         trust: bool = False,
         num_units: int = 1,
@@ -375,7 +394,9 @@ class Juju:
         :meth:`settle` runs each unit's startup events: ``install``,
         ``leader-elected`` on the leader and ``leader-settings-changed`` on the
         other units, ``config-changed``, ``start``, and ``pebble-ready`` for
-        each container.
+        each container. Each unit also gets a ``storage-attached`` for each
+        storage instance. As in Juju, these come before ``install`` in a
+        machine model, and after ``start`` in a Kubernetes model.
 
         Args:
             charm: A :class:`CharmSpec`, or a charm class, which is shorthand
@@ -385,13 +406,18 @@ class Juju:
                 metadata.
             config: Application configuration, merged over the defaults
                 declared in the charm's config options.
+            storage: How many instances of each store each unit gets, as
+                with ``juju deploy --storage <store>=<count>``. A store that
+                isn't listed gets the minimum its metadata allows, which is
+                one unless it sets ``multiple``.
             state_template: The starting :class:`State` for every unit of the
                 application, including units added later with
                 :meth:`add_unit`. Use it for what ``Juju`` can't know, such as
-                ``Exec`` mocks and layers on containers, storage, resources
-                and stored state. ``Juju`` sets each unit's ``leader``,
-                ``planned_units``, ``model``, ``config``, ``relations`` and
-                ``secrets`` itself, so the template may not set those.
+                ``Exec`` mocks and layers on containers, resources and stored
+                state. ``Juju`` sets each unit's ``leader``,
+                ``planned_units``, ``model``, ``config``, ``relations``,
+                ``secrets`` and ``storages`` itself, so the template may not
+                set those.
             trust: Whether the application has Juju trust, as with
                 ``juju deploy --trust``.
             num_units: How many units to deploy. Unit ``0`` is the leader.
@@ -400,8 +426,9 @@ class Juju:
         Raises:
             JujuError: if an application of this name already exists,
                 ``num_units`` is not positive, the charm has no metadata,
-                the template sets a field ``Juju`` owns, or ``config`` doesn't
-                match the charm's config options.
+                the template sets a field ``Juju`` owns, ``config`` doesn't
+                match the charm's config options, or ``storage`` doesn't
+                match the charm's stores.
         """
         self._check_open()
         if num_units < 1:
@@ -415,9 +442,11 @@ class Juju:
         if state_template is not None:
             _check_state_template(state_template)
         _check_config(app_name, config_schema, config or {})
+        storage_counts = _storage_counts(app_name, metadata, storage or {})
         new_app = App(
             _Charm(charm_type, app_name, metadata, config_schema, actions, juju_version, trust),
             config={**_default_config(config_schema), **(config or {})},
+            storage=storage_counts,
             state_template=state_template if state_template is not None else State(),
             order=len(self._apps),
         )
@@ -513,10 +542,16 @@ class Juju:
     def _add_unit(self, app: App) -> Unit:
         unit_id = app._next_unit_id
         app._next_unit_id += 1
+        storages: list[Storage] = []
+        for name, count in app._storage.items():
+            for _ in range(count):
+                storages.append(Storage(name, index=self._next_storage_id))
+                self._next_storage_id += 1
         state = dataclasses.replace(
             app._state_template,
             config=dict(app._config),
             containers=frozenset(app._containers()),
+            storages=frozenset(storages),
             leader=unit_id == app._leader_id,
             model=self._model_for(app._charm.juju_version),
         )
@@ -526,12 +561,25 @@ class Juju:
             other._state = dataclasses.replace(other._state, planned_units=len(app._units))
         self._queues[app.name, unit_id] = deque()
         leadership = 'leader_elected' if unit.is_leader else 'leader_settings_changed'
-        startup = [
+        attached = [
+            _Queued(Event(f'{storage.name}_storage_attached', _storage=storage))
+            for storage in storages
+        ]
+        # Juju runs storage-attached before install in a machine model, so
+        # the charm can install onto its storage. In a Kubernetes model the
+        # storage is provisioned with the pod, and Juju runs storage-attached
+        # some time after start. Here it's straight after start, before
+        # pebble-ready, every time.
+        is_k8s = self._model.type == 'kubernetes'
+        startup = [] if is_k8s else attached
+        startup += [
             _Queued(Event('install')),
             _Queued(Event(leadership)),
             _Queued(Event('config_changed')),
             _Queued(Event('start')),
         ]
+        if is_k8s:
+            startup += attached
         startup.extend(
             _Queued(Event(f'{name}_pebble_ready'), _Rebind('container', name))
             for name in app._container_names
@@ -649,6 +697,61 @@ def _check_config(
             )
 
 
+def _storage_counts(
+    app_name: str, metadata: Mapping[str, Any], storage: Mapping[str, int]
+) -> dict[str, int]:
+    """How many instances of each store a unit gets, checked as Juju checks them."""
+    stores: Mapping[str, Any] = metadata.get('storage') or {}
+    for name in storage:
+        if name not in stores:
+            raise JujuError(f'charm {app_name!r} has no store called {name!r}.')
+    counts: dict[str, int] = {}
+    for name, store in stores.items():
+        count_min, count_max = _storage_range(app_name, name, store)
+        count = storage.get(name, count_min)
+        if count_min == count_max == 1 and count != 1:
+            raise JujuError(
+                f'charm {app_name!r} store {name!r}: storage is singular, {count} specified.'
+            )
+        if count < count_min:
+            raise JujuError(
+                f'charm {app_name!r} store {name!r}: '
+                f'{count_min} instances required, {count} specified.'
+            )
+        if count_max >= 0 and count > count_max:
+            raise JujuError(
+                f'charm {app_name!r} store {name!r}: '
+                f'at most {count_max} instances supported, {count} specified.'
+            )
+        counts[name] = count
+    return counts
+
+
+def _storage_range(app_name: str, name: str, store: Mapping[str, Any]) -> tuple[int, int]:
+    """A store's minimum and maximum instance counts; a maximum of -1 means no limit."""
+    multiple = store.get('multiple')
+    if not multiple:
+        return 1, 1
+    count_range = multiple.get('range')
+    # Juju reads a plain number, or a string of digits, as both the minimum
+    # and the maximum.
+    if isinstance(count_range, str) and count_range.isdigit():
+        count_range = int(count_range)
+    if isinstance(count_range, int) and not isinstance(count_range, bool):
+        if count_range <= 0:
+            raise JujuError(f'charm {app_name!r} store {name!r}: invalid count {count_range}.')
+        return count_range, count_range
+    match = _STORAGE_RANGE_RE.match(count_range) if isinstance(count_range, str) else None
+    if match is None:
+        raise JujuError(
+            f"charm {app_name!r} store {name!r}: range {count_range!r} does not match 'm', "
+            "'m-n', or 'm+'."
+        )
+    count_min = int(match.group(1))
+    count_max = -1 if len(match.group(2)) == 1 else int(match.group(2)[1:])
+    return count_min, count_max
+
+
 def _check_state_template(template: State) -> None:
     """Reject a ``state_template`` that sets a field :class:`Juju` owns.
 
@@ -659,6 +762,7 @@ def _check_state_template(template: State) -> None:
     hints = {
         'model': ' Pass model_name=, uuid= and cloud_spec= to Juju instead.',
         'config': ' Pass config= to deploy() instead.',
+        'storages': ' Pass storage= to deploy() instead.',
     }
     for name in _JUJU_OWNED_FIELDS:
         value = getattr(template, name)

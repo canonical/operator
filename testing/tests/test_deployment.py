@@ -22,6 +22,7 @@ from scenario import (
     PeerRelation,
     Secret,
     State,
+    Storage,
     UnknownStatus,
 )
 from scenario._deployment import App, CharmSpec, Dispatch, Juju
@@ -375,6 +376,119 @@ def test_deploy_rejects_an_unknown_config_option(juju: Juju):
     assert not juju.apps
 
 
+# storage
+
+STORAGE_META: dict[str, Any] = {
+    **META,
+    'containers': {'workload': {}},
+    'storage': {
+        'data': {'type': 'filesystem'},
+        'logs': {'type': 'filesystem', 'multiple': {'range': '2-4'}},
+        'cache': {'type': 'filesystem', 'multiple': {'range': '0+'}},
+    },
+}
+
+
+def storage_events(trace: Sequence[Dispatch], unit: str) -> list[tuple[str, int | None]]:
+    return [
+        (d.event.name, d.event._storage.index if d.event._storage else None)
+        for d in trace
+        if d.unit_name == unit
+    ]
+
+
+def test_storage_attached_runs_before_install_in_a_machine_model():
+    with Juju(cloud_spec=CloudSpec(type='lxd', name='localhost')) as j:
+        j.deploy(spec(MyCharm, {**STORAGE_META, 'containers': {}}))
+        trace = j.settle()
+    assert storage_events(trace, 'myapp/0') == [
+        ('data_storage_attached', 0),
+        ('logs_storage_attached', 1),
+        ('logs_storage_attached', 2),
+        ('install', None),
+        ('leader_elected', None),
+        ('config_changed', None),
+        ('start', None),
+    ]
+
+
+def test_storage_attached_runs_after_start_in_a_kubernetes_model(juju: Juju):
+    juju.deploy(spec(MyCharm, STORAGE_META))
+    trace = juju.settle()
+    assert storage_events(trace, 'myapp/0') == [
+        ('install', None),
+        ('leader_elected', None),
+        ('config_changed', None),
+        ('start', None),
+        ('data_storage_attached', 0),
+        ('logs_storage_attached', 1),
+        ('logs_storage_attached', 2),
+        ('workload_pebble_ready', None),
+    ]
+
+
+def test_each_unit_gets_its_own_storage_numbered_across_the_model(juju: Juju):
+    app = juju.deploy(spec(MyCharm, STORAGE_META), num_units=2)
+    other = juju.deploy(spec(MyCharm, STORAGE_META), app='other')
+    added = juju.add_unit(app)
+
+    def ids(unit: Any) -> list[str]:
+        return sorted(f'{s.name}/{s.index}' for s in unit.state.storages)
+
+    assert ids(app.units[0]) == ['data/0', 'logs/1', 'logs/2']
+    assert ids(app.units[1]) == ['data/3', 'logs/4', 'logs/5']
+    assert ids(other.leader) == ['data/6', 'logs/7', 'logs/8']
+    assert ids(added) == ['data/9', 'logs/10', 'logs/11']
+
+
+def test_deploy_storage_sets_how_many_instances_each_unit_gets(juju: Juju):
+    app = juju.deploy(spec(MyCharm, STORAGE_META), storage={'logs': 4, 'cache': 1})
+    juju.add_unit(app)
+    for unit in app.units.values():
+        names = sorted(s.name for s in unit.state.storages)
+        assert names == ['cache', 'data', 'logs', 'logs', 'logs', 'logs']
+
+
+@pytest.mark.parametrize('count_range', [3, '3', '3-3'])
+def test_a_fixed_storage_range_gives_that_many_instances(juju: Juju, count_range: int | str):
+    meta = {
+        **META,
+        'storage': {'data': {'type': 'filesystem', 'multiple': {'range': count_range}}},
+    }
+    app = juju.deploy(spec(MyCharm, meta))
+    assert len(app.leader.state.storages) == 3
+
+
+@pytest.mark.parametrize(
+    ('storage', 'match'),
+    [
+        ({'nope': 1}, "has no store called 'nope'"),
+        ({'data': 2}, 'storage is singular, 2 specified'),
+        ({'logs': 1}, '2 instances required, 1 specified'),
+        ({'logs': 5}, 'at most 4 instances supported, 5 specified'),
+    ],
+)
+def test_deploy_rejects_storage_the_charm_does_not_allow(
+    juju: Juju, storage: dict[str, int], match: str
+):
+    with pytest.raises(JujuError, match=match):
+        juju.deploy(spec(MyCharm, STORAGE_META), storage=storage)
+    assert not juju.apps
+
+
+@pytest.mark.parametrize(
+    ('count_range', 'match'),
+    [('lots', "does not match 'm', 'm-n', or 'm\\+'"), (0, 'invalid count 0')],
+)
+def test_deploy_rejects_a_malformed_storage_range(juju: Juju, count_range: int | str, match: str):
+    meta = {
+        **META,
+        'storage': {'data': {'type': 'filesystem', 'multiple': {'range': count_range}}},
+    }
+    with pytest.raises(JujuError, match=match):
+        juju.deploy(spec(MyCharm, meta))
+
+
 # state_template
 
 
@@ -414,6 +528,7 @@ def test_state_template_leaves_the_juju_owned_fields_to_juju(juju: Juju):
         ('config', State(config={'log_level': 'debug'})),
         ('relations', State(relations={PeerRelation('replicas')})),
         ('secrets', State(secrets={Secret({'a': 'b'})})),
+        ('storages', State(storages={Storage('data', index=0)})),
     ],
 )
 def test_state_template_may_not_set_juju_owned_fields(juju: Juju, field: str, template: State):
