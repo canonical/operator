@@ -172,6 +172,32 @@ def test_add_app_secret_not_leader():
     assert not output.secrets
 
 
+@pytest.mark.parametrize('first_owner', ('app', 'unit'))
+@pytest.mark.parametrize('second_owner', ('app', 'unit'))
+def test_add_secret_label_used_in_same_hook(first_owner: str, second_owner: str):
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=True)) as mgr:
+        charm = mgr.charm
+        getattr(charm, first_owner).add_secret({'foo': 'bar'}, label='mylabel')
+        # Juju rejects the label whatever the owners of the two secrets are.
+        with pytest.raises(ops.ModelError, match='secret with label "mylabel" already exists'):
+            getattr(charm, second_owner).add_secret({'foo': 'baz'}, label='mylabel')
+        output = mgr.run()
+
+    assert len(output.secrets) == 1
+
+
+def test_add_secret_label_free_after_remove():
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=True)) as mgr:
+        charm = mgr.charm
+        charm.unit.add_secret({'foo': 'bar'}, label='mylabel').remove_all_revisions()
+        charm.unit.add_secret({'foo': 'baz'}, label='mylabel')
+        output = mgr.run()
+
+    assert output.get_secret(label='mylabel').latest_content == {'foo': 'baz'}
+
+
 def test_set_legacy_behaviour():
     # in juju < 3.1.7, secret owners always used to track the latest revision.
     # ref: https://bugs.launchpad.net/juju/+bug/2037120

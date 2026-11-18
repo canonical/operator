@@ -509,7 +509,10 @@ class Application:
             content: A key-value mapping containing the payload of the secret,
                 for example :code:`{"password": "foo123"}`.
             label: Charm-local label (or "name") to assign to this secret,
-                which can later be used for lookup.
+                which can later be used for lookup. The application's secrets
+                and its units' secrets share labels, so the label must not
+                already be in use by any of them. Two different units can use
+                the same label for their own secrets.
             description: Description of the secret's purpose.
             expire: Time in the future (or timedelta from now) at which the
                 secret is due to expire. When that time elapses, Juju will
@@ -521,7 +524,8 @@ class Application:
 
         Raises:
             ValueError: if the secret is empty, or the secret key is invalid.
-            ModelError: if this unit is not the leader.
+            ModelError: if this unit is not the leader, or if a secret created
+                earlier in the same hook already has the label.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(
@@ -713,6 +717,8 @@ class Unit:
 
         Raises:
             ValueError: if the secret is empty, or the secret key is invalid.
+            ModelError: if a secret created earlier in the same hook already
+                has the label.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(

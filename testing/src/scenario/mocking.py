@@ -183,6 +183,8 @@ class _MockModelBackend(_ModelBackend):
         self._event = event
         self._context = context
         self._charm_spec = charm_spec
+        # The IDs of the secrets that the charm has created in this hook.
+        self._added_secret_ids: set[str] = set()
 
     def opened_ports(self) -> set[Port_Ops]:
         return {
@@ -514,6 +516,14 @@ class _MockModelBackend(_ModelBackend):
             # Charm-facing side: the error that Juju's secret-add gives.
             raise ModelError('ERROR this unit is not the leader') from understandable_error
 
+        # Juju rejects a label that a secret created earlier in the same hook has,
+        # whatever its owner. A secret that has since been removed doesn't count.
+        if label is not None and any(
+            secret.id in self._added_secret_ids and secret.label == label
+            for secret in self._state.secrets
+        ):
+            raise ModelError(f'ERROR secret with label "{label}" already exists')
+
         secret = Secret(
             content,
             label=label,
@@ -526,6 +536,7 @@ class _MockModelBackend(_ModelBackend):
         secrets = set(self._state.secrets)
         secrets.add(secret)
         self._state._update_secrets(frozenset(secrets))
+        self._added_secret_ids.add(secret.id)
         return secret.id
 
     def _check_can_manage_secret(
