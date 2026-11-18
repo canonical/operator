@@ -17,6 +17,10 @@ To make your charm deployable from Charmhub, publish your charm.
 
 - {doc}`Publish your charm on Charmhub <publish-your-charm-on-charmhub>`
 
+Integrate your charm with applications that production charms most often support.
+
+- {doc}`Set up production integrations <set-up-production-integrations>`
+
 Once your charm is ready for wide production use, your next goal should be to get it publicly listed on Charmhub, so that it is visible in searches.
 
 - {doc}`Make your charm discoverable <make-your-charm-discoverable>`
@@ -141,12 +145,23 @@ Ops enables you to trace your charm code and send data to sources such as the [C
 Trace your charm <trace-your-charm>
 ```
 
+## Security
+
+To harden your charm and produce security documentation for users, work through [Security](#security), then follow these concrete actions.
+
+```{toctree}
+:maxdepth: 1
+
+Secure your charm <secure-your-charm>
+```
+
 % TOC only. Nothing shown on the page.
 
 ```{toctree}
 :hidden:
 
 Publish your charm on Charmhub <publish-your-charm-on-charmhub>
+Set up production integrations <set-up-production-integrations>
 Make your charm discoverable <make-your-charm-discoverable>
 ```
 

@@ -405,6 +405,24 @@ def test_relation_save_custom_naming_pattern(relation_data_class: type[_AliasPro
     }
 
 
+def test_juju_fields_pydantic_dataclass_without_is_pydantic_dataclass():
+    """Pydantic dataclasses from before pydantic 2.11 still have their aliases kept.
+
+    ``__is_pydantic_dataclass__`` only exists from pydantic 2.11, but every
+    pydantic 2 dataclass has ``__pydantic_validator__`` in its ``__dict__``.
+    Simulate the older shape on a plain dataclass, so that the test doesn't
+    need multiple installed pydantic versions.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+
+    Data.__pydantic_validator__ = object()  # pyright: ignore[reportAttributeAccessIssue]
+
+    assert ops.charm._juju_fields(Data) == {'fooBar': 'fooBar'}
+
+
 def test_relation_load_extra_args():
     @dataclasses.dataclass
     class Data:

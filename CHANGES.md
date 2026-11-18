@@ -1,3 +1,79 @@
+# 3.9.0 - 08 October 2026
+
+## Features
+
+* Add an exception note when `ModelError` is raised ([#2786](https://github.com/canonical/operator/pull/2786))
+
+## Fixes
+
+* Make `_CharmSpec` covariant in its charm type ([#2715](https://github.com/canonical/operator/pull/2715))
+* Say which tracing destination rejected the data ([#2714](https://github.com/canonical/operator/pull/2714))
+* Detect Pydantic dataclasses from before 2.11 when mapping aliases ([#2768](https://github.com/canonical/operator/pull/2768))
+* Enforce relation databag read permissions on all access paths ([#2738](https://github.com/canonical/operator/pull/2738))
+* Use cached leadership in security logging, renew lease on success by @cristiangirlea ([#2778](https://github.com/canonical/operator/pull/2778))
+* A gone relation raises `RelationNotFoundError`, not "permission denied" ([#2748](https://github.com/canonical/operator/pull/2748))
+* Treat an `_Abort(0)` from the charm's `__init__` as success in ops.testing ([#2780](https://github.com/canonical/operator/pull/2780))
+* Record trace data in every ops.testing run with opentelemetry-sdk 1.45 ([#2787](https://github.com/canonical/operator/pull/2787))
+* Let charms and libraries set `on` without a type: ignore ([#2775](https://github.com/canonical/operator/pull/2775))
+
+## Documentation
+
+* Surface the tool versions page ([#2712](https://github.com/canonical/operator/pull/2712))
+* Update Concierge links and intersphinx URLs in doc source ([#2725](https://github.com/canonical/operator/pull/2725))
+* Add retry loop to version check in K8s tutorial charm ([#2689](https://github.com/canonical/operator/pull/2689))
+* Merge HACKING.md into CONTRIBUTING.md, fewer files in root ([#2734](https://github.com/canonical/operator/pull/2734))
+* Add a how-to guide for securing a charm ([#2721](https://github.com/canonical/operator/pull/2721))
+* Condense and trim CONTRIBUTING.md ([#2754](https://github.com/canonical/operator/pull/2754))
+* Fix the self-review command in the discoverability how-to ([#2764](https://github.com/canonical/operator/pull/2764))
+* Mount the project directory to a target relative to the home directory ([#2765](https://github.com/canonical/operator/pull/2765))
+* Pull tutorial code snippets from examples/ ([#2544](https://github.com/canonical/operator/pull/2544))
+
+## Tests
+
+* Add conformance tests for the tracing and certificate_transfer interfaces ([#2711](https://github.com/canonical/operator/pull/2711))
+* Make pyright check whole trees rather than a list of directories ([#2779](https://github.com/canonical/operator/pull/2779))
+
+## Refactoring
+
+* Drop typing.cast where narrowing can do the work ([#2723](https://github.com/canonical/operator/pull/2723))
+* Only import pdb when a debugger is actually requested ([#2740](https://github.com/canonical/operator/pull/2740))
+
+## CI
+
+* Enrich scheduled-failure issues with an LLM triage pass ([#2663](https://github.com/canonical/operator/pull/2663), [#2781](https://github.com/canonical/operator/pull/2781))
+* Stop tox writing a .venv redirect file in the examples ([#2769](https://github.com/canonical/operator/pull/2769))
+* Move the release process from release.py to workflows ([#2772](https://github.com/canonical/operator/pull/2772))
+
+# 3.8.3 - 30 September 2026
+
+## **Security** Fixes
+
+* Stop recording secret content, relation data, pod specs, and action results and log messages in trace data (GHSA-4356-5g33-3qrp)
+* Stop including action results and action log messages in hook command errors
+
+# 3.8.2 - 31 August 2026
+
+## Fixes
+
+* Compare full event paths when skipping duplicate notices (#2684)
+* In `ops.testing`, don't pass a message when converting an unknown status by name (#2700)
+
+## Documentation
+
+* Give each best-practice admonition a stable anchor (#2524)
+* Reword text that vale 3.17 flags as misspelled (#2695)
+* Stop styling page references as blockquotes (#2666)
+* Make the custom-endpoint-name sample test actually test something (#2664)
+* Replace `requests` by `urllib` in K8s tutorial integration tests (#2687)
+* Recommend spread directly, rather than charmcraft test (#2706)
+* Extract sections in "how to write integration tests" to their own how-to guide (#2662)
+
+## CI
+
+* Point DB charm CI at the moved mysql-operators repo (#2551)
+* Switch example charm integration tests to Concierge `k8s` preset (#2696)
+* Use the upstream concierge presets again (#2699)
+
 # 3.8.1 - 30 July 2026
 
 ## Fixes

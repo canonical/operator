@@ -20,9 +20,7 @@ This is a mature, production framework used by thousands of charms. Changes requ
 | `ops/model.py` | Juju model abstractions |
 | `ops/pebble.py` | Pebble API for container workload management |
 | `ops/__init__.py` | Public API exports |
-| `STYLE.md` | Team Python style guide |
-| `CONTRIBUTING.md` | PR and contribution process |
-| `HACKING.md` | Detailed development setup and workflow |
+| `CONTRIBUTING.md` | Contribution process and development setup |
 
 ## Important Notes
 
@@ -46,7 +44,7 @@ This is a mature, production framework used by thousands of charms. Changes requ
 ## Development Standards
 
 ### Language & Type Checking
-- Follow conventions in STYLE.md
+- Follow conventions in our Python and docs style guides: https://raw.githubusercontent.com/canonical/charm-tech/refs/heads/main/style/python.md and https://raw.githubusercontent.com/canonical/charm-tech/refs/heads/main/style/docs.md
 - Use Ruff for formatting (`tox -e format`)
 - Python 3.10+ with **full type hints** required (check with `tox -e lint`)
 - Use modern `x: int | None` annotations, not old-style `x: Optional[int]`

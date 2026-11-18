@@ -28,15 +28,15 @@ jobs:
           - examples/k8s-5-observe
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python 3
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: '${{ matrix.python-version }}'
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Charmcraft
@@ -47,6 +47,11 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
+      - name: Lock dependencies
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
+        run: |
+          cd ${{ matrix.dir }}
+          if [ ! -f uv.lock ]; then uv lock; fi
       - name: Run linting and static checks
         run: |
           cd ${{ matrix.dir }}
@@ -55,7 +60,7 @@ jobs:
         run: |
           cd ${{ matrix.dir }}
           tox -e unit
-      - name: Write mypy-requirements.txt
+      - name: Write type checker requirements files
         shell: uv run --script --no-project {0}
         run: |
           # /// script
@@ -63,19 +68,33 @@ jobs:
           # ///
           import tomli, pathlib
           pyproject_toml = tomli.loads(pathlib.Path('pyproject.toml').read_text())
-          deps = '\n'.join(pyproject_toml['dependency-groups']['mypy'])
-          print(deps)  # logging
-          pathlib.Path('mypy-requirements.txt').write_text(deps)
+          for group in ('mypy', 'pyrefly', 'ty'):
+              deps = '\n'.join(pyproject_toml['dependency-groups'][group])
+              print(f'{group}: {deps}')  # logging
+              pathlib.Path(f'{group}-requirements.txt').write_text(deps)
       - name: Run mypy
         working-directory: ${{ matrix.dir }}
         env:
           MYPYPATH: 'src:lib:../..'
         run: |
-          uv run \
-            --with-requirements=../../mypy-requirements.txt \
-            --with=../.. \
-            --with=../../testing \
-            --group=lint \
-            --group=unit \
-            --group=integration \
-            mypy --explicit-package-bases --follow-imports=silent src tests
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../mypy-requirements.txt
+          uv run --no-sync mypy --explicit-package-bases --follow-imports=silent src tests
+      - name: Run pyrefly
+        working-directory: ${{ matrix.dir }}
+        run: |
+          # Only some charms have a lib directory, after fetching charm libs.
+          search_paths=()
+          if [ -d lib ]; then search_paths+=(--search-path lib); fi
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../pyrefly-requirements.txt
+          uv run --no-sync pyrefly check "${search_paths[@]}" src tests
+      - name: Run ty
+        working-directory: ${{ matrix.dir }}
+        run: |
+          # Only some charms have a lib directory, after fetching charm libs.
+          search_paths=()
+          if [ -d lib ]; then search_paths+=(--extra-search-path lib); fi
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../ty-requirements.txt
+          uv run --no-sync ty check "${search_paths[@]}" src tests

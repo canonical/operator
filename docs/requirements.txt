@@ -9,7 +9,7 @@ sphinx-notfound-page~=1.1
 sphinx-reredirects==0.1.6
 sphinx-tabs~=3.5
 sphinxcontrib-jquery~=4.1
-sphinxcontrib-mermaid~=2.0
+sphinxcontrib-mermaid~=2.1
 sphinxext-opengraph~=0.13
 sphinx-rerediraffe>=0.0.3, <1.0.0
 
@@ -32,4 +32,4 @@ sphinx-llm~=0.4
 
 # Vale dependencies
 rst2html
-vale~=3.13
+vale==3.13.0.0

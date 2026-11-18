@@ -22,7 +22,6 @@ import keyword
 import logging
 import marshal
 import pathlib
-import pdb
 import re
 import sys
 import types
@@ -38,6 +37,9 @@ from . import charm
 from ._private import tracer
 from .model import Model, _ModelBackend
 from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class Serializable(typing.Protocol):
@@ -343,7 +345,7 @@ class HandleKind:
     be explicitly overridden if desired.
     """
 
-    def __get__(self, obj: Object, obj_type: type[Object]) -> str:
+    def __get__(self, obj: Object | None, obj_type: type[Object]) -> str:
         kind = typing.cast('str', obj_type.__dict__.get('handle_kind'))
         if kind:
             return kind
@@ -371,12 +373,6 @@ class Object:
     """
 
     handle_kind: str = HandleKind()  # type: ignore
-
-    if TYPE_CHECKING:
-        # to help the type checker and IDEs:
-        # all these are guaranteed to be set at runtime.
-        @property
-        def on(self) -> 'ObjectEvents': ...  # ruff: ignore[undocumented-public-method, quoted-annotation]
 
     def __init__(self, parent: Framework | Object, key: str | None):
         self.framework: Framework = None  # type: ignore
@@ -410,9 +406,9 @@ class ObjectEvents(Object):
     def __init__(self, parent: Object | None = None, key: str | None = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache: weakref.WeakKeyDictionary[Object, ObjectEvents] = weakref.WeakKeyDictionary()
+        self._cache: weakref.WeakKeyDictionary[Object, Self] = weakref.WeakKeyDictionary()
 
-    def __get__(self, emitter: Object, emitter_type: type[Object]):
+    def __get__(self, emitter: Object | None, emitter_type: type[Object]) -> Self:
         if emitter is None:
             return self
         instance = self._cache.get(emitter)
@@ -569,7 +565,7 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 class Framework(Object):
     """Main interface from the Charm to the ops library's infrastructure."""
 
-    on = FrameworkEvents()  # type: ignore
+    on = FrameworkEvents()
     """Used for :meth:`observe`-ing framework-specific events."""
 
     # Override properties from Object so that we can set them in __init__.
@@ -583,12 +579,6 @@ class Framework(Object):
     """The directory where the charm is running."""
 
     _stored: StoredStateData = None  # type: ignore
-
-    # to help the type checker and IDEs:
-    if TYPE_CHECKING:
-
-        @property
-        def on(self) -> 'FrameworkEvents': ...  # ruff: ignore[undocumented-public-method, quoted-annotation]
 
     def __init__(
         self,
@@ -924,13 +914,14 @@ class Framework(Object):
         self._reemit()
 
     @contextmanager
-    def _event_context(self, event_name: str):
-        """Handles toggling the hook-is-running state in backends.
+    def _event_context(self, event_name: str, *, deferred: bool = False):
+        """Handles toggling the hook-is-running and event-is-deferred state in backends.
 
         This allows e.g. harness logic to know if it is executing within a running hook context
         or not.  It sets backend._hook_is_running equal to the name of the currently running
         hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
-        is completed.
+        is completed. It also records whether the event is a deferred one being re-emitted,
+        so that errors can report it.
 
         Usage:
 
@@ -954,11 +945,14 @@ class Framework(Object):
         self._event_name = event_name
 
         old_hook_is_running = backend._hook_is_running
+        old_event_is_deferred = backend._event_is_deferred
         backend._hook_is_running = event_name
+        backend._event_is_deferred = deferred
         try:
             yield
         finally:
             backend._hook_is_running = old_hook_is_running
+            backend._event_is_deferred = old_event_is_deferred
             self._event_name = old_event_name
 
     def _reemit(self, single_event_path: str | None = None):
@@ -1022,11 +1016,15 @@ class Framework(Object):
                         span.set_attribute('event_class', event.__class__.__qualname__)
                         span.set_attribute('event_name', event_handle.kind)
                         span.set_attribute('handler', f'{observer_path}.{method_name}')
-                        with self._event_context(event_handle.kind):
+                        with self._event_context(
+                            event_handle.kind, deferred=single_event_path is None
+                        ):
                             if (
                                 event_is_from_juju or event_is_action
                             ) and self._juju_debug_at.intersection({'all', 'hook'}):
                                 # Present the welcome message and run under PDB.
+                                import pdb  # Import expensive module only when needed.
+
                                 self._show_debug_code_message()
                                 pdb.runcall(custom_handler, event)
                             else:
@@ -1087,6 +1085,8 @@ class Framework(Object):
             return
 
         if 'all' in indicated_breakpoints or name in indicated_breakpoints:
+            import pdb  # Import expensive module only when needed.
+
             self._show_debug_code_message()
 
             # If we call set_trace() directly it will open the debugger *here*, so indicating
@@ -1179,18 +1179,10 @@ class BoundStoredState:
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)
 
-    @typing.overload
-    def __getattr__(self, key: Literal['on']) -> ObjectEvents:
-        pass
-
-    @typing.overload
-    def __getattr__(self, key: str) -> Any:
-        pass
-
     def __getattr__(self, key: str) -> Any:
         # "on" is the only reserved key that can't be used in the data map.
         if key == 'on':
-            return self._data.on
+            raise AttributeError("attribute 'on' is reserved")
         if key not in self._data:
             raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])
