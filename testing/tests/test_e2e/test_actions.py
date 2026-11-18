@@ -108,6 +108,26 @@ def test_action_params_nested_defaults(
     assert evt.params == expected
 
 
+def test_action_params_default_is_copied():
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_action, self._on_foo_action)
+
+        def _on_foo_action(self, event: ActionEvent):
+            event.set_results({'tags': ','.join(event.params['tags'])})
+            event.params['tags'].append('extra')
+
+    ctx = Context(
+        MyCharm,
+        meta={'name': 'foo'},
+        actions={'foo': {'params': {'tags': {'type': 'array', 'default': ['a']}}}},
+    )
+    ctx.run(ctx.on.action('foo'), State())
+    ctx.run(ctx.on.action('foo'), State())
+    assert ctx.action_results == {'tags': 'a'}
+
+
 def test_action_no_results():
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
