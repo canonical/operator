@@ -31,7 +31,7 @@ from email.message import Message
 from typing import Any
 
 import pytest
-from hypothesis import given
+from hypothesis import example, given
 from hypothesis import strategies as st
 
 from ops import pebble
@@ -227,12 +227,14 @@ def _encode_push(
     body = b''.join(generator)
     boundary = content_type.split('boundary="', 1)[1].rstrip('"')
     parts = _parse_encoded(body, boundary)
-    disposition = next(
-        line for line in parts[-1][2].splitlines() if line.startswith('Content-Disposition:')
-    )
+    # Go's textproto splits header lines on '\n' and drops a trailing '\r'.
+    # str.splitlines() would also split on characters such as U+2028.
+    lines = [line.removesuffix('\r') for line in parts[-1][2].split('\n')]
+    disposition = next(line for line in lines if line.startswith('Content-Disposition:'))
     return parts, _go_param(disposition, 'filename')
 
 
+@example(metadata={}, path='/a\u2028b', content=b'x', chunk_size=8)
 @given(
     metadata=st.dictionaries(st.text(), _json_values, max_size=4),
     path=_paths.filter(_push_safe),
