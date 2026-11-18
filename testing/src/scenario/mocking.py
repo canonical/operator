@@ -506,6 +506,14 @@ class _MockModelBackend(_ModelBackend):
     ) -> str:
         from .state import Secret
 
+        # secret-add's default owner is the application, so None needs the leader too.
+        if owner != 'unit' and not self.is_leader():
+            understandable_error = SecretNotFoundError(
+                'Only the leader unit can create an app-owned secret.',
+            )
+            # Charm-facing side: the error that Juju's secret-add gives.
+            raise ModelError('ERROR this unit is not the leader') from understandable_error
+
         secret = Secret(
             content,
             label=label,

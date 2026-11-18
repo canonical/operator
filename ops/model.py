@@ -501,6 +501,8 @@ class Application:
     ) -> Secret:
         """Create a :class:`Secret` owned by this application.
 
+        Only the leader unit can create a secret owned by the application.
+
         .. jujuadded:: 3.0
 
         Args:
@@ -519,6 +521,7 @@ class Application:
 
         Raises:
             ValueError: if the secret is empty, or the secret key is invalid.
+            ModelError: if this unit is not the leader.
         """
         Secret._validate_content(content)
         id = self._backend.secret_add(

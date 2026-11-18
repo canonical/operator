@@ -161,6 +161,17 @@ def test_add(app: bool):
     assert secret.label == 'mylabel'
 
 
+def test_add_app_secret_not_leader():
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=False)) as mgr:
+        # Juju's secret-add only lets the leader create a secret owned by the application.
+        with pytest.raises(ops.ModelError, match='this unit is not the leader'):
+            mgr.charm.app.add_secret({'foo': 'bar'}, label='mylabel')
+        output = mgr.run()
+
+    assert not output.secrets
+
+
 def test_set_legacy_behaviour():
     # in juju < 3.1.7, secret owners always used to track the latest revision.
     # ref: https://bugs.launchpad.net/juju/+bug/2037120
