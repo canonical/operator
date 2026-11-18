@@ -231,6 +231,10 @@ class App:
         # Where the application comes in the round-robin: its place in
         # deploy order.
         self._order = order
+        # One Context per unit, kept for the unit's life. Each Context holds
+        # its containers' and storage's simulated filesystems in its own
+        # temporary directory, so a new one per event would lose any files
+        # the charm wrote.
         self._contexts: dict[int, Context[CharmBase]] = {}
         self._leader_id = 0
         self._units: dict[int, Unit] = {}
