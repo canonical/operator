@@ -273,11 +273,11 @@ class App:
     def _container_names(self) -> tuple[str, ...]:
         return tuple(self._charm.metadata.get('containers') or {})
 
-    def _containers(self) -> list[Container]:
-        """Each unit's starting containers: the template's, or a connectable default."""
+    def _containers(self, *, can_connect: bool) -> list[Container]:
+        """Each unit's starting containers: the template's, or a default."""
         from_template = {c.name: c for c in self._state_template.containers}
         containers = [
-            from_template.pop(name, Container(name=name, can_connect=True))
+            from_template.pop(name, Container(name=name, can_connect=can_connect))
             for name in self._container_names
         ]
         # Anything left names a container the metadata doesn't declare; keep
@@ -393,10 +393,11 @@ class Juju:
 
         :meth:`settle` runs each unit's startup events: ``install``,
         ``leader-elected`` on the leader and ``leader-settings-changed`` on the
-        other units, ``config-changed``, ``start``, and ``pebble-ready`` for
-        each container. Each unit also gets a ``storage-attached`` for each
-        storage instance. As in Juju, these come before ``install`` in a
-        machine model, and after ``start`` in a Kubernetes model.
+        other units, ``config-changed``, ``start``, and, in a Kubernetes
+        model, ``pebble-ready`` for each container. Each unit also gets a
+        ``storage-attached`` for each storage instance. As in Juju, these
+        come before ``install`` in a machine model, and after ``start`` in a
+        Kubernetes model.
 
         Args:
             charm: A :class:`CharmSpec`, or a charm class, which is shorthand
@@ -542,6 +543,10 @@ class Juju:
     def _add_unit(self, app: App) -> Unit:
         unit_id = app._next_unit_id
         app._next_unit_id += 1
+        # A machine charm can declare containers, and Juju deploys it, but
+        # only the Kubernetes agent watches containers, so on a machine there
+        # is no Pebble to connect to and no pebble-ready.
+        is_k8s = self._model.type == 'kubernetes'
         storages: list[Storage] = []
         for name, count in app._storage.items():
             for _ in range(count):
@@ -550,7 +555,7 @@ class Juju:
         state = dataclasses.replace(
             app._state_template,
             config=dict(app._config),
-            containers=frozenset(app._containers()),
+            containers=frozenset(app._containers(can_connect=is_k8s)),
             storages=frozenset(storages),
             leader=unit_id == app._leader_id,
             model=self._model_for(app._charm.juju_version),
@@ -570,7 +575,6 @@ class Juju:
         # storage is provisioned with the pod, and Juju runs storage-attached
         # some time after start. Here it's straight after start, before
         # pebble-ready, every time.
-        is_k8s = self._model.type == 'kubernetes'
         startup = [] if is_k8s else attached
         startup += [
             _Queued(Event('install')),
@@ -580,10 +584,10 @@ class Juju:
         ]
         if is_k8s:
             startup += attached
-        startup.extend(
-            _Queued(Event(f'{name}_pebble_ready'), _Rebind('container', name))
-            for name in app._container_names
-        )
+            startup.extend(
+                _Queued(Event(f'{name}_pebble_ready'), _Rebind('container', name))
+                for name in app._container_names
+            )
         for event, rebind in startup:
             self._enqueue(app, unit_id, event, rebind)
         return unit

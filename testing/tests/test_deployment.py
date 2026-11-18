@@ -241,6 +241,14 @@ def test_deploy_creates_containers_and_runs_pebble_ready(juju: Juju):
     assert {c.name for c in app.leader.state.containers} == {'workload'}
 
 
+def test_a_machine_model_has_unconnectable_containers_and_no_pebble_ready():
+    with Juju(cloud_spec=CloudSpec(type='lxd', name='localhost')) as j:
+        app = j.deploy(spec(MyCharm, {**META, 'containers': {'workload': {}}}))
+        trace = j.settle()
+    assert events(trace, 'myapp/0') == ['install', 'leader_elected', 'config_changed', 'start']
+    assert app.leader.state.containers == {Container('workload', can_connect=False)}
+
+
 def test_a_charm_spec_can_be_deployed_more_than_once(juju: Juju):
     charm = spec(MyCharm)
     one = juju.deploy(charm, app='one')
