@@ -77,7 +77,7 @@ class MyCharm(ops.CharmBase):
         except ops.ModelError:
             logger.exception("Could not fetch resource 'my-resource'.")
             self.unit.status = ops.BlockedStatus(
-                "Resource 'my-resource' is missing; attach it with "
+                "Could not fetch resource 'my-resource'; attach it with "
                 '`juju attach-resource`'
             )
             return
@@ -212,21 +212,15 @@ def test_resource_attached(tmp_path: pathlib.Path):
     assert state_out.unit_status == testing.ActiveStatus()
 ```
 
-If you leave a declared resource out of `State.resources`, `ops.testing` treats the state as inconsistent and raises an error. It doesn't raise `ops.ModelError`. To test how your charm handles a missing resource, patch `fetch()` to raise `ops.ModelError`. For example:
+To test how your charm handles a missing resource, leave it out of `State.resources`. `fetch()` raises `ops.ModelError`, as it does in Juju. For example:
 
 ```python
-import ops
-import pytest
 from ops import testing
 
 from charm import MyCharm
 
 
-def test_resource_missing(monkeypatch: pytest.MonkeyPatch):
-    def fetch(self: ops.Resources, name: str):
-        raise ops.ModelError(f'could not download resource: {name}')
-
-    monkeypatch.setattr(ops.Resources, 'fetch', fetch)
+def test_resource_missing():
     ctx = testing.Context(MyCharm)
 
     state_out = ctx.run(ctx.on.install(), testing.State())
