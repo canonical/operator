@@ -47,13 +47,20 @@ _boundaries = st.text(alphabet=_BCHARS, min_size=1, max_size=70).filter(
 # Linear whitespace is allowed between a boundary and its CRLF (RFC 2046).
 _lwsp = st.text(alphabet=' \t', max_size=3)
 
+# MIME tspecials: Go's mime.ParseMediaType treats a backslash before one of
+# these as an escape inside a quoted parameter value.
+_TSPECIALS = '()<>@,;:\\"/[]?='
+
 # Absolute file paths. Control characters are left out: a CR or LF in a
-# path would need header folding, which neither side does.
-_paths = st.text(
-    alphabet=st.characters(blacklist_categories=['Cs', 'Cc']),
+# path would need header folding, which neither side does. Half the
+# characters are tspecials, space or tab, which the full Unicode range would
+# otherwise almost never produce. This is a list rather than text() because
+# text() merges the two alphabets into one and loses the weighting.
+_paths = st.lists(
+    st.characters(blacklist_categories=['Cs', 'Cc']) | st.sampled_from(_TSPECIALS + ' \t'),
     min_size=1,
     max_size=50,
-).map(lambda p: '/' + p)
+).map(lambda chars: '/' + ''.join(chars))
 
 # Known problems these tests found, kept out of the general strategies so
 # that the properties stay green; each has its own xfail test below.
@@ -66,7 +73,6 @@ _paths = st.text(
 #   mime.ParseMediaType (which Pebble uses) treats '\' before a tspecial as an
 #   escape, so '\\' arrives as '\', '\/' as '/', and a trailing '\' makes the
 #   header unparsable.
-_TSPECIALS = '()<>@,;:\\"/[]?='
 
 
 def _pull_safe(path: str) -> bool:
@@ -235,6 +241,7 @@ def _encode_push(
 
 
 @example(metadata={}, path='/a\u2028b', content=b'x', chunk_size=8)
+@example(metadata={}, path='/a"b', content=b'x', chunk_size=8)
 @given(
     metadata=st.dictionaries(st.text(), _json_values, max_size=4),
     path=_paths.filter(_push_safe),
