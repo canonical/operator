@@ -698,6 +698,10 @@ class Juju:
     def _settle(self, *, budget: int | None = None) -> list[Dispatch]:
         """Settle, or stop after ``budget`` dispatches, leaving the rest pending."""
         self._check_open()
+        # The trace and the loop check start again on every call, so a caller
+        # that steps with a small budget never reaches the dispatch limit or
+        # sees a loop. Stepping that needs those checks has to keep its own
+        # count and history across calls.
         self._trace = []
         seen: dict[tuple[str, int, str], list[tuple[Event, State]]] = {}
         while budget is None or len(self._trace) < budget:
