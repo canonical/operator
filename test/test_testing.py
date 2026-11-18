@@ -5674,6 +5674,20 @@ class TestFilesystem:
         container.make_dir('/foo/bar/foobar', make_parents=True)
         assert (container_fs_root / 'foo/bar/foobar').is_dir()
 
+    def test_make_dir_parents_with_zero_permissions(
+        self, container: ops.Container, container_fs_root: pathlib.Path
+    ):
+        container.make_dir('/a/b', make_parents=True, permissions=0)
+
+        # Stat the directories themselves: a mode 0 directory cannot be traversed
+        # by a non-root user, so the child is checked after opening up the parent.
+        assert (container_fs_root / 'a').stat().st_mode & 0o777 == 0
+        (container_fs_root / 'a').chmod(0o700)
+        assert (container_fs_root / 'a/b').stat().st_mode & 0o777 == 0
+
+        # Allow the temporary directory to be cleaned up.
+        (container_fs_root / 'a/b').chmod(0o700)
+
     def test_pull(self, container: ops.Container, container_fs_root: pathlib.Path):
         (container_fs_root / 'foo').write_text('foo')
         with container.pull('/foo') as f:
