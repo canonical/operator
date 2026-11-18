@@ -205,8 +205,9 @@ class Worker:
 
     def _read_stderr(self, stream: IO[bytes]) -> None:
         try:
-            for line in stream:
-                self._stderr.append(line.decode(errors='replace'))
+            # A size limit splits a long line, so the deque bounds memory too.
+            for chunk in iter(lambda: stream.readline(4096), b''):
+                self._stderr.append(chunk.decode(errors='replace'))
         except (OSError, ValueError):
             pass  # Closed by _finish.
 
@@ -243,7 +244,7 @@ class Worker:
         stderr = ''.join(self._stderr).strip()
         return IsolationError(
             f'{message}\nReturn code: {proc.returncode}\n'
-            f'Worker stderr (last {self._stderr.maxlen} lines):\n{stderr}'
+            f'Worker stderr (most recent output):\n{stderr}'
         )
 
     def _finish(self, proc: subprocess.Popen[bytes]) -> None:

@@ -213,6 +213,16 @@ def test_charm_output_doesnt_reach_the_protocol(workers: list[Worker]):
         assert worker.run(on.install(), State()).unit_status == ActiveStatus('survived')
 
 
+def test_output_without_newlines_is_kept_within_a_limit(workers: list[Worker]):
+    worker = Worker(CHARMS / 'noisy')
+    workers.append(worker)
+    with pytest.raises(IsolationError, match='crashed without responding') as caught:
+        worker.run(on.start(), State())
+    message = str(caught.value)
+    assert message.endswith('end of output')
+    assert len(message) < 1024 * 1024
+
+
 def test_close_stops_the_worker_and_a_later_event_starts_another():
     worker = Worker(CHARMS / 'report')
     try:
