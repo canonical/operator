@@ -113,11 +113,11 @@ def test_parse_duration_reads_go_durations(ns: int):
     assert abs(us * _NS_PER_US - ns) <= _NS_PER_US // 2
 
 
-@given(_durations_ns, st.sampled_from(['+', '']))
-def test_parse_duration_explicit_plus_sign(ns: int, plus: str):
+@given(_durations_ns)
+def test_parse_duration_explicit_plus_sign(ns: int):
     """A leading "+" makes no difference."""
     formatted = _go_duration(abs(ns))
-    assert timeconv.parse_duration(plus + formatted) == timeconv.parse_duration(formatted)
+    assert timeconv.parse_duration('+' + formatted) == timeconv.parse_duration(formatted)
 
 
 @given(st.integers(min_value=1_000, max_value=999_999))
