@@ -4,9 +4,10 @@
 """Drive several charms together with Juju-shaped operations.
 
 A :class:`Juju` holds applications, each with units that have their own
-:class:`State`. Operations such as :meth:`Juju.deploy` change the model
-straight away, and :meth:`Juju.settle` runs the events that Juju would run
-for them, along with whatever the charms' own changes cause on their peers.
+:class:`State`. Operations such as :meth:`Juju.deploy` and :meth:`Juju.config`
+change the model straight away, and :meth:`Juju.settle` runs the events that
+Juju would run for them, along with whatever the charms' own changes cause on
+their peers.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ import types
 import unittest.mock
 from collections import deque
 from collections.abc import Generator, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Generic, Literal, NamedTuple, Protocol
 
 from ops import JujuVersion
 
@@ -70,7 +71,7 @@ _NO_LEADER_SETTINGS_JUJU_VERSION = '4.0.0'
 
 # Events that only say "look again". One already waiting for a unit, about the
 # same thing, covers a second.
-_COALESCED_SUFFIXES = ('_relation_changed',)
+_COALESCED_SUFFIXES = ('_relation_changed', 'config_changed')
 
 # State fields that describe a unit's place in the model. Juju sets these
 # itself, so a state_template may not.
@@ -124,6 +125,14 @@ class CharmSpec(Generic[CharmType]):
     """
 
 
+class _Candidate(NamedTuple):
+    """A unit with events pending, and the first of them: one possible next dispatch."""
+
+    app_name: str
+    unit_id: int
+    event: Event
+
+
 @dataclasses.dataclass(frozen=True)
 class Dispatch:
     """One event dispatched to one unit, as recorded in a settle trace.
@@ -155,10 +164,40 @@ class Dispatch:
     state_out: State
     """The :class:`State` the charm produced."""
 
+    _: dataclasses.KW_ONLY
+
+    _charm: _Charm | None = dataclasses.field(default=None, repr=False, compare=False)
+
+    # The units that had an event pending when this one was chosen, and which
+    # of them was chosen.
+    _candidates: tuple[_Candidate, ...] = dataclasses.field(default=(), repr=False, compare=False)
+    _chosen: int = dataclasses.field(default=0, repr=False, compare=False)
+
     @property
     def unit_name(self) -> str:
         """The Juju unit name, for example ``myapp/2``."""
         return f'{self.app_name}/{self.unit_id}'
+
+    def to_context(self) -> Context[CharmBase]:
+        """A new :class:`~ops.testing.Context` for the unit as it was at this dispatch.
+
+        The ``Context`` has the charm and metadata the test gave
+        :meth:`Juju.deploy`, the application's trust, and the unit's ID.
+        Config and leadership come from :attr:`state_in`, so running
+        :attr:`event` against :attr:`state_in` runs the dispatch again from
+        the same starting point::
+
+            ctx = dispatch.to_context()
+            state_out = ctx.run(dispatch.event, dispatch.state_in)
+
+        Like :meth:`Unit.to_context`, it's new on every call.
+
+        Raises:
+            JujuError: if this ``Dispatch`` wasn't recorded by :meth:`Juju.settle`.
+        """
+        if self._charm is None:
+            raise JujuError('Only a Dispatch from Juju.settle() knows its charm.')
+        return self._charm.context(self.unit_id)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -229,6 +268,22 @@ class Unit:
         run whatever the operations so far have caused, then assert.
         """
         return self._state
+
+    def to_context(self) -> Context[CharmBase]:
+        """A new :class:`~ops.testing.Context` for this unit's charm.
+
+        Use it to run an action against the unit at this point in the test, or
+        to carry on with a single-charm test from here::
+
+            ctx = web.leader.to_context()
+            ctx.run(ctx.on.action('backup'), web.leader.state)
+
+        The ``Context`` has the application's metadata, config options,
+        actions, name and trust, and this unit's ID. It is new on every call,
+        so its collections, such as the Juju log, start empty. Running it
+        doesn't change this unit or anything else under the :class:`Juju`.
+        """
+        return self._app._charm.context(self._id)
 
     def __repr__(self) -> str:
         return f'<Unit {self.name}>'
@@ -358,6 +413,23 @@ class _Queued(NamedTuple):
     rebind: _Rebind | None = None
 
 
+class _Scheduler(Protocol):
+    def choose(self, candidates: Sequence[_Candidate]) -> int:
+        """Pick the next dispatch: an index into ``candidates``, which is never empty."""
+        ...
+
+
+class _RoundRobin:
+    """The default scheduler: each unit in turn.
+
+    ``Juju`` lists the candidates starting from the unit after the last one
+    that had a turn, so the next in turn is always the first.
+    """
+
+    def choose(self, candidates: Sequence[_Candidate]) -> int:
+        return 0
+
+
 class Juju:
     """A set of applications, driven with Juju-shaped operations.
 
@@ -372,6 +444,7 @@ class Juju:
     with whatever the charms' own changes cause on their peers, so most
     tests are a sequence of operations, a ``settle()``, and then assertions::
 
+        juju.config(web, {'log_level': 'debug'})
         juju.settle()
         assert web.leader.state.unit_status == ActiveStatus('ready')
     """
@@ -410,6 +483,7 @@ class Juju:
         # The round-robin position, (application order, unit ID), of the last
         # unit that had a turn.
         self._turn: tuple[int, int] | None = None
+        self._scheduler: _Scheduler = _RoundRobin()
         # Relation IDs are per model in Juju, so they are per Juju here,
         # rather than from the process-wide counter Relation uses.
         self._next_relation_id = 0
@@ -532,6 +606,26 @@ class Juju:
         self._check_deployed(app)
         return self._add_unit(app)
 
+    def config(self, app: App, config: Mapping[str, Any]) -> None:
+        """Change an application's configuration, as ``juju config`` would.
+
+        The new values are merged over the existing ones and are in every
+        unit's :class:`State` straight away. :meth:`settle` runs
+        ``config-changed`` on each unit, once however many times this is
+        called before it.
+
+        Raises:
+            JujuError: if an option isn't one of the charm's config options,
+                or a value is the wrong type for its option.
+        """
+        self._check_open()
+        self._check_deployed(app)
+        _check_config(app.name, app._charm.config, config)
+        app._config.update(config)
+        for unit in app._units.values():
+            unit._state = dataclasses.replace(unit._state, config=dict(app._config))
+            self._enqueue(app, unit.id, Event('config_changed'))
+
     def settle(self) -> Sequence[Dispatch]:
         """Run events until the model converges.
 
@@ -565,34 +659,7 @@ class Juju:
                 number of pairs of peers. The message ends with the last
                 events dispatched.
         """
-        self._check_open()
-        self._trace = []
-        seen: dict[tuple[str, int, str], list[tuple[Event, State]]] = {}
-        while (next_unit := self._next_unit()) is not None:
-            if len(self._trace) >= self._settle_limit():
-                raise JujuError(
-                    f'Did not converge after {len(self._trace)} events. Check for charms '
-                    'that write a new value to a databag on every event.'
-                    f'{self._trace_tail()}'
-                )
-            app = self._apps[next_unit[0]]
-            unit = app._units[next_unit[1]]
-            queued = self._queues[app.name, unit.id].popleft()
-            self._turn = (app._order, unit.id)
-            event = self._bind(app, unit, queued)
-            if event is None:
-                continue
-            key, compared = _dispatch_key(app, unit, event)
-            earlier_dispatches = seen.setdefault(key, [])
-            if compared in earlier_dispatches:
-                raise JujuError(
-                    f'{unit.name} was about to handle {event.name} with the same '
-                    'State it had the last time it handled it, so settling would '
-                    f'never end.{self._trace_tail()}'
-                )
-            earlier_dispatches.append(compared)
-            self._dispatch(app, unit, event)
-        return list(self._trace)
+        return self._settle()
 
     def close(self) -> None:
         """Close the model. Safe to call more than once."""
@@ -608,19 +675,59 @@ class Juju:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def _next_unit(self) -> tuple[str, int] | None:
-        """The next unit with an event pending, starting from the unit after the last turn."""
+    def _settle(self, *, budget: int | None = None) -> list[Dispatch]:
+        """Settle, or stop after ``budget`` dispatches, leaving the rest pending."""
+        self._check_open()
+        self._trace = []
+        seen: dict[tuple[str, int, str], list[tuple[Event, State]]] = {}
+        while budget is None or len(self._trace) < budget:
+            candidates = self._candidates()
+            if not candidates:
+                break
+            if len(self._trace) >= self._settle_limit():
+                raise JujuError(
+                    f'Did not converge after {len(self._trace)} events. Check for charms '
+                    'that write a new value to a databag on every event.'
+                    f'{self._trace_tail()}'
+                )
+            chosen = self._scheduler.choose(candidates)
+            app = self._apps[candidates[chosen].app_name]
+            unit = app._units[candidates[chosen].unit_id]
+            queued = self._queues[app.name, unit.id].popleft()
+            self._turn = (app._order, unit.id)
+            event = self._bind(app, unit, queued)
+            if event is None:
+                continue
+            key, compared = _dispatch_key(app, unit, event)
+            earlier_dispatches = seen.setdefault(key, [])
+            if compared in earlier_dispatches:
+                raise JujuError(
+                    f'{unit.name} was about to handle {event.name} with the same '
+                    'State it had the last time it handled it, so settling would '
+                    f'never end.{self._trace_tail()}'
+                )
+            earlier_dispatches.append(compared)
+            self._dispatch(app, unit, event, tuple(candidates), chosen)
+        return list(self._trace)
+
+    def _candidates(self) -> list[_Candidate]:
+        """The first pending event of each unit, starting from the unit after the last turn."""
         pending = sorted(
-            ((self._apps[app_name]._order, unit_id), app_name, unit_id)
+            ((self._apps[app_name]._order, unit_id), app_name, unit_id, queue[0].event)
             for (app_name, unit_id), queue in self._queues.items()
             if queue
         )
-        if not pending:
-            return None
-        _, app_name, unit_id = next(
-            (p for p in pending if self._turn is None or p[0] > self._turn), pending[0]
-        )
-        return app_name, unit_id
+        after = [
+            _Candidate(app_name, unit_id, event)
+            for position, app_name, unit_id, event in pending
+            if self._turn is None or position > self._turn
+        ]
+        before = [
+            _Candidate(app_name, unit_id, event)
+            for position, app_name, unit_id, event in pending
+            if self._turn is not None and position <= self._turn
+        ]
+        return after + before
 
     def _bind(self, app: App, unit: Unit, queued: _Queued) -> Event | None:
         """The event to dispatch for a queue entry, or ``None`` if it no longer applies."""
@@ -673,14 +780,32 @@ class Juju:
         # peer's relation-joined.
         return peer_id is None or peer_id in view.peers_data
 
-    def _dispatch(self, app: App, unit: Unit, event: Event) -> None:
+    def _dispatch(
+        self,
+        app: App,
+        unit: Unit,
+        event: Event,
+        candidates: tuple[_Candidate, ...],
+        chosen: int,
+    ) -> None:
         state_in = unit._state
         # Seeded by the unit's own history, so that a secret's ID doesn't
         # depend on what other units ran before it.
         seed = f'{self._model.uuid}/{unit.name}/{unit._dispatches}'
         unit._dispatches += 1
         unit._state = app._run(unit.id, event, state_in, seed)
-        self._trace.append(Dispatch(event, app.name, unit.id, state_in, unit._state))
+        self._trace.append(
+            Dispatch(
+                event,
+                app.name,
+                unit.id,
+                state_in,
+                unit._state,
+                _charm=app._charm,
+                _candidates=candidates,
+                _chosen=chosen,
+            )
+        )
         self._propagate_peers(app, unit)
         if event.name.endswith('_relation_created') and isinstance(event._relation, PeerRelation):
             self._enter_peer_scope(app, unit, event._relation.endpoint)

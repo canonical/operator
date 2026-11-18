@@ -26,7 +26,7 @@ from scenario import (
     UnknownStatus,
     _deployment,
 )
-from scenario._deployment import App, CharmSpec, Dispatch, Juju, Unit
+from scenario._deployment import App, CharmSpec, Dispatch, Juju, Unit, _Candidate
 from scenario._juju_errors import JujuError
 from scenario.errors import InconsistentScenarioError, UncaughtCharmError
 
@@ -219,6 +219,15 @@ class UnguardedCharm(ops.CharmBase):
 
     def _on_install(self, _: ops.EventBase):
         self.unit.get_container('workload').replan()
+
+
+class ActionCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.backup_action, self._on_backup)
+
+    def _on_backup(self, event: ops.ActionEvent):
+        event.set_results({'unit': self.unit.name, 'level': self.config['log_level']})
 
 
 class NoMetadataCharm(ops.CharmBase):
@@ -590,23 +599,31 @@ TYPED_CONFIG: dict[str, Any] = {
         {'debug': 'yes'},
     ],
 )
-def test_deploy_rejects_config_of_the_wrong_type(juju: Juju, values: dict[str, Any]):
+def test_config_of_the_wrong_type_is_rejected(juju: Juju, values: dict[str, Any]):
+    app = deploy_mycharm(juju, config_schema=TYPED_CONFIG)
     with pytest.raises(JujuError, match=f'{next(iter(values))!r} is a'):
-        deploy_mycharm(juju, config_schema=TYPED_CONFIG, config=values)
-    assert not juju.apps
+        juju.config(app, values)
+    with pytest.raises(JujuError, match=f'{next(iter(values))!r} is a'):
+        juju.deploy(spec(MyCharm, config=TYPED_CONFIG), app='other', config=values)
+    assert app.config == {'log_level': 'info'}
+    assert 'other' not in juju.apps
 
 
-def test_deploy_accepts_config_of_the_right_type(juju: Juju):
+def test_config_of_the_right_type_is_accepted(juju: Juju):
+    app = deploy_mycharm(juju, config_schema=TYPED_CONFIG)
     values = {'log_level': 'debug', 'port': 8080, 'ratio': 0.5, 'debug': True}
-    app = deploy_mycharm(juju, config_schema=TYPED_CONFIG, config=values)
+    juju.config(app, values)
     juju.settle()
     assert app.leader.state.config == values
 
 
-def test_deploy_rejects_an_unknown_config_option(juju: Juju):
+def test_an_unknown_config_option_is_rejected(juju: Juju):
+    app = deploy_mycharm(juju)
     with pytest.raises(JujuError, match=r"no config option 'bogus'\. Its options are: log_level"):
-        deploy_mycharm(juju, config={'bogus': 1})
-    assert not juju.apps
+        juju.config(app, {'bogus': 1})
+    with pytest.raises(JujuError, match="no config option 'bogus'"):
+        juju.deploy(spec(MyCharm), app='other', config={'bogus': 1})
+    assert juju.settle()  # The rejected config left nothing behind to trip over.
 
 
 # storage
@@ -795,12 +812,52 @@ def test_add_unit_runs_the_startup_sequence_for_the_new_unit(juju: Juju):
     ]
 
 
-def test_add_unit_rejects_an_app_from_another_juju(juju: Juju):
+@pytest.mark.parametrize('operation', ['add_unit', 'config'])
+def test_operations_reject_an_app_from_another_juju(juju: Juju, operation: str):
     with Juju() as other:
         app = deploy_mycharm(other)
         deploy_mycharm(juju)
         with pytest.raises(JujuError, match='not deployed in this Juju'):
-            juju.add_unit(app)
+            if operation == 'add_unit':
+                juju.add_unit(app)
+            else:
+                juju.config(app, {'log_level': 'debug'})
+
+
+# config
+
+
+def test_config_is_in_the_state_straight_away_and_runs_one_config_changed(juju: Juju):
+    schema = {
+        'options': {
+            'log_level': {'type': 'string', 'default': 'info'},
+            'other': {'type': 'string', 'default': 'keep'},
+        }
+    }
+    app = deploy_mycharm(juju, config_schema=schema, num_units=2)
+    juju.settle()
+    juju.config(app, {'log_level': 'debug'})
+    assert app.leader.state.config == {'log_level': 'debug', 'other': 'keep'}
+    juju.config(app, {'other': 'changed'})
+    trace = juju.settle()
+    assert sorted((d.event.name, d.unit_id) for d in trace) == [
+        ('config_changed', 0),
+        ('config_changed', 1),
+    ]
+    assert app.config == {'log_level': 'debug', 'other': 'changed'}
+    for dispatch in trace:
+        assert dispatch.state_in.config == {'log_level': 'debug', 'other': 'changed'}
+    for unit in app.units.values():
+        assert unit.state.unit_status == ActiveStatus('config_changed:debug')
+
+
+def test_config_before_settling_joins_the_startup_config_changed(juju: Juju):
+    app = juju.deploy(spec(PeerCharm, PEER_META), num_units=2)
+    juju.config(app, {'log_level': 'debug'})
+    trace = juju.settle()
+    for unit in ('myapp/0', 'myapp/1'):
+        assert events(trace, unit).count('config_changed') == 1
+    assert app.units[1].state.unit_status == ActiveStatus("peers=['myapp/0']")
 
 
 # Peers
@@ -1062,4 +1119,109 @@ def test_close_rejects_later_operations_and_can_be_repeated(juju: Juju):
     with pytest.raises(JujuError, match='been closed'):
         juju.add_unit(app)
     with pytest.raises(JujuError, match='been closed'):
+        juju.config(app, {})
+    with pytest.raises(JujuError, match='been closed'):
         juju.settle()
+
+
+# to_context
+
+
+def test_unit_to_context_carries_the_app_settings_and_does_not_feed_back(juju: Juju):
+    meta: dict[str, Any] = {**META, 'config': CONFIG, 'actions': {'backup': {}}}
+    app = juju.deploy(CharmSpec(ActionCharm, meta=meta), app='renamed', trust=True, num_units=2)
+    juju.config(app, {'log_level': 'debug'})
+    juju.settle()
+    unit = app.units[1]
+    before = unit.state
+    ctx = unit.to_context()
+    assert unit.to_context() is not ctx
+    assert (ctx.app_name, ctx.unit_id, ctx.app_trusted) == ('renamed', 1, True)
+    ctx.run(ctx.on.action('backup'), before)
+    assert ctx.action_results == {'unit': 'renamed/1', 'level': 'debug'}
+    assert unit.state is before
+    assert juju.settle() == []
+
+
+def test_dispatch_to_context_runs_the_dispatch_again(juju: Juju):
+    deploy_mycharm(juju)
+    start = juju.settle()[-1]
+    assert start.event.name == 'start'
+    ctx = start.to_context()
+    state_out = ctx.run(start.event, start.state_in)
+    assert state_out.unit_status == start.state_out.unit_status
+
+
+def test_dispatch_to_context_needs_a_dispatch_from_settle(juju: Juju):
+    deploy_mycharm(juju)
+    recorded = juju.settle()[0]
+    made = Dispatch(recorded.event, 'myapp', 0, recorded.state_in, recorded.state_out)
+    assert made == recorded
+    with pytest.raises(JujuError, match=r'Only a Dispatch from Juju\.settle'):
+        made.to_context()
+
+
+# Choosing, recording and stopping the dispatch order
+
+
+class _Last:
+    def __init__(self):
+        self.seen: list[tuple[_Candidate, ...]] = []
+
+    def choose(self, candidates: Sequence[_Candidate]) -> int:
+        self.seen.append(tuple(candidates))
+        return len(candidates) - 1
+
+
+def test_the_scheduler_chooses_among_the_first_pending_event_of_each_unit(juju: Juju):
+    deploy_mycharm(juju, num_units=2)
+    juju.deploy(spec(MyCharm), app='other')
+    scheduler = juju._scheduler = _Last()
+    trace = juju.settle()
+
+    first = scheduler.seen[0]
+    assert {(c.app_name, c.unit_id) for c in first} == {('myapp', 0), ('myapp', 1), ('other', 0)}
+    assert all(c.event.name == 'install' for c in first)
+    for candidates in scheduler.seen:
+        units = [(c.app_name, c.unit_id) for c in candidates]
+        assert len(units) == len(set(units))
+
+    # A different order across units, but each unit's own events are unchanged.
+    with Juju() as default:
+        deploy_mycharm(default, num_units=2)
+        default.deploy(spec(MyCharm), app='other')
+        expected = default.settle()
+    assert [d.unit_name for d in trace] != [d.unit_name for d in expected]
+    for unit in ('myapp/0', 'myapp/1', 'other/0'):
+        assert events(trace, unit) == events(expected, unit)
+    assert {d.unit_name: d.state_out for d in trace} == {
+        d.unit_name: d.state_out for d in expected
+    }
+
+
+def test_each_dispatch_records_the_candidates_and_the_choice(juju: Juju):
+    deploy_mycharm(juju, num_units=2)
+    juju._scheduler = _Last()
+    trace = juju.settle()
+    install = trace[0]
+    assert install._candidates == (
+        _Candidate('myapp', 0, install.event),
+        _Candidate('myapp', 1, install.event),
+    )
+    assert install._chosen == 1
+    for dispatch in trace:
+        chosen = dispatch._candidates[dispatch._chosen]
+        assert (chosen.app_name, chosen.unit_id) == (dispatch.app_name, dispatch.unit_id)
+        assert chosen.event.name == dispatch.event.name
+
+
+def test_a_budget_stops_settling_with_the_rest_pending(juju: Juju):
+    with Juju() as whole:
+        deploy_mycharm(whole, num_units=2)
+        expected = whole.settle()
+
+    deploy_mycharm(juju, num_units=2)
+    first = juju._settle(budget=3)
+    assert first == expected[:3]
+    rest = juju.settle()
+    assert [*first, *rest] == expected
