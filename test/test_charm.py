@@ -1570,6 +1570,38 @@ options:
     assert typed_config.c == 'foo'
 
 
+def test_config_init_false_field(request: pytest.FixtureRequest):
+    @dataclasses.dataclass
+    class Config:
+        a: int
+        double_a: int = dataclasses.field(init=False)
+
+        def __post_init__(self):
+            self.double_a = self.a * 2
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(Config)
+
+    # A config option with the same name as a field that isn't an __init__
+    # argument is not passed to the class.
+    schema = """
+options:
+    a:
+        type: int
+    double-a:
+        type: int
+"""
+    harness = testing.Harness(Charm, config=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({'a': 2, 'double-a': 5})
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert isinstance(typed_config, Config)
+    assert typed_config.double_a == 4
+
+
 class SmallConfig:
     x: int
 

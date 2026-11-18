@@ -1673,6 +1673,10 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
     juju_to_arg: dict[str, str] = {}
     if dataclasses.is_dataclass(cls):
         for field in dataclasses.fields(cls):
+            # A field that isn't an __init__ argument, such as one that
+            # __post_init__ derives from the others, can't be passed to the class.
+            if not field.init:
+                continue
             alias = field.metadata.get('alias', field.name)
             # If this a Pydantic dataclass, then it handles the alias.
             # Using pydantic.dataclasses.is_pydantic_dataclass() would be best
