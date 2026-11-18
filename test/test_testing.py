@@ -5377,10 +5377,16 @@ class PebbleStorageAPIsTestMixin:
     ):
         client.make_dir(f'{pebble_dir}/dir1', permissions=0o700)
         client.make_dir(f'{pebble_dir}/dir2', permissions=0o777)
+        # A permissions value of 0 is valid and must not be replaced by the default.
+        client.make_dir(f'{pebble_dir}/dir0', permissions=0)
+        # When permissions are not given, the default of 0o755 applies.
+        client.make_dir(f'{pebble_dir}/dir_default')
 
         files = client.list_files(f'{pebble_dir}/', pattern='dir*')
         assert next(f for f in files if f.path == f'{pebble_dir}/dir1').permissions == 0o700
         assert next(f for f in files if f.path == f'{pebble_dir}/dir2').permissions == 0o777
+        assert next(f for f in files if f.path == f'{pebble_dir}/dir0').permissions == 0
+        assert next(f for f in files if f.path == f'{pebble_dir}/dir_default').permissions == 0o755
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.

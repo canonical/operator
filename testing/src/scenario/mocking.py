@@ -723,7 +723,9 @@ class _MockModelBackend(_ModelBackend):
         if self._context.action_results:
             self._context.action_results.update(results)
         else:
-            self._context.action_results = results
+            # Store a copy so that later changes to the charm's dict do not
+            # leak into the recorded results.
+            self._context.action_results = copy.deepcopy(results)
 
     def action_fail(self, message: str = ''):
         if not self._event._action:

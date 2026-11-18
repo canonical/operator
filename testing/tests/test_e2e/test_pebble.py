@@ -159,6 +159,27 @@ def test_fs_pull(tmp_path: pathlib.Path, make_dirs: bool):
         assert not state_delta(out_purged, state)
 
 
+def test_fs_make_dir_permissions():
+    def callback(self: ops.CharmBase):
+        container = self.unit.get_container('foo')
+        container.make_dir('/d0', permissions=0)
+        # When permissions are not given, the default of 0o755 applies.
+        container.make_dir('/d755')
+
+        zero = container.list_files('/d0', itself=True)[0]
+        assert zero.permissions == 0
+        default = container.list_files('/d755', itself=True)[0]
+        assert default.permissions == 0o755
+
+    trigger(
+        State(containers={Container(name='foo', can_connect=True)}),
+        charm_type=Charm,
+        meta={'name': 'foo', 'containers': {'foo': {}}},
+        event='start',
+        post_event=callback,
+    )
+
+
 LS = """
 .rw-rw-r--  228 ubuntu ubuntu 18 jan 12:05 -- charmcraft.yaml
 .rw-rw-r--  497 ubuntu ubuntu 18 jan 12:05 -- config.yaml

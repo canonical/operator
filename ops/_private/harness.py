@@ -3707,7 +3707,9 @@ class _TestingPebbleClient:
                 group=group,
             )
         try:
-            permissions = permissions if permissions else 0o755
+            # A permissions argument of 0 is valid, so only fall back to the
+            # default when it is None, as real Pebble does.
+            permissions = 0o755 if permissions is None else permissions
             dir_path.mkdir()
             os.chmod(dir_path, permissions)
         except FileExistsError:
