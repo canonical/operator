@@ -851,6 +851,25 @@ def test_config_is_in_the_state_straight_away_and_runs_one_config_changed(juju: 
         assert unit.state.unit_status == ActiveStatus('config_changed:debug')
 
 
+def test_config_with_the_values_already_set_runs_nothing(juju: Juju):
+    app = deploy_mycharm(juju, config={'log_level': 'debug'}, num_units=2)
+    juju.settle()
+    juju.config(app, {'log_level': 'debug'})
+    assert juju.settle() == []
+
+
+def test_config_setting_an_option_to_its_default_runs_config_changed(juju: Juju):
+    # Juju compares the options set explicitly, not the effective values, so
+    # an option that has only its default is unset until it's given a value.
+    app = deploy_mycharm(juju)
+    juju.settle()
+    juju.config(app, {'log_level': 'info'})
+    trace = juju.settle()
+    assert [d.event.name for d in trace] == ['config_changed']
+    juju.config(app, {'log_level': 'info'})
+    assert juju.settle() == []
+
+
 def test_config_before_settling_joins_the_startup_config_changed(juju: Juju):
     app = juju.deploy(spec(PeerCharm, PEER_META), num_units=2)
     juju.config(app, {'log_level': 'debug'})

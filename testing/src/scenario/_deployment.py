@@ -301,14 +301,18 @@ class App:
         juju: Juju,
         charm: _Charm,
         *,
-        config: dict[str, Any],
+        settings: dict[str, Any],
         storage: dict[str, int],
         state_template: State,
         order: int,
     ):
         self._juju = juju
         self._charm = charm
-        self._config = config
+        # The options set explicitly, with deploy --config or juju config, as
+        # Juju stores them. Whether config-changed runs depends on these, not
+        # on the defaults merged over them.
+        self._settings = settings
+        self._config = {**_default_config(charm.config), **settings}
         # How many instances of each store a new unit gets.
         self._storage = storage
         self._state_template = state_template
@@ -581,7 +585,7 @@ class Juju:
         new_app = App(
             self,
             _Charm(charm_type, app_name, metadata, config_schema, actions, juju_version, trust),
-            config={**_default_config(config_schema), **(config or {})},
+            settings=dict(config or {}),
             storage=storage_counts,
             state_template=state_template if state_template is not None else State(),
             order=len(self._apps),
@@ -614,6 +618,11 @@ class Juju:
         ``config-changed`` on each unit, once however many times this is
         called before it.
 
+        As in Juju, nothing runs if every option is already set to the value
+        given. An option that has only its default counts as unset, so
+        setting it to the default value explicitly does run
+        ``config-changed``.
+
         Raises:
             JujuError: if an option isn't one of the charm's config options,
                 or a value is the wrong type for its option.
@@ -621,7 +630,11 @@ class Juju:
         self._check_open()
         self._check_deployed(app)
         _check_config(app.name, app._charm.config, config)
-        app._config.update(config)
+        settings = {**app._settings, **config}
+        if settings == app._settings:
+            return
+        app._settings = settings
+        app._config = {**_default_config(app._charm.config), **settings}
         for unit in app._units.values():
             unit._state = dataclasses.replace(unit._state, config=dict(app._config))
             self._enqueue(app, unit.id, Event('config_changed'))
