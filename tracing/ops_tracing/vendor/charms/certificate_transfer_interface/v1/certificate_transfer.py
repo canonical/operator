@@ -673,7 +673,9 @@ class CertificateTransferRequires(Object):
             databag = relation.data[relation.app]
             certificates = ProviderApplicationData().load(databag).certificates
             if not certificates and relation.units:
-                databag = relation.data.get(relation.units.pop(), {})
+                # Patched in ops-tracing to match charmlibs: `relation.units` is the set
+                # that ops caches for the relation, so `pop()` removed the unit from it.
+                databag = relation.data.get(next(iter(relation.units)), {})
                 certs = ProviderUnitDataV0.load(databag).chain
                 if certs is None:
                     return set()
