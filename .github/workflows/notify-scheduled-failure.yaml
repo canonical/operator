@@ -44,10 +44,12 @@ jobs:
           set -euo pipefail
           marker="<!-- ai-failure-notifications:run=$RUN_ID:origin="
 
-          # Search for the "Workflow: <name>" footer rather than the bare
-          # workflow name, which for a short name like "CI" also matches
-          # unrelated issues. Enrichment rewrites the title and body but
-          # always keeps this footer, and the issue this job opens has it too.
+          # Search for "Workflow: <name>" rather than the bare workflow name,
+          # which for a short name like "CI" also matches unrelated issues.
+          # Search ignores the colon, so this matches the phrase "workflow
+          # <name>" anywhere in an issue, not only the footer line.
+          # Enrichment rewrites the title and body but always keeps this
+          # footer, and the issue this job opens has it too.
           match=$(gh issue list --repo "$REPO" --state open \
             --search "\"Workflow: $WORKFLOW_NAME\"" \
             --json number --limit 1 -q '.[0].number // empty')
