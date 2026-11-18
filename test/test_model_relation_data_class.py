@@ -405,6 +405,29 @@ def test_relation_save_custom_naming_pattern(relation_data_class: type[_AliasPro
     }
 
 
+@pytest.mark.skipif(pydantic is None, reason='pydantic is not installed')
+def test_relation_save_serialization_alias():
+    assert pydantic is not None
+
+    class Data(pydantic.BaseModel):
+        host: str = pydantic.Field(serialization_alias='hostname')
+        port: int
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            event.relation.save(Data(host='example.com', port=5432), self.app)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db')
+    state_out = ctx.run(ctx.on.relation_changed(rel), testing.State(leader=True, relations={rel}))
+    data = state_out.get_relation(rel.id).local_app_data
+    assert data == {'hostname': json.dumps('example.com'), 'port': json.dumps(5432)}
+
+
 def test_juju_fields_pydantic_dataclass_without_is_pydantic_dataclass():
     """Pydantic dataclasses from before pydantic 2.11 still have their aliases kept.
 
