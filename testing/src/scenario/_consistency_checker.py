@@ -364,13 +364,23 @@ def _check_action_param_types(
             )
 
     # The default in Juju 4 is False. The default in earlier Juju versions is True.
-    additional_properties = action_spec.get('additionalProperties', juju_version < '4.0.0')
+    declared_additional_properties = action_spec.get('additionalProperties')
+    if declared_additional_properties is None:
+        additional_properties = juju_version < '4.0.0'
+    else:
+        additional_properties = declared_additional_properties
     for provided_param_name, provided_param_value in action.params.items():
         if provided_param_name not in action_params:
             if not additional_properties:
                 errors.append(
                     f'param {provided_param_name} is not a valid parameter for {action.name}: '
                     'missing from action specification',
+                )
+            elif declared_additional_properties is None:
+                warnings.append(
+                    f'param {provided_param_name} is not declared for {action.name}. Juju '
+                    'accepts it only because `additionalProperties` is not set, and Juju 4 '
+                    'will reject it. Set `additionalProperties` in the action specification.',
                 )
             continue
         expected_type = expected_param_type.get(provided_param_name)

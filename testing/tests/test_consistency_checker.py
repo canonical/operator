@@ -661,18 +661,18 @@ def test_action_params_no_type_is_not_missing():
 
 
 @pytest.mark.parametrize(
-    'juju_version,additional_properties,allowed',
+    'juju_version,additional_properties,warns',
     [
-        ('3.6', True, True),
-        ('3.6', False, False),
+        ('3.6', True, False),
         ('3.6', None, True),
-        ('4.0', True, True),
-        ('4.0', False, False),
-        ('4.0', None, False),
+        ('4.0', True, False),
     ],
 )
-def test_action_params_not_declared(
-    juju_version: str, additional_properties: bool | None, allowed: bool
+def test_action_params_not_declared_allowed(
+    juju_version: str,
+    additional_properties: bool | None,
+    warns: bool,
+    caplog: pytest.LogCaptureFixture,
 ):
     action_spec: dict[str, Any] = {'params': {}}
     if additional_properties is not None:
@@ -680,11 +680,29 @@ def test_action_params_not_declared(
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
     spec = _CharmSpec(MyCharm, meta={}, actions={'foo': action_spec})
     event = ctx.on.action('foo', params={'bar': 'baz'})
-    if allowed:
-        assert_consistent(State(), event, spec, juju_version=juju_version)
-    else:
-        with pytest.raises(InconsistentScenarioError, match='missing from action specification'):
-            check_consistency(State(), event, spec, juju_version, 0)
+    assert_consistent(State(), event, spec, juju_version=juju_version)
+    assert ('Set `additionalProperties`' in caplog.text) == warns
+
+
+@pytest.mark.parametrize(
+    'juju_version,additional_properties',
+    [
+        ('3.6', False),
+        ('4.0', False),
+        ('4.0', None),
+    ],
+)
+def test_action_params_not_declared_rejected(
+    juju_version: str, additional_properties: bool | None
+):
+    action_spec: dict[str, Any] = {'params': {}}
+    if additional_properties is not None:
+        action_spec['additionalProperties'] = additional_properties
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': action_spec})
+    event = ctx.on.action('foo', params={'bar': 'baz'})
+    with pytest.raises(InconsistentScenarioError, match='missing from action specification'):
+        check_consistency(State(), event, spec, juju_version, 0)
 
 
 @pytest.mark.parametrize('juju_version', ['3.6-beta1', '3.6.9.1', '4.0-rc2'])
