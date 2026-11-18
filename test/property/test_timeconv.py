@@ -105,10 +105,12 @@ _timestamps = st.datetimes(
 
 @given(_durations_ns)
 def test_parse_duration_reads_go_durations(ns: int):
-    """Any Go duration string parses to its value, to the microsecond."""
+    """Any Go duration string parses to its value, to the nearest microsecond."""
     parsed = timeconv.parse_duration(_go_duration(ns))
-    expected = datetime.timedelta(microseconds=ns / _NS_PER_US)
-    assert abs(parsed - expected) <= datetime.timedelta(microseconds=1)
+    # Compare in integer nanoseconds: ns / 1000 as a float is itself off by
+    # up to a microsecond above 2**53, which would hide rounding bugs.
+    us = (parsed.days * 86_400 + parsed.seconds) * 1_000_000 + parsed.microseconds
+    assert abs(us * _NS_PER_US - ns) <= _NS_PER_US // 2
 
 
 @given(_durations_ns, st.sampled_from(['+', '']))
@@ -137,7 +139,7 @@ def test_parse_duration_micro_sign_and_mu_agree(ns: int):
 def test_parse_rfc3339_reads_go_timestamps(
     naive: datetime.datetime, tz: datetime.timezone, frac_ns: int, sep: str
 ):
-    """Any Go RFC 3339 timestamp parses to the same instant, to the microsecond.
+    """Any Go RFC 3339 timestamp parses to the same instant, to the nearest microsecond.
 
     Fractions that round up to a whole second are clamped, as the standard
     library does, so the result never moves into the next second.
@@ -146,4 +148,5 @@ def test_parse_rfc3339_reads_go_timestamps(
     parsed = timeconv.parse_rfc3339(_go_timestamp(dt, frac_ns, sep))
     assert parsed.replace(microsecond=0) == dt
     assert parsed.utcoffset() == dt.utcoffset()
-    assert abs(parsed.microsecond * _NS_PER_US - frac_ns) <= _NS_PER_US
+    expected_ns = min(frac_ns, 999_999 * _NS_PER_US)
+    assert abs(parsed.microsecond * _NS_PER_US - expected_ns) <= _NS_PER_US // 2
