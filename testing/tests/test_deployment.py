@@ -1,0 +1,509 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+from __future__ import annotations
+
+import dataclasses
+import importlib.util
+import itertools
+import pathlib
+import sys
+import textwrap
+from collections.abc import Iterator, Sequence
+from typing import Any
+
+import pytest
+from scenario import (
+    ActiveStatus,
+    CloudSpec,
+    Container,
+    Exec,
+    Model,
+    PeerRelation,
+    Secret,
+    State,
+    UnknownStatus,
+)
+from scenario._deployment import App, CharmSpec, Dispatch, Juju
+from scenario._juju_errors import JujuError
+
+import ops
+
+META: dict[str, Any] = {'name': 'myapp'}
+CONFIG: dict[str, Any] = {'options': {'log_level': {'type': 'string', 'default': 'info'}}}
+
+
+class MyCharm(ops.CharmBase):
+    """Sets its status from the event and its config."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        for event in (
+            self.on.install,
+            self.on.start,
+            self.on.config_changed,
+            self.on.leader_elected,
+            self.on.leader_settings_changed,
+        ):
+            framework.observe(event, self._on_any)
+
+    def _on_any(self, event: ops.EventBase):
+        self.unit.status = ops.ActiveStatus(f'{event.handle.kind}:{self.config["log_level"]}')
+
+
+class SecretCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.leader_elected, self._on_leader_elected)
+
+    def _on_leader_elected(self, _: ops.EventBase):
+        self.app.add_secret({'password': 'hunter2'}, label='admin')
+
+
+class TrustCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.install, self._on_install)
+
+    def _on_install(self, _: ops.EventBase):
+        try:
+            message = f'cloud={self.model.get_cloud_spec().name}'
+        except ops.ModelError as e:
+            message = str(e)
+        self.unit.status = ops.ActiveStatus(message)
+
+
+class ExecCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['workload'].pebble_ready, self._on_ready)
+
+    def _on_ready(self, event: ops.PebbleReadyEvent):
+        stdout, _ = event.workload.exec(['update-ca-certificates']).wait_output()
+        self.unit.status = ops.ActiveStatus(stdout.strip())
+
+
+class NoMetadataCharm(ops.CharmBase):
+    pass
+
+
+EXEC_META: dict[str, Any] = {'name': 'execy', 'containers': {'workload': {}}}
+EXEC_TEMPLATE = State(
+    containers={
+        Container(
+            'workload',
+            can_connect=True,
+            execs={Exec(['update-ca-certificates'], stdout='updated\n')},
+        )
+    },
+)
+
+
+def spec(
+    charm_type: type[ops.CharmBase],
+    meta: dict[str, Any] = META,
+    config: dict[str, Any] | None = CONFIG,
+) -> CharmSpec[Any]:
+    """A CharmSpec with the config options in charmcraft.yaml shape."""
+    full = {**meta, 'config': config} if config is not None else meta
+    return CharmSpec(charm_type, meta=full)
+
+
+def deploy_mycharm(juju: Juju, *, config_schema: dict[str, Any] = CONFIG, **kwargs: Any) -> App:
+    return juju.deploy(spec(MyCharm, config=config_schema), app='myapp', **kwargs)
+
+
+def events(trace: Sequence[Dispatch], unit: str) -> list[str]:
+    return [d.event.name for d in trace if d.unit_name == unit]
+
+
+@pytest.fixture
+def juju() -> Iterator[Juju]:
+    with Juju() as j:
+        yield j
+
+
+# The model
+
+
+def test_the_default_model_is_the_same_for_every_juju():
+    with Juju() as one, Juju() as two:
+        first = deploy_mycharm(one).leader.state.model
+        second = deploy_mycharm(two).leader.state.model
+    assert first == second
+    assert type(first) is Model
+    assert first.name == 'test-model'
+    assert first.type == 'kubernetes'
+    assert first.cloud_spec == CloudSpec(type='kubernetes', name='localhost')
+
+
+def test_an_explicit_name_and_uuid_are_kept():
+    uuid = '6b23fcd2-0b0c-4d2e-8d7a-6b23fcd2a88a'
+    with Juju('mine', uuid=uuid) as j:
+        app = deploy_mycharm(j, num_units=2)
+        for unit in app.units.values():
+            assert (unit.state.model.name, unit.state.model.uuid) == ('mine', uuid)
+
+
+@pytest.mark.parametrize(
+    ('cloud_type', 'model_type'), [('kubernetes', 'kubernetes'), ('lxd', 'lxd')]
+)
+def test_the_cloud_spec_s_type_decides_the_model_type(cloud_type: str, model_type: str):
+    cloud_spec = CloudSpec(type=cloud_type, name='localhost')
+    with Juju(cloud_spec=cloud_spec) as j:
+        model = deploy_mycharm(j).leader.state.model
+    assert model.type == model_type
+    assert model.cloud_spec == cloud_spec
+
+
+# deploy
+
+
+def test_deploy_creates_units_with_unit_zero_the_leader(juju: Juju):
+    app = deploy_mycharm(juju, num_units=3)
+    assert app.name == 'myapp'
+    assert juju.apps == {'myapp': app}
+    assert [unit.name for unit in app.units.values()] == ['myapp/0', 'myapp/1', 'myapp/2']
+    assert app.leader is app.units[0]
+    assert [unit.is_leader for unit in app.units.values()] == [True, False, False]
+    assert [unit.state.leader for unit in app.units.values()] == [True, False, False]
+    assert {unit.state.planned_units for unit in app.units.values()} == {3}
+
+
+def test_deploy_runs_the_startup_sequence(juju: Juju):
+    deploy_mycharm(juju, num_units=2)
+    trace = juju.settle()
+    assert events(trace, 'myapp/0') == ['install', 'leader_elected', 'config_changed', 'start']
+    assert events(trace, 'myapp/1') == [
+        'install',
+        'leader_settings_changed',
+        'config_changed',
+        'start',
+    ]
+
+
+@pytest.mark.parametrize(
+    ('config', 'expected'), [(None, 'info'), ({'log_level': 'trace'}, 'trace')]
+)
+def test_deploy_config_is_merged_over_the_defaults(
+    juju: Juju, config: dict[str, Any] | None, expected: str
+):
+    app = deploy_mycharm(juju, config=config)
+    assert app.config == {'log_level': expected}
+    juju.settle()
+    assert app.leader.state.config == {'log_level': expected}
+    assert app.leader.state.unit_status == ActiveStatus(f'start:{expected}')
+
+
+def test_deploy_rejects_a_duplicate_app_name(juju: Juju):
+    deploy_mycharm(juju)
+    with pytest.raises(JujuError, match='already deployed'):
+        deploy_mycharm(juju)
+
+
+def test_deploy_rejects_zero_units(juju: Juju):
+    with pytest.raises(JujuError, match='at least 1'):
+        deploy_mycharm(juju, num_units=0)
+    assert not juju.apps
+
+
+def test_deploy_creates_containers_and_runs_pebble_ready(juju: Juju):
+    app = juju.deploy(spec(MyCharm, {**META, 'containers': {'workload': {}}}))
+    trace = juju.settle()
+    assert trace[-1].event.name == 'workload_pebble_ready'
+    assert {c.name for c in app.leader.state.containers} == {'workload'}
+
+
+def test_a_charm_spec_can_be_deployed_more_than_once(juju: Juju):
+    charm = spec(MyCharm)
+    one = juju.deploy(charm, app='one')
+    two = juju.deploy(charm, app='two')
+    juju.settle()
+    assert one.leader.state.unit_status == ActiveStatus('start:info')
+    assert two.leader.state.unit_status == ActiveStatus('start:info')
+
+
+def test_app_meta_is_charmcraft_shaped_and_read_only(juju: Juju):
+    app = juju.deploy(CharmSpec(MyCharm, meta={**META, 'config': CONFIG, 'actions': {}}))
+    assert app.meta == {**META, 'config': CONFIG, 'actions': {}}
+    with pytest.raises(TypeError):
+        app.meta['name'] = 'other'  # pyright: ignore[reportIndexIssue]
+    with pytest.raises(TypeError):
+        app.units[5] = app.leader  # pyright: ignore[reportIndexIssue]
+
+
+def test_a_charm_class_reads_its_metadata_from_disk(juju: Juju, tmp_path: pathlib.Path):
+    (tmp_path / 'src').mkdir()
+    (tmp_path / 'charmcraft.yaml').write_text(
+        textwrap.dedent("""\
+            name: ondisk
+            type: charm
+            summary: A charm on disk.
+            description: A charm on disk.
+            config:
+              options:
+                port: {type: int, default: 80}
+        """)
+    )
+    (tmp_path / 'src' / 'charm.py').write_text(
+        textwrap.dedent("""\
+            import ops
+
+            class OnDiskCharm(ops.CharmBase):
+                def __init__(self, framework):
+                    super().__init__(framework)
+                    framework.observe(self.on.start, self._on_start)
+
+                def _on_start(self, _):
+                    self.unit.status = ops.ActiveStatus(f'port={self.config["port"]}')
+        """)
+    )
+    module_spec = importlib.util.spec_from_file_location(
+        '_test_deployment_ondisk', tmp_path / 'src' / 'charm.py'
+    )
+    assert module_spec is not None and module_spec.loader is not None
+    module = importlib.util.module_from_spec(module_spec)
+    sys.modules[module_spec.name] = module
+    try:
+        module_spec.loader.exec_module(module)
+        app = juju.deploy(module.OnDiskCharm)
+        juju.settle()
+    finally:
+        del sys.modules[module_spec.name]
+    assert app.name == 'ondisk'
+    assert app.leader.state.unit_status == ActiveStatus('port=80')
+
+
+def test_a_charm_class_with_no_metadata_needs_a_charm_spec(juju: Juju):
+    with pytest.raises(JujuError, match='Wrap it in a CharmSpec'):
+        juju.deploy(NoMetadataCharm)
+
+
+def test_deploy_takes_only_a_charm_class_or_a_charm_spec(juju: Juju):
+    with pytest.raises(JujuError, match='a charm class or a CharmSpec'):
+        juju.deploy('./charms/myapp')  # pyright: ignore[reportArgumentType]
+
+
+@pytest.mark.parametrize(
+    ('trust', 'juju_version', 'message'),
+    [
+        (True, '3.6.10', 'cloud=localhost'),
+        (False, '3.6.10', 'not trusted'),
+        (True, '3.6.9', 'cloud spec is empty'),
+    ],
+)
+def test_a_trusted_charm_gets_the_cloud_spec(
+    juju: Juju, trust: bool, juju_version: str, message: str
+):
+    app = juju.deploy(
+        CharmSpec(TrustCharm, meta={'name': 'trusty'}), trust=trust, juju_version=juju_version
+    )
+    juju.settle()
+    assert message in app.leader.state.unit_status.message
+
+
+TYPED_CONFIG: dict[str, Any] = {
+    'options': {
+        'log_level': {'type': 'string', 'default': 'info'},
+        'port': {'type': 'int'},
+        'ratio': {'type': 'float'},
+        'debug': {'type': 'boolean'},
+    }
+}
+
+
+@pytest.mark.parametrize(
+    'values',
+    [
+        {'log_level': 1},
+        {'port': '8080'},
+        {'port': True},
+        {'ratio': 'half'},
+        {'debug': 'yes'},
+    ],
+)
+def test_deploy_rejects_config_of_the_wrong_type(juju: Juju, values: dict[str, Any]):
+    with pytest.raises(JujuError, match=f'{next(iter(values))!r} is a'):
+        deploy_mycharm(juju, config_schema=TYPED_CONFIG, config=values)
+    assert not juju.apps
+
+
+def test_deploy_accepts_config_of_the_right_type(juju: Juju):
+    values = {'log_level': 'debug', 'port': 8080, 'ratio': 0.5, 'debug': True}
+    app = deploy_mycharm(juju, config_schema=TYPED_CONFIG, config=values)
+    juju.settle()
+    assert app.leader.state.config == values
+
+
+def test_deploy_rejects_an_unknown_config_option(juju: Juju):
+    with pytest.raises(JujuError, match=r"no config option 'bogus'\. Its options are: log_level"):
+        deploy_mycharm(juju, config={'bogus': 1})
+    assert not juju.apps
+
+
+# state_template
+
+
+def test_state_template_reaches_every_unit_including_those_added_later(juju: Juju):
+    app = juju.deploy(
+        CharmSpec(ExecCharm, meta=EXEC_META), state_template=EXEC_TEMPLATE, num_units=2
+    )
+    juju.settle()
+    juju.add_unit(app)
+    juju.settle()
+    for unit in app.units.values():
+        assert unit.state.unit_status == ActiveStatus('updated')
+
+
+def test_state_template_leaves_the_juju_owned_fields_to_juju(juju: Juju):
+    app = juju.deploy(spec(MyCharm), state_template=State(workload_version='1.2.3'))
+    unit = app.leader
+    assert unit.state.workload_version == '1.2.3'
+    assert unit.state.leader
+    assert unit.state.model.name == 'test-model'
+    assert unit.state.config == {'log_level': 'info'}
+
+
+@pytest.mark.parametrize(
+    ('field', 'template'),
+    [
+        ('leader', State(leader=True)),
+        ('planned_units', State(planned_units=3)),
+        ('model', State(model=Model(type='lxd'))),
+        ('config', State(config={'log_level': 'debug'})),
+        ('relations', State(relations={PeerRelation('replicas')})),
+        ('secrets', State(secrets={Secret({'a': 'b'})})),
+    ],
+)
+def test_state_template_may_not_set_juju_owned_fields(juju: Juju, field: str, template: State):
+    with pytest.raises(JujuError, match=f'may not set {field}'):
+        juju.deploy(spec(MyCharm), state_template=template)
+
+
+# add_unit
+
+
+def test_add_unit_runs_the_startup_sequence_for_the_new_unit(juju: Juju):
+    app = deploy_mycharm(juju)
+    juju.settle()
+    unit = juju.add_unit(app)
+    assert unit.id == 1
+    assert app.units[1] is unit
+    assert {u.state.planned_units for u in app.units.values()} == {2}
+    trace = juju.settle()
+    assert [(d.unit_name, d.event.name) for d in trace] == [
+        ('myapp/1', 'install'),
+        ('myapp/1', 'leader_settings_changed'),
+        ('myapp/1', 'config_changed'),
+        ('myapp/1', 'start'),
+    ]
+
+
+def test_add_unit_rejects_an_app_from_another_juju(juju: Juju):
+    with Juju() as other:
+        app = deploy_mycharm(other)
+        deploy_mycharm(juju)
+        with pytest.raises(JujuError, match='not deployed in this Juju'):
+            juju.add_unit(app)
+
+
+# settle
+
+
+def test_settle_returns_the_trace_and_reading_state_runs_nothing(juju: Juju):
+    app = deploy_mycharm(juju)
+    assert app.leader.state.unit_status == UnknownStatus()
+    trace = juju.settle()
+    first = trace[0]
+    assert first.event.name == 'install'
+    assert (first.app_name, first.unit_id, first.unit_name) == (app.name, 0, app.leader.name)
+    assert first.state_in.unit_status == UnknownStatus()
+    assert first.state_out.unit_status == ActiveStatus('install:info')
+    assert trace[-1].state_out == app.leader.state
+    assert juju.settle() == []
+
+
+def test_a_dispatch_s_state_in_is_the_unit_s_previous_state_out(juju: Juju):
+    deploy_mycharm(juju)
+    trace = juju.settle()
+    for before, after in itertools.pairwise(trace):
+        assert after.state_in == before.state_out
+
+
+def test_dispatches_compare_by_value_and_hold_no_live_handles(juju: Juju):
+    app = deploy_mycharm(juju)
+    install = juju.settle()[0]
+    assert install == dataclasses.replace(install)
+    juju.add_unit(app)
+    juju.settle()
+    assert install.state_out.planned_units != app.leader.state.planned_units
+    assert juju.apps[install.app_name] is app
+
+
+def test_units_take_turns(juju: Juju):
+    deploy_mycharm(juju, num_units=2)
+    juju.deploy(spec(MyCharm), app='other')
+    trace = juju.settle()
+    assert [d.unit_name for d in trace[:6]] == [
+        'myapp/0',
+        'myapp/1',
+        'other/0',
+        'myapp/0',
+        'myapp/1',
+        'other/0',
+    ]
+    assert [d.event.name for d in trace[:3]] == ['install'] * 3
+
+
+def test_the_next_settle_starts_from_the_unit_after_the_last_turn(juju: Juju):
+    app = deploy_mycharm(juju, num_units=2)
+    other = juju.deploy(spec(MyCharm), app='other')
+    assert juju.settle()[-1].unit_name == 'other/0'
+    juju.add_unit(app)
+    juju.add_unit(other)
+    # other/1 comes after other/0, then the turn wraps round to myapp/2.
+    assert [d.unit_name for d in juju.settle()[:2]] == ['other/1', 'myapp/2']
+
+
+def test_settle_is_deterministic():
+    def run() -> list[Dispatch]:
+        with Juju() as j:
+            deploy_mycharm(j, num_units=3)
+            j.deploy(spec(SecretCharm, {'name': 'secrets'}, config=None), num_units=2)
+            return list(j.settle())
+
+    first = run()
+    assert first
+    for _ in range(3):
+        assert run() == first
+
+
+def test_a_secret_s_id_depends_only_on_its_unit_s_own_history():
+    def secret_id(*apps: str) -> str:
+        with Juju() as j:
+            for name in apps:
+                charm = SecretCharm if name == 'secrets' else MyCharm
+                j.deploy(spec(charm, {'name': name}), num_units=2)
+            j.settle()
+            (secret,) = j.apps['secrets'].leader.state.secrets
+            return secret.id
+
+    alone = secret_id('secrets')
+    assert alone.startswith('secret:')
+    assert secret_id('first', 'secrets') == alone
+    assert secret_id('secrets', 'after') == alone
+
+
+# Lifecycle
+
+
+def test_close_rejects_later_operations_and_can_be_repeated(juju: Juju):
+    app = deploy_mycharm(juju)
+    juju.close()
+    juju.close()
+    with pytest.raises(JujuError, match='been closed'):
+        deploy_mycharm(juju)
+    with pytest.raises(JujuError, match='been closed'):
+        juju.add_unit(app)
+    with pytest.raises(JujuError, match='been closed'):
+        juju.settle()
