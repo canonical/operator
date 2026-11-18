@@ -567,10 +567,12 @@ def test_action_meta_type_inconsistent():
         _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {}}}}),
     )
 
+    # In Juju 4, an action without additionalProperties rejects undeclared params.
     assert_inconsistent(
         State(),
         ctx.on.action('foo', params={'bar': 'baz'}),
         _CharmSpec(MyCharm, meta={}, actions={'foo': None}),
+        juju_version='4.0',
     )
 
 
@@ -658,11 +660,31 @@ def test_action_params_no_type_is_not_missing():
     assert 'missing from action specification' not in str(excinfo.value)
 
 
-def test_action_params_not_declared_is_missing():
+@pytest.mark.parametrize(
+    'juju_version,additional_properties,allowed',
+    [
+        ('3.6', True, True),
+        ('3.6', False, False),
+        ('3.6', None, True),
+        ('4.0', True, True),
+        ('4.0', False, False),
+        ('4.0', None, False),
+    ],
+)
+def test_action_params_not_declared(
+    juju_version: str, additional_properties: bool | None, allowed: bool
+):
+    action_spec: dict[str, Any] = {'params': {}}
+    if additional_properties is not None:
+        action_spec['additionalProperties'] = additional_properties
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
-    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {}}})
-    with pytest.raises(InconsistentScenarioError, match='missing from action specification'):
-        check_consistency(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec, '3.0', 0)
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': action_spec})
+    event = ctx.on.action('foo', params={'bar': 'baz'})
+    if allowed:
+        assert_consistent(State(), event, spec, juju_version=juju_version)
+    else:
+        with pytest.raises(InconsistentScenarioError, match='missing from action specification'):
+            check_consistency(State(), event, spec, juju_version, 0)
 
 
 @pytest.mark.parametrize('juju_version', ['3.6-beta1', '3.6.9.1', '4.0-rc2'])
