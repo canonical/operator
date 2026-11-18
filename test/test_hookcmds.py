@@ -907,6 +907,20 @@ def test_secret_set(run: Run, mock_temp_dir: str):
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
 
 
+def test_secret_set_keys_are_not_paths(run: Run, mock_temp_dir: TemporaryDirectory):
+    # Juju rejects these keys, but the files are written before Juju sees them,
+    # so the keys must not be used as file names.
+    run.handle([
+        'secret-set',
+        'secret:123',
+        f'../leak#file={mock_temp_dir}/0',
+        f'sub/key#file={mock_temp_dir}/1',
+    ])
+    hookcmds.secret_set('secret:123', content={'../leak': 'one', 'sub/key': 'two'})
+    assert [f.name for f in mock_temp_dir.files] == [f'{mock_temp_dir}/0', f'{mock_temp_dir}/1']
+    assert [f.writes for f in mock_temp_dir.files] == [['one'], ['two']]
+
+
 def test_secret_set_with_metadata(run: Run, mock_temp_dir: str):
     run.handle(
         [
