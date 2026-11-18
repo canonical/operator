@@ -28,7 +28,7 @@ from .context import _DEFAULT_JUJU_VERSION
 from .errors import MetadataNotFoundError
 from .state import State, _CharmSpec, _Event
 
-#: Seconds one event may run before the worker is killed.
+# Seconds one event may run before the worker is killed.
 # A guard against a hang, not a performance check: the first event also
 # imports the charm, which can be slow for a large charm on a busy CI runner.
 _DEFAULT_TIMEOUT = 60.0
