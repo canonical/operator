@@ -53,12 +53,20 @@ def load_charm_spec(
     return meta, config, actions
 
 
+# Python puts the current directory first on sys.path when running -c, and
+# the worker inherits the test's, which would shadow the worker's own ops and
+# scenario. PYTHONSAFEPATH and -P only exist from Python 3.11, and the worker's
+# interpreter may be older, so the bootstrap removes the entry itself.
+_WORKER_BOOTSTRAP = """\
+import runpy, sys
+if sys.path and sys.path[0] == '':
+    del sys.path[0]
+runpy.run_module('scenario._isolated_worker', run_name='__main__', alter_sys=True)
+"""
+
+
 def _worker_environ() -> dict[str, str]:
     environ = dict(os.environ)
-    # python -m puts the current directory first on sys.path, and the worker
-    # inherits the test's, which would shadow the worker's own ops and
-    # scenario. A 3.10 interpreter ignores this, where -P would be an error.
-    environ['PYTHONSAFEPATH'] = '1'
     # The charm's output is only kept if it's written before the worker is
     # killed, and a block-buffered sys.stdout never is.
     environ['PYTHONUNBUFFERED'] = '1'
@@ -115,7 +123,7 @@ class Worker:
             'juju_version': juju_version,
             'app_trusted': app_trusted,
         }
-        self._command = [python, '-m', 'scenario._isolated_worker']
+        self._command = [python, '-c', _WORKER_BOOTSTRAP]
         self._environ = _worker_environ()
         self._timeout = timeout
         self._proc: subprocess.Popen[bytes] | None = None
