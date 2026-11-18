@@ -725,6 +725,12 @@ class Juju:
                     peer._state,
                     dataclasses.replace(view, peers_data=peers_data, local_app_data=app_data),
                 )
+                # Not yet what Juju does. Juju runs a separate relation-changed
+                # for an app data change, with no remote unit, so the charm
+                # sees event.unit as None. Here one event covers both kinds
+                # of change and names the writer whenever it's in scope.
+                # Splitting them needs a Scenario Event that can be a
+                # relation event with no remote unit.
                 self._enqueue(
                     app,
                     peer.id,
