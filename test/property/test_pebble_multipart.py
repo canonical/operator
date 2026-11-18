@@ -79,6 +79,22 @@ def _pull_safe(path: str) -> bool:
     return path.isascii() and path == path.rstrip(' \t')
 
 
+# Pull paths are drawn from ASCII directly: filtering _paths with _pull_safe
+# would throw away most draws. Only paths with trailing whitespace are
+# filtered out.
+_pull_paths = (
+    st
+    .lists(
+        st.characters(min_codepoint=0x20, max_codepoint=0x7E)
+        | st.sampled_from(_TSPECIALS + ' \t'),
+        min_size=1,
+        max_size=50,
+    )
+    .map(lambda chars: '/' + ''.join(chars))
+    .filter(_pull_safe)
+)
+
+
 def _push_safe(path: str) -> bool:
     # The closing quote follows the path, so a trailing backslash escapes it.
     return not any(a == '\\' and b in _TSPECIALS for a, b in itertools.pairwise(path + '"'))
@@ -151,7 +167,7 @@ def _pull_bodies(draw: st.DrawFn) -> tuple[str, bytes, str, bytes, dict[str, Any
     # The delimiter must not appear in the content (RFC 2046), and Pebble
     # picks a random boundary to make sure it doesn't.
     content = draw(st.binary(max_size=2000).filter(lambda c: delimiter not in c))
-    path = draw(_paths.filter(_pull_safe))
+    path = draw(_pull_paths)
     response = {
         'type': 'sync',
         'status-code': 200,
