@@ -43,9 +43,14 @@ from .state import (
 if TYPE_CHECKING:
     from ops.charm import CharmBase
 
-# How many dispatches per unit Juju.settle() allows before it decides the
-# model will not converge.
+# How many dispatches Juju.settle() allows before it decides the model will
+# not converge: this many per unit, plus this many for each ordered pair of
+# units in a peer relation. Peer startup alone costs a relation-joined and a
+# relation-changed per pair, so a fixed amount per unit would falsely fail a
+# large peer application. The rest leaves room for each unit to answer each
+# peer's change.
 _SETTLE_DISPATCHES_PER_UNIT = 100
+_SETTLE_DISPATCHES_PER_PEER_PAIR = 4
 
 # How many dispatches from the end of the trace a settle error shows.
 _TRACE_TAIL = 10
@@ -547,15 +552,15 @@ class Juju:
             JujuError: if the model does not converge. The same event reaching
                 the same unit with the same :class:`State` twice is a loop,
                 and is reported as soon as it happens; otherwise, the limit
-                grows with the number of units in the model. The message ends
+                grows with the number of units in the model, and with the
+                number of pairs of peers. The message ends
                 with the last events dispatched.
         """
         self._check_open()
         self._trace = []
         seen: dict[tuple[str, int, str], list[tuple[Event, State]]] = {}
         while (next_unit := self._next_unit()) is not None:
-            limit = _SETTLE_DISPATCHES_PER_UNIT * sum(len(a._units) for a in self._apps.values())
-            if len(self._trace) >= limit:
+            if len(self._trace) >= self._settle_limit():
                 raise JujuError(
                     f'Did not converge after {len(self._trace)} events. Check for charms '
                     'that write a new value to a databag on every event.'
@@ -867,6 +872,15 @@ class Juju:
     def _check_deployed(self, app: App) -> None:
         if self._apps.get(app.name) is not app:
             raise JujuError(f'{app.name} is not deployed in this Juju.')
+
+    def _settle_limit(self) -> int:
+        """How many dispatches settle() allows before it reports a model that won't converge."""
+        limit = 0
+        for app in self._apps.values():
+            units = len(app._units)
+            pairs = units * (units - 1) * len(app._peer_ids)
+            limit += _SETTLE_DISPATCHES_PER_UNIT * units + _SETTLE_DISPATCHES_PER_PEER_PAIR * pairs
+        return limit
 
     def _trace_tail(self) -> str:
         lines = [f'  {d.event.name} on {d.unit_name}' for d in self._trace[-_TRACE_TAIL:]]

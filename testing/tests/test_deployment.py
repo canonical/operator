@@ -24,6 +24,7 @@ from scenario import (
     State,
     Storage,
     UnknownStatus,
+    _deployment,
 )
 from scenario._deployment import App, CharmSpec, Dispatch, Juju, Unit
 from scenario._juju_errors import JujuError
@@ -929,9 +930,22 @@ def test_only_relations_change_between_a_unit_s_dispatches(juju: Juju):
 
 def test_settle_raises_when_the_model_does_not_converge(juju: Juju):
     juju.deploy(spec(ChattyCharm, PEER_META, config=None), num_units=2)
-    with pytest.raises(JujuError, match='Did not converge after 200 events') as exc_info:
+    # 100 per unit, and 4 for each of the 2 ordered pairs of peers.
+    with pytest.raises(JujuError, match='Did not converge after 208 events') as exc_info:
         juju.settle()
     assert 'replicas_relation_changed on myapp/' in str(exc_info.value)
+
+
+def test_settle_allows_for_peer_startup_growing_with_the_square_of_the_units(
+    juju: Juju, monkeypatch: pytest.MonkeyPatch
+):
+    # Each unit gets a joined and a changed from every peer. With a small
+    # per-unit allowance, 10 peers need more than it gives on its own.
+    monkeypatch.setattr(_deployment, '_SETTLE_DISPATCHES_PER_UNIT', 10)
+    juju.deploy(spec(PublishingCharm, PEER_META, config=None), num_units=10)
+    trace = juju.settle()
+    assert len(trace) > 10 * 10
+    assert not any(juju._queues.values())
 
 
 def test_settle_reports_the_same_dispatch_twice_as_a_loop(juju: Juju):
