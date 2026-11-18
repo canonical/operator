@@ -111,6 +111,9 @@ def _get_loki_logs(loki_api_url: str) -> list[str] | None:
             time.sleep(1)
         try:
             response = urllib.request.urlopen(loki_api_url)
+        except urllib.error.HTTPError as error:
+            error.close()  # Prevent a file handle leak.
+            continue
         except urllib.error.URLError:
             continue
         response_decoded = json.loads(response.read())

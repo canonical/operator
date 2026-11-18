@@ -18,6 +18,7 @@ import dataclasses
 import datetime
 import email.message
 import email.parser
+import http.client
 import io
 import json
 import signal
@@ -1024,6 +1025,97 @@ class TestService:
         assert d['environment'] == {'k1': 'v1', 'k2': 'v2'}
         assert d['on-check-failure'] == {'chk1': 'halt'}
 
+    def test_dict_zero_fields(self):
+        d: pebble.ServiceDict = {
+            'user': 'root',
+            'user-id': 0,
+            'group': 'root',
+            'group-id': 0,
+        }
+        s = pebble.Service('Name 1', d)
+        assert s.user_id == 0
+        assert s.group_id == 0
+        assert s.to_dict() == d
+
+        layer = pebble.Layer({'services': {'Name 1': d}})
+        assert layer.to_dict() == {'services': {'Name 1': d}}
+
+    def test_merge(self):
+        s = pebble.Service(
+            'Name 1',
+            {
+                'summary': 'Sum Mary',
+                'description': 'The lazy quick brown',
+                'startup': 'enabled',
+                'override': 'merge',
+                'command': 'echo sum mary',
+                'after': ['a1', 'a2'],
+                'before': ['b1', 'b2'],
+                'requires': ['r1', 'r2'],
+                'environment': {'k1': 'v1', 'k2': 'v2'},
+                'user': 'bob',
+                'user-id': 1000,
+                'group': 'staff',
+                'group-id': 2000,
+                'working-dir': '/working/dir',
+                'on-success': 'restart',
+                'on-failure': 'ignore',
+                'on-check-failure': {'chk1': 'halt'},
+                'backoff-delay': '1s',
+                'backoff-factor': 4,
+                'backoff-limit': '10s',
+                'kill-delay': '420s',
+            },
+        )
+        s._merge(
+            pebble.Service(
+                'Name 2',
+                {
+                    'summary': 'New summary',
+                    'description': '',
+                    'startup': 'disabled',
+                    'override': 'replace',
+                    'command': 'echo new',
+                    'after': ['a3'],
+                    'before': ['b3'],
+                    'requires': ['r3'],
+                    'environment': {'k3': 'v3'},
+                    'user': '',
+                    'user-id': 0,
+                    'group': 'wheel',
+                    'working-dir': '/new/dir',
+                    'on-success': 'shutdown',
+                    'on-failure': 'restart',
+                    'on-check-failure': {'chk2': 'ignore'},
+                    'backoff-delay': '2s',
+                    'kill-delay': '60s',
+                },
+            )
+        )
+        assert s.name == 'Name 1'
+        assert s.summary == 'New summary'
+        assert s.description == 'The lazy quick brown'
+        assert s.startup == 'disabled'
+        # Like Pebble, merging keeps the existing override.
+        assert s.override == 'merge'
+        assert s.command == 'echo new'
+        assert s.after == ['a1', 'a2', 'a3']
+        assert s.before == ['b1', 'b2', 'b3']
+        assert s.requires == ['r1', 'r2', 'r3']
+        assert s.environment == {'k1': 'v1', 'k2': 'v2', 'k3': 'v3'}
+        assert s.user == 'bob'
+        assert s.user_id == 0
+        assert s.group == 'wheel'
+        assert s.group_id == 2000
+        assert s.working_dir == '/new/dir'
+        assert s.on_success == 'shutdown'
+        assert s.on_failure == 'restart'
+        assert s.on_check_failure == {'chk1': 'halt', 'chk2': 'ignore'}
+        assert s.backoff_delay == '2s'
+        assert s.backoff_factor == 4
+        assert s.backoff_limit == '10s'
+        assert s.kill_delay == '60s'
+
     def test_equality(self):
         d: pebble.ServiceDict = {
             'summary': 'Sum Mary',
@@ -1130,6 +1222,21 @@ class TestCheck:
         check = pebble.Check('chk-http', d)
         assert check.level == 'foobar!'  # remains a string
 
+    def test_merge_keeps_level(self):
+        base = pebble.Check(
+            'chk', {'override': 'replace', 'level': 'alive', 'http': {'url': 'http://a/'}}
+        )
+        override = pebble.Check('chk', {'override': 'merge', 'period': '5s'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.ALIVE
+        assert base.period == '5s'
+        # Like Pebble, merging keeps the existing override.
+        assert base.override == 'replace'
+
+        override = pebble.Check('chk', {'override': 'merge', 'level': 'ready'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.READY
+
     def test_equality(self):
         d: pebble.CheckDict = {
             'override': 'replace',
@@ -1150,8 +1257,38 @@ class TestCheck:
         assert one != d
         assert one != 5
 
+    def test_merge_exec_zero_ids(self):
+        check = pebble.Check(
+            'chk',
+            {
+                'override': 'merge',
+                'exec': {'command': 'echo foo', 'user-id': 1000, 'group-id': 2000},
+            },
+        )
+        check._merge(
+            pebble.Check(
+                'chk',
+                {
+                    'override': 'merge',
+                    'exec': {'command': 'echo foo', 'user-id': 0, 'group-id': 0},
+                },
+            )
+        )
+        assert check.exec == {'command': 'echo foo', 'user-id': 0, 'group-id': 0}
+
+        check._merge(pebble.Check('chk', {'override': 'merge', 'exec': {'command': 'echo bar'}}))
+        assert check.exec == {'command': 'echo bar', 'user-id': 0, 'group-id': 0}
+
 
 class TestLogTarget:
+    def test_merge_keeps_override(self):
+        base = pebble.LogTarget(
+            'tgt', {'override': 'replace', 'type': 'loki', 'location': 'http://a/'}
+        )
+        base._merge(pebble.LogTarget('tgt', {'override': 'merge', 'services': ['svc']}))
+        assert base.override == 'replace'
+        assert base.services == ['svc']
+
     def _assert_empty(self, target: pebble.LogTarget, name: str):
         assert target.name == name
         assert target.override == ''
@@ -2389,7 +2526,7 @@ Content-Disposition: form-data; name="response"\r
 --01234567890123456789012345678901\r
 Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
 \r
-127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\xff\xfe\x00\x80\r
 --01234567890123456789012345678901\r
 Content-Disposition: form-data; name="response"\r
 \r
@@ -2405,7 +2542,7 @@ Content-Disposition: form-data; name="response"\r
 
         with client.pull('/etc/hosts', encoding=None) as infile:
             content = infile.read()
-        assert content == b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar'
+        assert content == b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\xff\xfe\x00\x80'
 
         assert client.requests == [
             (
@@ -2451,6 +2588,57 @@ Content-Disposition: form-data; name="response"\r
                 None,
             ),
         ]
+
+    def test_pull_non_ascii_path(self, client: MockClient):
+        client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/tmp/cr\xc3\xa8me.txt"\r
+\r
+contents\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/tmp/cr\xc3\xa8me.txt"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
+""",
+        ))
+        with client.pull('/tmp/crème.txt') as infile:  # ruff: ignore[hardcoded-temp-file]
+            assert infile.read() == 'contents'
+
+    @pytest.mark.parametrize('path', ['/srv/file ', '/srv/file\t', ' /srv/file', '/srv/ file '])
+    def test_pull_path_with_surrounding_whitespace(self, client: MockClient, path: str):
+        client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="%s"\r
+\r
+contents\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+%s\r
+--01234567890123456789012345678901--\r
+"""
+            % (
+                path.encode(),
+                json.dumps({
+                    'result': [{'path': path}],
+                    'status': 'OK',
+                    'status-code': 200,
+                    'type': 'sync',
+                }).encode(),
+            ),
+        ))
+        with client.pull(path) as infile:
+            assert infile.read() == 'contents'
 
     def test_pull_protocol_errors(self, client: MockClient):
         client.responses.append(({'Content-Type': 'c/t'}, b''))
@@ -3357,6 +3545,163 @@ class TestSocketClient:
         assert isinstance(excinfo.value, pebble.Error)
         assert 'Could not connect to Pebble' in str(excinfo.value)
 
+    def test_error_reading_response(self, monkeypatch: pytest.MonkeyPatch):
+        client = pebble.Client(socket_path='does_not_exist')
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                raise http.client.RemoteDisconnected('Remote end closed connection')
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        with pytest.raises(pebble.ConnectionError) as excinfo:
+            client.get_system_info()
+        assert 'RemoteDisconnected' in str(excinfo.value)
+
+    @pytest.mark.parametrize(
+        'error',
+        [
+            pytest.param(http.client.BadStatusLine('hello'), id='bad-status'),
+            pytest.param(http.client.LineTooLong('header line'), id='line-too-long'),
+            pytest.param(http.client.IncompleteRead(b'x'), id='incomplete'),
+        ],
+    )
+    def test_bad_response(self, monkeypatch: pytest.MonkeyPatch, error: Exception):
+        client = pebble.Client(socket_path='does_not_exist')
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                raise error
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        with pytest.raises(pebble.ConnectionError) as excinfo:
+            client.get_system_info()
+        assert type(error).__name__ in str(excinfo.value)
+        assert not isinstance(excinfo.value, TimeoutError)
+
+    def test_not_pebble_on_socket(self):
+        # Something other than Pebble listening on the socket, such as the
+        # wrong service, is a connection error rather than a crash.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            socket_path = f'{tmpdir}/sock'
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(socket_path)
+            server.listen(1)
+
+            def serve():
+                conn, _ = server.accept()
+                with conn:
+                    conn.recv(4096)
+                    conn.sendall(b'hello\n')
+
+            thread = threading.Thread(target=serve)
+            thread.start()
+            try:
+                client = pebble.Client(socket_path=socket_path)
+                with pytest.raises(pebble.ConnectionError) as excinfo:
+                    client.get_system_info()
+                assert 'BadStatusLine' in str(excinfo.value)
+            finally:
+                thread.join()
+                server.close()
+
+    def test_invalid_url_not_connection_error(self):
+        client = pebble.Client(socket_path='does_not_exist')
+        # A bad URL is a bug in the caller, not a problem reaching Pebble.
+        with pytest.raises(http.client.InvalidURL):
+            client.get_change(pebble.ChangeID('1 2'))
+
+    @pytest.mark.parametrize(
+        'method,args,content_type',
+        [
+            ('get_system_info', (), 'application/json'),
+            ('pull', ('/f',), 'multipart/form-data; boundary=x'),
+            ('push', ('/f', 'data'), 'application/json'),
+        ],
+    )
+    @pytest.mark.parametrize(
+        'error,is_timeout',
+        [
+            pytest.param(http.client.IncompleteRead(b'x'), False, id='incomplete'),
+            pytest.param(ConnectionResetError('reset'), False, id='reset'),
+            pytest.param(TimeoutError('timed out'), True, id='timeout'),
+        ],
+    )
+    def test_error_reading_response_body(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        method: str,
+        args: tuple[str, ...],
+        content_type: str,
+        error: Exception,
+        is_timeout: bool,
+    ):
+        client = pebble.Client(socket_path='does_not_exist')
+
+        def read(_: int | None = None, /) -> bytes:
+            raise error
+
+        response = MockHTTPResponse({'Content-Type': content_type}, b'')
+        response.read = read
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                return response
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        with pytest.raises(pebble.ConnectionError) as excinfo:
+            getattr(client, method)(*args)
+        assert type(error).__name__ in str(excinfo.value)
+        assert isinstance(excinfo.value, TimeoutError) is is_timeout
+
+    def test_socket_timeout_before_response(self, monkeypatch: pytest.MonkeyPatch):
+        client = pebble.Client(socket_path='does_not_exist')
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                raise TimeoutError('timed out')
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        with pytest.raises(pebble.ConnectionError) as excinfo:
+            client.get_system_info()
+        assert isinstance(excinfo.value, TimeoutError)
+
+    @pytest.mark.parametrize('in_body', [False, True], ids=['before-response', 'in-body'])
+    def test_wait_change_retries_after_socket_timeout(
+        self, monkeypatch: pytest.MonkeyPatch, in_body: bool
+    ):
+        client = pebble.Client(socket_path='does_not_exist')
+        change: dict[str, typing.Any] = {
+            'id': '70',
+            'kind': 'autostart',
+            'ready': True,
+            'ready-time': '2021-01-28T14:37:03.270218778+13:00',
+            'spawn-time': '2021-01-28T14:37:02.247202105+13:00',
+            'status': 'Done',
+            'summary': 'Autostart service "svc"',
+            'tasks': [],
+        }
+        body = json.dumps({'result': change, 'status-code': 200, 'type': 'sync'}).encode()
+        headers = {'Content-Type': 'application/json'}
+        requests: list[typing.Any] = []
+
+        def read(_: int | None = None, /) -> bytes:
+            raise TimeoutError('timed out')
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                requests.append(request)
+                if len(requests) > 1:
+                    return MockHTTPResponse(headers, body)
+                if not in_body:
+                    raise TimeoutError('timed out')
+                response = MockHTTPResponse(headers, b'')
+                response.read = read
+                return response
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        assert client.wait_change(pebble.ChangeID('70'), timeout=30).status == 'Done'
+        assert len(requests) == 2
+
     def test_real_client(self):
         shutdown, socket_path = fake_pebble.start_server()
 
@@ -3685,6 +4030,176 @@ class TestExec:
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
+
+    def test_wait_output_multibyte_split_across_messages(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        # U+1F600 is four bytes in UTF-8; split it between two messages.
+        stdio.receives.append(b'cr\xc3')
+        stdio.receives.append(b'\xa8me \xf0\x9f')
+        stdio.receives.append(b'\x98\x80\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        out, err = process.wait_output()
+        assert out == 'crème 😀\n'
+        assert err == ''
+
+    @pytest.mark.parametrize(
+        'encoding,text',
+        [
+            ('utf-8', 'crème 😀\n'),
+            ('utf-16', 'crème 😀\n'),
+            ('utf-32', 'crème 😀\n'),
+            ('utf-16-le', 'crème 😀\n'),
+            ('shift_jis', '日本語\n'),
+        ],
+    )
+    def test_output_split_anywhere_decodes_whole(
+        self, client: MockClient, encoding: str, text: str
+    ):
+        # The BOM-sniffing codecs (utf-16, utf-32) only see a byte order mark
+        # at the start of the stream, so every later message must be decoded
+        # with the state the earlier ones left behind.
+        data = text.encode(encoding)
+        for split in range(1, len(data)):
+            stdio, stderr, _ = self.add_responses(client, '123', 0)
+            stdio.receives.append(data[:split])
+            stdio.receives.append(data[split:])
+            stdio.receives.append('{"command":"end"}')
+            stderr.receives.append('{"command":"end"}')
+
+            process = client.exec(['echo'], encoding=encoding)
+            assert process.stdout is not None
+            pieces: list[str] = []
+            while piece := process.stdout.read():
+                pieces.append(piece)
+            process.wait()
+            assert ''.join(pieces) == text, f'split at byte {split}'
+
+    def test_stdout_read_multibyte_split_across_messages(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.append(b'cr\xc3')
+        stdio.receives.append(b'\xa8me\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        assert process.stdout is not None
+        # Each read returns one message, less any character that is only
+        # partly in it, which comes with the next message.
+        assert process.stdout.read() == 'cr'
+        assert process.stdout.read() == 'ème\n'
+        assert process.stdout.read() == ''
+        process.wait()
+
+    def test_websocket_to_writer_multibyte_split_across_messages(self):
+        ws = MockWebsocket()
+        ws.receives = [b'cr\xc3', b'\xa8me\n', '{"command":"end"}']
+        out = io.StringIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            'utf-8',
+        )
+        assert out.getvalue() == 'crème\n'
+
+    @pytest.mark.parametrize(
+        'receives,expected',
+        [
+            pytest.param([b'ok \xc3', '{"command":"end"}'], 'ok �', id='partial-then-end'),
+            pytest.param([b'ok \xc3'], 'ok �', id='partial-then-closed'),
+            pytest.param(
+                [b'a\xffb', b'more', '{"command":"end"}'], 'a�bmore', id='invalid-mid-stream'
+            ),
+        ],
+    )
+    def test_websocket_to_writer_replaces_undecodable_bytes(
+        self, receives: list[str | bytes], expected: str
+    ):
+        ws = MockWebsocket()
+        chunks = list(receives)
+
+        def recv():
+            if chunks:
+                return chunks.pop(0)
+            raise websocket.WebSocketConnectionClosedException('socket is already closed.')
+
+        ws.recv = recv
+        out = io.StringIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            'utf-8',
+        )
+        assert out.getvalue() == expected
+
+    def test_websocket_reader_holds_back_incomplete_character(self):
+        ws = MockWebsocket()
+        ws.receives = [b'cr\xc3', b'\xa8me \xf0', b'\x9f', b'\x98\x80\n', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        # Each read() returns one message's worth, less any incomplete
+        # character at the end, which is returned with the next message.
+        assert reader.read() == b'cr'
+        assert reader.read() == b'\xc3\xa8me '
+        # A message that is nothing but part of a character is joined with the next.
+        assert reader.read() == b'\xf0\x9f\x98\x80\n'
+        assert reader.read() == b''
+
+    def test_websocket_reader_incomplete_character_at_eof(self):
+        ws = MockWebsocket()
+        ws.receives = [b'ok \xc3', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        assert reader.read() == b'ok '
+        # There is nothing to complete it with, so the caller gets the bytes.
+        assert reader.read() == b'\xc3'
+        assert reader.read() == b''
+
+    def test_websocket_reader_invalid_bytes_do_not_raise(self):
+        ws = MockWebsocket()
+        ws.receives = [b'a\xffb', b'more', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        assert reader.read() == b'a\xffb'
+        assert reader.read() == b'more'
+        assert reader.read() == b''
+
+    @pytest.mark.parametrize(
+        'receives,expected',
+        [
+            pytest.param([b'ok \xc3'], 'ok �', id='partial-then-end'),
+            pytest.param([b'a\xffb', b'more'], 'a�bmore', id='invalid-mid-stream'),
+        ],
+    )
+    def test_wait_output_replaces_undecodable_bytes(
+        self, client: MockClient, receives: list[str | bytes], expected: str
+    ):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.extend([*receives, '{"command":"end"}'])
+        stderr.receives.extend([*receives, '{"command":"end"}'])
+
+        process = client.exec(['echo'])
+        assert process.wait_output() == (expected, expected)
+
+    def test_stdout_read_replaces_undecodable_bytes(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.extend([b'a\xffb', b'more', '{"command":"end"}'])
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        assert process.stdout is not None
+        assert process.stdout.read() == 'a�b'
+        assert process.stdout.read() == 'more'
+        assert process.stdout.read() == ''
+        process.wait()
+
+    def test_websocket_reader_bytes_reads_one_message(self):
+        ws = MockWebsocket()
+        ws.receives = [b'foo', b'bar', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws))
+        assert reader.read() == b'foo'
+        assert reader.read(1) == b'b'
+        assert reader.read() == b'ar'
+        assert reader.read() == b''
 
     def test_wait_output_combine_stderr(self, client: MockClient):
         stdio, _, _ = self.add_responses(client, '123', 0)
@@ -4054,6 +4569,33 @@ class TestExec:
         with pytest.raises(pebble.ConnectionError) as excinfo:
             client.exec(['foo'])
         assert str(excinfo.value) in 'unexpected error connecting to websockets: conn!'
+
+    def test_connect_websocket_closes_socket_on_error(self, monkeypatch: pytest.MonkeyPatch):
+        sockets: list[socket.socket] = []
+        real_socket = socket.socket
+
+        def fake_socket(*args: typing.Any, **kwargs: typing.Any):
+            sock = real_socket(*args, **kwargs)
+            sockets.append(sock)
+            return sock
+
+        monkeypatch.setattr(pebble.socket, 'socket', fake_socket)
+        client = pebble.Client(socket_path='does_not_exist')
+        with pytest.raises(OSError):
+            client._connect_websocket('1', 'stdio')
+        assert len(sockets) == 1
+        assert sockets[0].fileno() == -1  # Closed.
+
+    def test_connect_websocket_oserror(self):
+        class Client(MockClient):
+            def _connect_websocket(self, change_id: str, websocket_id: str):
+                raise ConnectionRefusedError('refused')
+
+        client = Client()
+        self.add_responses(client, '123', 0, change_err='change error!')
+        with pytest.raises(pebble.ChangeError) as excinfo:
+            client.exec(['foo'])
+        assert str(excinfo.value) == 'change error!'
 
     def test_websocket_send_raises(self, client: MockClient):
         stdio, stderr, _ = self.add_responses(client, '123', 0)

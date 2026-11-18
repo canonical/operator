@@ -44,12 +44,12 @@ dependencies = [
 
 [dependency-groups]
 lint = [
-    "ruff==0.16.10",
+    "ruff==0.17.2",
     "codespell==2.4.2",
     "pyright~=1.1",
 ]
 unit = [
-    "ops[testing]",
+    "ops-scenario",
     "pytest~=9.0",
 ]
 

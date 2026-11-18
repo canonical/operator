@@ -433,7 +433,7 @@ def test_secrets_jujuv_bad(bad_v: str):
     )
 
 
-@pytest.mark.parametrize('good_v', ('3.0', '3.1', '3', '3.33', '4', '100'))
+@pytest.mark.parametrize('good_v', ('3.0', '3.1', '3.33', '4.0', '100.0'))
 def test_secrets_jujuv_good(good_v: str):
     assert_consistent(
         State(secrets={Secret({'a': 'b'})}),
@@ -620,6 +620,93 @@ def test_action_params_type(ptype: str, good: Any, bad: Any):
             ctx.on.action('foo', params={'bar': bad}),
             _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': ptype}}}}),
         )
+
+
+def test_action_params_type_list():
+    # JSON schema allows a list of types.
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(
+        MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': ['string', 'null']}}}}
+    )
+    assert_consistent(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec)
+    assert_consistent(State(), ctx.on.action('foo', params={'bar': None}), spec)
+    assert_inconsistent(State(), ctx.on.action('foo', params={'bar': 42}), spec)
+
+
+@pytest.mark.parametrize('type_', [['string', 'bogus'], 'bogus', [['string']]])
+def test_action_params_unknown_type_is_not_missing(type_: Any):
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': type_}}}})
+    with pytest.raises(InconsistentScenarioError) as excinfo:
+        check_consistency(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec, '3.0', 0)
+    assert 'unknown data type declared' in str(excinfo.value)
+    assert 'missing from action specification' not in str(excinfo.value)
+
+
+def test_action_params_unknown_type_not_passed_is_consistent():
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': 'bogus'}}}})
+    assert_consistent(State(), ctx.on.action('foo'), spec)
+
+
+def test_action_params_no_type_is_not_missing():
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {}}}})
+    with pytest.raises(InconsistentScenarioError) as excinfo:
+        check_consistency(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec, '3.0', 0)
+    assert 'has no type' in str(excinfo.value)
+    assert 'missing from action specification' not in str(excinfo.value)
+
+
+def test_action_params_not_declared_is_missing():
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {}}})
+    with pytest.raises(InconsistentScenarioError, match='missing from action specification'):
+        check_consistency(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec, '3.0', 0)
+
+
+@pytest.mark.parametrize('juju_version', ['3.6-beta1', '3.6.9.1', '4.0-rc2'])
+def test_tagged_juju_version(juju_version: str):
+    assert_consistent(
+        State(),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo'}),
+        juju_version=juju_version,
+    )
+
+
+@pytest.mark.parametrize('juju_version', ['4', 'banana'])
+def test_invalid_juju_version(juju_version: str):
+    with pytest.raises(RuntimeError, match=f'"{juju_version}" is not a valid Juju version'):
+        check_consistency(
+            State(),
+            Event('start'),
+            _CharmSpec(MyCharm, meta={'name': 'foo'}),
+            juju_version,
+            0,
+        )
+
+
+def test_skipped_checks_do_not_parse_juju_version(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_SKIP_CONSISTENCY_CHECKS', '1')
+    check_consistency(
+        State(),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo'}),
+        'banana',
+        0,
+    )
+
+
+def test_juju_version_tag_is_earlier_than_release():
+    # The number in the tag is not a patch version: this is before 3.6.0.
+    cloud_spec = CloudSpec(name='localhost', type='k8s')
+    assert_inconsistent(
+        State(model=Model(name='k8s-model', type='kubernetes', cloud_spec=cloud_spec)),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo'}),
+        juju_version='3.6-rc12',
+    )
 
 
 def test_duplicate_relation_ids():

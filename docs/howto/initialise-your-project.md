@@ -102,6 +102,7 @@ Important files to be aware of:
 
 ## Next steps
 
+- Run `uv lock` to create a lock file called `uv.lock`. This file specifies the exact dependency versions that will be installed when you test and build your charm.
 - Start writing your charm code. See {ref}`write-and-structure-charm-code` and our other guides.
 - Provide metadata in `charmcraft.yaml`. See {external+charmcraft:ref}`Charmcraft | Configure package information <configure-package-information>`.
 
