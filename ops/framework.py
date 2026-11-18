@@ -114,13 +114,13 @@ class Handle:
         """Create a new handle as child of the current one."""
         return Handle(self, kind, key)
 
-    def __hash__(self) -> int:
+    def __hash__(self):
         return hash((self.parent, self.kind, self.key))
 
     def __eq__(self, other: Handle) -> bool:
         return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
 
-    def __str__(self) -> str:
+    def __str__(self):
         return self.path
 
     @property
@@ -183,7 +183,7 @@ class EventBase:
         self.handle: Handle = handle
         self.deferred: bool = False
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'<{self.__class__.__name__} via {self.handle}>'
 
     def defer(self) -> None:
@@ -277,7 +277,7 @@ class EventSource:
         self.event_kind: str | None = None
         self.emitter_type: type[Object] | None = None
 
-    def __set_name__(self, emitter_type: type[Object], event_kind: str) -> None:
+    def __set_name__(self, emitter_type: type[Object], event_kind: str):
         if self.event_kind is not None:
             raise RuntimeError(
                 'EventSource({}) reused as {}.{} and {}.{}'.format(
@@ -321,7 +321,7 @@ class BoundEvent:
         self.event_type = event_type
         self.event_kind = event_kind
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return (
             f'<BoundEvent {self.event_type.__name__} bound to '
             f'{type(self.emitter).__name__}.{self.event_kind} at {hex(id(self))}>'
@@ -489,7 +489,7 @@ class ObjectEvents(Object):
     def __getitem__(self, key: str) -> PrefixedEvents:
         return PrefixedEvents(self, key)
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         k = type(self)
         event_kinds = ', '.join(sorted(self._event_kinds()))
         return f'<{k.__module__}.{k.__qualname__}: {event_kinds}>'
@@ -560,7 +560,7 @@ class NoTypeError(Exception):
     def __init__(self, handle_path: str):
         self.handle_path = handle_path
 
-    def __str__(self) -> str:
+    def __str__(self):
         return f'cannot restore {self.handle_path} since no class was registered for it'
 
 
@@ -1147,11 +1147,11 @@ class StoredStateData(Object):
     def __getitem__(self, key: str) -> Any:
         return self._cache.get(key)
 
-    def __setitem__(self, key: str, value: Any) -> None:
+    def __setitem__(self, key: str, value: Any):
         self._cache[key] = value
         self.dirty = True
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: str):
         return key in self._cache
 
     def snapshot(self) -> dict[str, Any]:
@@ -1356,18 +1356,18 @@ class StoredDict(typing.MutableMapping[Hashable, Any]):
     def __getitem__(self, key: Hashable) -> Any:
         return _wrap_stored(self._stored_data, self._under[key])
 
-    def __setitem__(self, key: Hashable, value: Any) -> None:
+    def __setitem__(self, key: Hashable, value: Any):
         self._under[key] = _unwrap_stored(self._stored_data, value)
         self._stored_data.dirty = True
 
-    def __delitem__(self, key: Hashable) -> None:
+    def __delitem__(self, key: Hashable):
         del self._under[key]
         self._stored_data.dirty = True
 
     def __iter__(self) -> Iterator[Hashable]:
         return self._under.__iter__()
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self._under)
 
     def __eq__(self, other: object) -> bool:
@@ -1378,7 +1378,7 @@ class StoredDict(typing.MutableMapping[Hashable, Any]):
         else:
             return NotImplemented
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return _wrapped_repr(self)
 
 
@@ -1397,15 +1397,15 @@ class StoredList(typing.MutableSequence[Any]):
     def __getitem__(self, index: int) -> Any:
         return _wrap_stored(self._stored_data, self._under[index])
 
-    def __setitem__(self, index: int, value: Any) -> None:
+    def __setitem__(self, index: int, value: Any):
         self._under[index] = _unwrap_stored(self._stored_data, value)
         self._stored_data.dirty = True
 
-    def __delitem__(self, index: int) -> None:
+    def __delitem__(self, index: int):
         del self._under[index]
         self._stored_data.dirty = True
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self._under)
 
     def insert(self, index: int, value: Any) -> None:
@@ -1458,7 +1458,7 @@ class StoredList(typing.MutableSequence[Any]):
         else:
             return NotImplemented
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return _wrapped_repr(self)
 
 
@@ -1490,13 +1490,13 @@ class StoredSet(typing.MutableSet[Any]):
         self._under.discard(key)
         self._stored_data.dirty = True
 
-    def __contains__(self, key: Any) -> bool:
+    def __contains__(self, key: Any):
         return key in self._under
 
     def __iter__(self) -> Iterator[Any]:
         return self._under.__iter__()
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self._under)
 
     @classmethod
@@ -1534,5 +1534,5 @@ class StoredSet(typing.MutableSet[Any]):
         else:
             return NotImplemented
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return _wrapped_repr(self)
