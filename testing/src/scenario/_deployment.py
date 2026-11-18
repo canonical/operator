@@ -578,7 +578,9 @@ class Juju:
         # the charm can install onto its storage. In a Kubernetes model the
         # storage is provisioned with the pod, and Juju runs storage-attached
         # some time after start. Here it's straight after start, before
-        # pebble-ready, every time.
+        # pebble-ready, every time. Juju can also run pebble-ready any time
+        # after install, whenever the workload's Pebble comes up. Putting
+        # both after start is deliberate, so that every run is the same.
         startup = [] if is_k8s else attached
         startup += [
             _Queued(Event('install')),
