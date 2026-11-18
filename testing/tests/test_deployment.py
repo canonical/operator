@@ -1144,10 +1144,11 @@ def test_unit_to_context_carries_the_app_settings_and_does_not_feed_back(juju: J
 
 
 def test_dispatch_to_context_runs_the_dispatch_again(juju: Juju):
-    deploy_mycharm(juju)
+    deploy_mycharm(juju, num_units=2)
     start = juju.settle()[-1]
-    assert start.event.name == 'start'
+    assert (start.unit_name, start.event.name) == ('myapp/1', 'start')
     ctx = start.to_context()
+    assert ctx.unit_id == 1
     state_out = ctx.run(start.event, start.state_in)
     assert state_out.unit_status == start.state_out.unit_status
 
@@ -1213,6 +1214,20 @@ def test_each_dispatch_records_the_candidates_and_the_choice(juju: Juju):
         chosen = dispatch._candidates[dispatch._chosen]
         assert (chosen.app_name, chosen.unit_id) == (dispatch.app_name, dispatch.unit_id)
         assert chosen.event.name == dispatch.event.name
+
+
+class _Second:
+    def choose(self, candidates: Sequence[_Candidate]) -> int:
+        return min(1, len(candidates) - 1)
+
+
+def test_the_candidates_start_after_the_last_turn_and_wrap_round(juju: Juju):
+    deploy_mycharm(juju, num_units=3)
+    juju._scheduler = _Second()
+    first, second = juju.settle()[:2]
+    assert [c.unit_id for c in first._candidates] == [0, 1, 2]
+    assert first.unit_id == 1
+    assert [c.unit_id for c in second._candidates] == [2, 0, 1]
 
 
 def test_a_budget_stops_settling_with_the_rest_pending(juju: Juju):
