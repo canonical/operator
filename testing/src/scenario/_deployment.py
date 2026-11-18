@@ -19,7 +19,7 @@ import re
 import types
 import unittest.mock
 from collections import deque
-from collections.abc import Generator, Mapping, Sequence
+from collections.abc import Generator, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Generic, Literal, NamedTuple, Protocol
 
 from ops import JujuVersion
@@ -619,27 +619,45 @@ class Juju:
         self._check_deployed(app)
         return self._add_unit(app)
 
-    def config(self, app: App, config: Mapping[str, Any]) -> None:
+    def config(
+        self,
+        app: App,
+        config: Mapping[str, Any] | None = None,
+        *,
+        reset: Sequence[str] = (),
+    ) -> None:
         """Change an application's configuration, as ``juju config`` would.
 
-        The new values are merged over the existing ones and are in every
-        unit's :class:`State` straight away. :meth:`settle` runs
-        ``config-changed`` on each unit, once however many times this is
-        called before it.
+        The new values are merged over the existing ones, the options in
+        ``reset`` go back to their defaults, as with ``juju config --reset``,
+        and the result is in every unit's :class:`State` straight away.
+        :meth:`settle` runs ``config-changed`` on each unit, once however
+        many times this is called before it.
 
         As in Juju, nothing runs if every option is already set to the value
-        given. An option that has only its default counts as unset, so
-        setting it to the default value explicitly does run
-        ``config-changed``.
+        given and every option being reset is already unset. An option that
+        has only its default counts as unset, so setting it to the default
+        value explicitly does run ``config-changed``, and so does resetting
+        it afterwards.
 
         Raises:
             JujuError: if an option isn't one of the charm's config options,
-                or a value is the wrong type for its option.
+                a value is the wrong type for its option, or an option is both
+                set and reset.
         """
         self._check_open()
         self._check_deployed(app)
+        config = config or {}
+        if isinstance(reset, str):
+            reset = [reset]
         _check_config(app.name, app._charm.config, config)
+        _check_config_names(app.name, app._charm.config, reset)
+        for name in reset:
+            if name in config:
+                raise JujuError(f'Cannot set and reset key {name!r} simultaneously.')
         settings = {**app._settings, **config}
+        for name in reset:
+            settings.pop(name, None)
         if settings == app._settings:
             return
         app._settings = settings
@@ -1119,16 +1137,24 @@ def _default_config(config_schema: Mapping[str, Any] | None) -> dict[str, Any]:
     return {name: option['default'] for name, option in options.items() if 'default' in option}
 
 
-def _check_config(
-    app_name: str, config_schema: Mapping[str, Any] | None, config: Mapping[str, Any]
+def _check_config_names(
+    app_name: str, config_schema: Mapping[str, Any] | None, names: Iterable[str]
 ) -> None:
     options: Mapping[str, Any] = (config_schema or {}).get('options') or {}
-    for name, value in config.items():
+    for name in names:
         if name not in options:
             raise JujuError(
                 f'{app_name} has no config option {name!r}. '
                 f'Its options are: {", ".join(sorted(options)) or "none"}.'
             )
+
+
+def _check_config(
+    app_name: str, config_schema: Mapping[str, Any] | None, config: Mapping[str, Any]
+) -> None:
+    _check_config_names(app_name, config_schema, config)
+    options: Mapping[str, Any] = (config_schema or {}).get('options') or {}
+    for name, value in config.items():
         option_type = options[name].get('type')
         expected = _CONFIG_TYPES.get(option_type)
         if expected is None:

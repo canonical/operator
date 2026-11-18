@@ -870,6 +870,51 @@ def test_config_setting_an_option_to_its_default_runs_config_changed(juju: Juju)
     assert juju.settle() == []
 
 
+def test_config_reset_returns_an_option_to_its_default(juju: Juju):
+    app = deploy_mycharm(juju, config={'log_level': 'debug'}, num_units=2)
+    juju.settle()
+    juju.config(app, reset=['log_level'])
+    assert app.config == {'log_level': 'info'}
+    assert app.leader.state.config == {'log_level': 'info'}
+    trace = juju.settle()
+    assert sorted((d.event.name, d.unit_id) for d in trace) == [
+        ('config_changed', 0),
+        ('config_changed', 1),
+    ]
+
+
+def test_config_reset_of_an_unset_option_runs_nothing(juju: Juju):
+    app = deploy_mycharm(juju)
+    juju.settle()
+    juju.config(app, reset=['log_level'])
+    assert juju.settle() == []
+
+
+def test_config_reset_after_setting_the_default_runs_config_changed(juju: Juju):
+    app = deploy_mycharm(juju)
+    juju.settle()
+    juju.config(app, {'log_level': 'info'})
+    juju.settle()
+    juju.config(app, reset=['log_level'])
+    assert [d.event.name for d in juju.settle()] == ['config_changed']
+
+
+@pytest.mark.parametrize(
+    ('config', 'reset', 'match'),
+    [
+        (None, ['bogus'], "no config option 'bogus'"),
+        ({'log_level': 'debug'}, ['log_level'], "set and reset key 'log_level' simultaneously"),
+    ],
+)
+def test_config_reset_rejects_unknown_or_also_set_options(
+    juju: Juju, config: dict[str, Any] | None, reset: list[str], match: str
+):
+    app = deploy_mycharm(juju)
+    with pytest.raises(JujuError, match=match):
+        juju.config(app, config, reset=reset)
+    assert app.config == {'log_level': 'info'}
+
+
 def test_config_before_settling_joins_the_startup_config_changed(juju: Juju):
     app = juju.deploy(spec(PeerCharm, PEER_META), num_units=2)
     juju.config(app, {'log_level': 'debug'})
