@@ -15,7 +15,6 @@ import functools
 import inspect
 import io
 import os
-import shutil
 import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -887,7 +886,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                     container_name,
                 )
             # Path.rmdir will fail if root is nonempty
-            shutil.rmtree(container_root)
+            _pebble_filesystem.remove_tree(container_root)
 
         # initialize simulated filesystem
         container_root.mkdir(parents=True)
@@ -991,13 +990,9 @@ class _MockPebbleClient(_TestingPebbleClient):
         return stopped
 
     # The filesystem methods below override the Harness parent's
-    # implementations: ops.testing aligns with real Pebble's behaviour,
+    # implementations: ops.testing aligns with a non-root Pebble's behaviour,
     # while Harness is deprecated and deliberately unchanged (see ops#2830
     # and ops#2380). The implementation lives in `_pebble_filesystem`.
-
-    def _is_mount_point(self, path: str) -> bool:
-        """Whether the container path is a mount point declared by the state's container."""
-        return os.path.normpath(path) in self._mount_locations
 
     @property
     def _mount_locations(self) -> frozenset[str]:
@@ -1038,7 +1033,7 @@ class _MockPebbleClient(_TestingPebbleClient):
             encoding=encoding,
             make_dirs=make_dirs,
             permissions=permissions,
-            is_mount_point=self._is_mount_point,
+            mount_locations=self._mount_locations,
         )
 
     def list_files(
@@ -1048,7 +1043,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         path = str(path)
         self._check_absolute_path(path)
         return _pebble_filesystem.list_files(
-            self._root, path, pattern=pattern, itself=itself, is_mount_point=self._is_mount_point
+            self._root, path, pattern=pattern, itself=itself, mount_locations=self._mount_locations
         )
 
     def make_dir(
@@ -1073,12 +1068,12 @@ class _MockPebbleClient(_TestingPebbleClient):
             self._root, path, make_parents=make_parents, permissions=permissions
         )
 
-    def remove_path(self, path: str | Path, *, recursive: bool = False):
+    def remove_path(self, path: str | Path, *, recursive: bool = False) -> None:
         self._check_connection()
         path = str(path)
         self._check_absolute_path(path)
         _pebble_filesystem.remove_path(
-            self._root, path, recursive=recursive, is_mount_point=self._is_mount_point
+            self._root, path, recursive=recursive, mount_locations=self._mount_locations
         )
 
     @property

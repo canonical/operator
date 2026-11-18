@@ -11,10 +11,17 @@ and message wording as production: errors are ``pebble.PathError`` (or
 ``pebble.APIError`` for ``list_files``) with Pebble's kind or code and
 reason phrases, worded '<op> <path>: <reason>'.
 
+The module mirrors a Pebble daemon running as a non-root user. Permission
+checks are made by the kernel, against the user running the tests, so
+permission failures match those of a non-root Pebble. A Pebble running as
+root would allow some calls that fail here, such as pushing into a directory
+with mode 0o555.
+
 Mount points (Scenario ``Mount``s) are symlinks in the container root
 created by the test setup; they model real mounts, so pushing to a mounted
-file writes through to its source, a mount point cannot be removed, and a
-mount point in a listing shows its target's type.
+file writes through to its source, a mount point (or a directory containing
+one, when removing recursively) cannot be removed, and a mount point in a
+listing shows its target's type.
 """
 
 from __future__ import annotations
@@ -22,20 +29,74 @@ from __future__ import annotations
 import datetime
 import errno
 import http
+import io
 import os
 import pathlib
 import shutil
 import stat
-from collections.abc import Callable
-from io import BytesIO, IOBase, StringIO
+from collections.abc import Collection
 from typing import BinaryIO, TextIO, cast
 
 from ops import pebble
+from ops._private.harness import ReadableBuffer
 
-ReadableBuffer = bytes | str | StringIO | BytesIO | BinaryIO
+# The normalised container paths of the mount points declared by the test setup.
+MountLocations = Collection[str]
 
-# Whether a container path is a mount point declared by the test setup.
-IsMountPoint = Callable[[str], bool]
+
+def _is_mount_point(mount_locations: MountLocations, path: str) -> bool:
+    """Whether the container path is a mount point.
+
+    This compares the normalised path string only, so a path that reaches a
+    mount through another symlink is not recognised as a mount point.
+    """
+    return os.path.normpath(path) in mount_locations
+
+
+def _contains_mount_point(mount_locations: MountLocations, path: str) -> bool:
+    """Whether any mount point is strictly below the container path."""
+    prefix = os.path.normpath(path).rstrip('/') + '/'
+    return any(location.startswith(prefix) for location in mount_locations)
+
+
+def _make_tree_removable(path: pathlib.Path) -> None:
+    """Give the owner rwx on every real directory in the tree at `path`.
+
+    Symlinks are never followed or chmod-ed, as Mount locations are symlinks
+    to files that belong to the test.
+    """
+    try:
+        mode = path.lstat().st_mode
+        if not stat.S_ISDIR(mode):
+            return
+        path.chmod(stat.S_IMODE(mode) | stat.S_IRWXU)
+        children = list(path.iterdir())
+    except OSError:
+        return
+    for child in children:
+        _make_tree_removable(child)
+
+
+def remove_tree(path: pathlib.Path, *, ignore_errors: bool = False) -> None:
+    """Remove the tree at `path`, even if it contains directories the user cannot access.
+
+    A charm can create a directory with mode 0o000, which `shutil.rmtree`
+    cannot clear. On a permission error, restore the owner's access within
+    the tree (without following symlinks out of it) and try again.
+    """
+    try:
+        shutil.rmtree(path)
+    except PermissionError:
+        _make_tree_removable(path)
+        try:
+            shutil.rmtree(path)
+        except OSError:
+            if not ignore_errors:
+                raise
+    except OSError:
+        if not ignore_errors:
+            raise
+
 
 # Reason text that real Pebble's error messages use for these errnos (Go's
 # lower-case syscall error strings). Charm and library error handlers match
@@ -297,7 +358,7 @@ def _write_source_to(dest: pathlib.Path, source: ReadableBuffer, encoding: str |
         open_mode = 'wb' if is_binary else 'w'
         open_encoding = None if is_binary else encoding
         with dest.open(open_mode, encoding=open_encoding) as f:
-            shutil.copyfileobj(cast('IOBase', source), cast('IOBase', f))
+            shutil.copyfileobj(cast('io.IOBase', source), cast('io.IOBase', f))
 
 
 def _remove_quietly(path: pathlib.Path) -> None:
@@ -336,7 +397,7 @@ def push(
     encoding: str = 'utf-8',
     make_dirs: bool = False,
     permissions: int | None = None,
-    is_mount_point: IsMountPoint,
+    mount_locations: MountLocations,
 ) -> None:
     """Write `source` to the container path `path` in the mock filesystem at `root`."""
     file_path = root / path[1:]
@@ -347,10 +408,12 @@ def push(
             # Real Pebble reports make_dirs failures with this prefix.
             raise pebble.PathError(e.kind, f'cannot create directory: {e.message}') from None
     permissions = permissions if permissions is not None else 0o644
-    if is_mount_point(path):
+    if _is_mount_point(mount_locations, path):
         # A mount point models a real mount: pushing writes the content
         # through to the mounted file, keeping its identity, rather than
-        # replacing the path with a new file.
+        # replacing the path with a new file. This is deliberate and follows
+        # the Mount docstring; a real file bind mount would instead make
+        # Pebble's rename fail with EBUSY.
         if file_path.is_dir():
             raise pebble.PathError('generic-file-error', f'rename {path}.~ {path}: file exists')
         try:
@@ -362,6 +425,8 @@ def push(
     # Real Pebble writes the content to a temporary sibling file and renames
     # it over the target, so pushing replaces symlinks and other
     # non-directories, and only fails if the target is a directory.
+    # Real Pebble uses '<name>.<random digits>~'; a fixed name keeps the
+    # error messages (which include it) deterministic.
     temp_path = file_path.with_name(file_path.name + '.~')
     try:
         _write_source_to(temp_path, source, encoding)
@@ -385,7 +450,7 @@ def list_files(
     *,
     pattern: str | None,
     itself: bool,
-    is_mount_point: IsMountPoint,
+    mount_locations: MountLocations,
 ) -> list[pebble.FileInfo]:
     """List the files at the container path `path` in the mock filesystem at `root`."""
     file_path = root / path[1:]
@@ -426,9 +491,13 @@ def list_files(
         # A mount point appears as its target's type, like a real mount
         # point; any other symlink entry stays a symlink.
         entry_container_path = os.path.join(path, file.name) if is_entry_listing else path
-        file_info = build_fileinfo(
-            file, follow_symlinks=not is_entry_listing or is_mount_point(entry_container_path)
-        )
+        follow = not is_entry_listing or _is_mount_point(mount_locations, entry_container_path)
+        try:
+            file_info = build_fileinfo(file, follow_symlinks=follow)
+        except OSError:
+            # A mount whose source is missing (or loops) cannot be followed;
+            # list the entry itself rather than failing the whole listing.
+            file_info = build_fileinfo(file)
         rel_path = os.path.relpath(file_info.path, start=root)
         rel_path = '/' if rel_path == '.' else '/' + rel_path
         file_info.path = rel_path
@@ -473,7 +542,7 @@ def make_dir(
     except FileExistsError:
         pass
     except OSError as e:
-        raise path_error('mkdir', path, e) from None
+        raise path_error('mkdir', f'{path}.mkdir-new', e) from None
     os.chmod(temp_path, permissions if permissions is not None else 0o755)
     try:
         os.rename(temp_path, dir_path)
@@ -481,15 +550,58 @@ def make_dir(
         raise path_error('rename', f'{path}.mkdir-new {path}', e) from None
 
 
+def _recursive_prechecks(root: pathlib.Path, file_path: pathlib.Path, path: str) -> bool:
+    """Mirror the first steps of Go's os.RemoveAll, which Pebble uses.
+
+    RemoveAll first tries a plain remove (unlink, then rmdir) and is done if
+    that succeeds or the path doesn't exist. Otherwise it opens the parent
+    directory before recursing, so a parent that cannot be opened is reported
+    as 'open <parent>: <reason>'. Returns True if the path was removed.
+    """
+    try:
+        file_path.unlink()
+        return True
+    except FileNotFoundError:
+        return True
+    except OSError:
+        pass
+    try:
+        file_path.rmdir()
+        return True
+    except FileNotFoundError:
+        return True
+    except OSError:
+        pass
+    parent = os.path.dirname(path)
+    if path != '/':
+        # O_NONBLOCK so that a FIFO parent cannot hang the test, which real
+        # Pebble would.
+        try:
+            os.close(os.open(root / parent[1:], os.O_RDONLY | os.O_NONBLOCK))
+        except OSError as e:
+            raise path_error('open', parent, e) from None
+    return False
+
+
 def remove_path(
     root: pathlib.Path,
     path: str,
     *,
     recursive: bool = False,
-    is_mount_point: IsMountPoint,
+    mount_locations: MountLocations,
 ) -> None:
     """Remove the container path `path` from the mock filesystem at `root`."""
     file_path = root / path[1:]
+    if recursive:
+        # Mount points cannot be removed. These checks come before anything
+        # is deleted, since a plain unlink would remove the mount's symlink.
+        # Real Pebble (os.RemoveAll) would delete the other entries,
+        # including the mounted contents, before failing with EBUSY; nothing
+        # is deleted here, because mount sources are the test's own files.
+        if _is_mount_point(mount_locations, path) or _contains_mount_point(mount_locations, path):
+            raise pebble.PathError('generic-file-error', f'remove {path}: device or resource busy')
+        if _recursive_prechecks(root, file_path, path):
+            return
     # Real Pebble removes the path itself: a symlink is unlinked, never
     # followed, however broken or looping its target is. lstat, rather than
     # exists(), so that broken links and loops are not 'not found', and so
@@ -502,7 +614,7 @@ def remove_path(
         raise pebble.PathError('not-found', f'remove {path}: no such file or directory') from None
     except OSError as e:
         raise path_error('remove', path, e) from None
-    if is_mount_point(path):
+    if _is_mount_point(mount_locations, path):
         # A mount point cannot be removed, like a real mount point.
         raise pebble.PathError('generic-file-error', f'remove {path}: device or resource busy')
     if stat.S_ISDIR(info.st_mode):

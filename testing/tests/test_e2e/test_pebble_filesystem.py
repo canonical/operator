@@ -407,3 +407,212 @@ class TestFileErrors:
                 assert 'syntax error in pattern' in excinfo.value.message
             # An empty pattern is no filter.
             assert len(container.list_files('/dir', pattern='')) == 1
+
+
+needs_non_root = pytest.mark.skipif(
+    os.geteuid() == 0, reason='root bypasses the permission checks under test'
+)
+
+
+@contextlib.contextmanager
+def _restored_modes(*paths: pathlib.Path) -> Generator[None]:
+    """Restore owner access to the paths afterwards, so that temp dir cleanup works."""
+    try:
+        yield
+    finally:
+        for path in paths:
+            if path.exists():
+                path.chmod(0o755)
+
+
+@needs_non_root
+class TestPermissions:
+    """Permission failures match those of a non-root Pebble."""
+
+    def test_make_dir_with_no_permissions(self):
+        with running_container() as (container, root):
+            with _restored_modes(root / 'd'):
+                container.make_dir('/d', permissions=0)
+                assert (root / 'd').stat().st_mode & 0o777 == 0
+                (info,) = container.list_files('/d', itself=True)
+                assert info.permissions == 0
+
+    def test_make_parents_with_no_permissions(self):
+        with running_container() as (container, root):
+            with _restored_modes(root / 'a'):
+                with pytest.raises(pebble.PathError) as excinfo:
+                    container.make_dir('/a/b', make_parents=True, permissions=0)
+                assert excinfo.value.kind == 'permission-denied'
+
+    def test_push_into_read_only_dir(self):
+        with running_container() as (container, root):
+            container.make_dir('/d', permissions=0o555)
+            with _restored_modes(root / 'd'):
+                with pytest.raises(pebble.PathError) as excinfo:
+                    container.push('/d/f', 'x')
+                assert excinfo.value.kind == 'permission-denied'
+
+    def test_pull_unreadable_file(self):
+        with running_container() as (container, root):
+            (root / 'f').write_text('x')
+            (root / 'f').chmod(0)
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.pull('/f')
+            assert excinfo.value.kind == 'permission-denied'
+
+    def test_list_unreadable_dir(self):
+        with running_container() as (container, root):
+            with _restored_modes(root / 'd'):
+                container.make_dir('/d', permissions=0)
+                with pytest.raises(pebble.APIError) as excinfo:
+                    container.list_files('/d')
+                assert excinfo.value.code == 403
+
+    def test_make_dir_in_read_only_dir(self):
+        with running_container() as (container, root):
+            container.make_dir('/d', permissions=0o555)
+            with _restored_modes(root / 'd'):
+                with pytest.raises(pebble.PathError) as excinfo:
+                    container.make_dir('/d/e')
+                assert excinfo.value.kind == 'permission-denied'
+
+    def test_remove_file_in_read_only_dir(self):
+        with running_container() as (container, root):
+            container.make_dir('/d')
+            container.push('/d/f', 'x')
+            (root / 'd').chmod(0o555)
+            with _restored_modes(root / 'd'):
+                with pytest.raises(pebble.PathError) as excinfo:
+                    container.remove_path('/d/f')
+                assert excinfo.value.kind == 'permission-denied'
+
+    def test_recursive_remove_empty_unreadable_dir(self):
+        with running_container() as (container, root):
+            with _restored_modes(root / 'd'):
+                container.make_dir('/d', permissions=0)
+                # Removing an empty directory needs no access to it.
+                container.remove_path('/d', recursive=True)
+                assert not (root / 'd').exists()
+
+    def test_recursive_remove_below_unreadable_file(self):
+        with running_container() as (container, root):
+            (root / 'f').write_text('x')
+            (root / 'f').chmod(0)
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.remove_path('/f/child', recursive=True)
+            assert excinfo.value.kind == 'permission-denied'
+            assert excinfo.value.message.startswith('open /f:')
+
+    def test_recursive_remove_existing_behaviour(self):
+        with running_container() as (container, root):
+            container.remove_path('/missing', recursive=True)
+            container.remove_path('/missing/child', recursive=True)
+            (root / 'dir').mkdir()
+            (root / 'dir' / 'f').write_text('x')
+            (root / 'link').symlink_to('dir')
+            (root / 'broken').symlink_to('nowhere')
+            (root / 'loop').symlink_to('loop')
+            for link in ('link', 'broken', 'loop'):
+                container.remove_path(f'/{link}', recursive=True)
+                assert not (root / link).is_symlink()
+            assert (root / 'dir' / 'f').exists()
+            (root / 'file').write_text('x')
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.remove_path('/file/child', recursive=True)
+            assert excinfo.value.kind == 'generic-file-error'
+            assert 'not a directory' in excinfo.value.message
+            (root / 'loop').symlink_to('loop')
+            with pytest.raises(pebble.PathError) as excinfo:
+                container.remove_path('/loop/child', recursive=True)
+            assert 'too many levels of symbolic links' in excinfo.value.message
+            container.remove_path('/dir', recursive=True)
+            assert not (root / 'dir').exists()
+
+    def test_push_over_read_only_file(self):
+        with running_container() as (container, root):
+            container.push('/f', 'old', permissions=0o444)
+            # The content goes to a temporary file that is renamed over the
+            # target, so the target's own mode does not matter.
+            container.push('/f', 'new')
+            assert (root / 'f').read_text() == 'new'
+
+
+class MakeDirCharm(Charm):
+    def _on_event(self, event: ops.EventBase):
+        if isinstance(event, ops.StartEvent):
+            self.unit.get_container('c').make_dir('/d', permissions=0)
+
+
+def _new_context() -> ops.testing.Context[MakeDirCharm]:
+    return ops.testing.Context(MakeDirCharm, meta={'name': 'test', 'containers': {'c': {}}})
+
+
+@needs_non_root
+class TestCleanup:
+    def _run_creating_unreadable_dir(self, ctx: ops.testing.Context[MakeDirCharm]) -> pathlib.Path:
+        state = ops.testing.State(containers={ops.testing.Container('c', can_connect=True)})
+        out = ctx.run(ctx.on.start(), state)
+        return out.get_container('c').get_filesystem(ctx)
+
+    def test_context_reuse(self):
+        ctx = _new_context()
+        with ctx:
+            root = self._run_creating_unreadable_dir(ctx)
+            assert (root / 'd').stat().st_mode & 0o777 == 0
+            # The second run wipes the container filesystem again.
+            self._run_creating_unreadable_dir(ctx)
+
+    def test_close_removes_unreadable_dir(self):
+        ctx = _new_context()
+        self._run_creating_unreadable_dir(ctx)
+        tmp_path = ctx._tmp_path
+        assert tmp_path.exists()
+        ctx.close()
+        assert not tmp_path.exists()
+
+    def test_remove_tree_does_not_follow_symlinks(self, tmp_path: pathlib.Path):
+        source = tmp_path / 'source'
+        source.mkdir()
+        (source / 'f').write_text('x')
+        source.chmod(0o555)
+        tree = tmp_path / 'tree'
+        (tree / 'locked').mkdir(parents=True)
+        (tree / 'link').symlink_to(source)
+        (tree / 'locked').chmod(0)
+        try:
+            _pebble_filesystem.remove_tree(tree)
+            assert not tree.exists()
+            # The target of the symlink was neither changed nor removed.
+            assert source.stat().st_mode & 0o777 == 0o555
+            assert (source / 'f').read_text() == 'x'
+        finally:
+            source.chmod(0o755)
+
+
+class TestMounts:
+    def test_remove_parent_of_mount_point(self, tmp_path: pathlib.Path):
+        source = tmp_path / 'source'
+        source.mkdir()
+        (source / 'f').write_text('x')
+        mounts = {'m': ops.testing.Mount(location='/a/b/mnt', source=source)}
+        with running_container(mounts) as (container, root):
+            (root / 'a' / 'other').write_text('y')
+            for path in ('/a', '/a/b', '/'):
+                with pytest.raises(pebble.PathError) as excinfo:
+                    container.remove_path(path, recursive=True)
+                assert excinfo.value.kind == 'generic-file-error'
+                assert 'device or resource busy' in excinfo.value.message
+            # Nothing was deleted, not even unrelated entries.
+            assert (root / 'a' / 'other').read_text() == 'y'
+            assert (root / 'a' / 'b' / 'mnt').is_symlink()
+            assert (source / 'f').read_text() == 'x'
+            # A sibling with a similar name is not a parent of the mount.
+            (root / 'a' / 'b' / 'mnt2').mkdir()
+            container.remove_path('/a/b/mnt2', recursive=True)
+
+    def test_list_parent_of_mount_with_missing_source(self, tmp_path: pathlib.Path):
+        mounts = {'m': ops.testing.Mount(location='/d/mnt', source=tmp_path / 'missing')}
+        with running_container(mounts) as (container, _):
+            (info,) = container.list_files('/d')
+            assert info.path == '/d/mnt'
+            assert info.type == pebble.FileType.SYMLINK

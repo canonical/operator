@@ -12,7 +12,6 @@ from __future__ import annotations
 import copy
 import functools
 import pathlib
-import shutil
 import sys
 import tempfile
 import weakref
@@ -26,6 +25,7 @@ from typing_extensions import deprecated
 import ops
 from ops._private.harness import ActionFailed
 
+from . import _pebble_filesystem
 from ._runtime import Runtime
 from .errors import (
     AlreadyEmittedError,
@@ -834,7 +834,9 @@ class Context(Generic[CharmType]):
         # Context isn't used as a context manager. Callers should still prefer
         # `with Context(...) as ctx:` (or call ctx.close()) for eager cleanup.
         self._tmp_path = pathlib.Path(tempfile.mkdtemp(prefix='scenario-'))
-        self._tmp_finalizer = weakref.finalize(self, shutil.rmtree, str(self._tmp_path), True)
+        self._tmp_finalizer = weakref.finalize(
+            self, _pebble_filesystem.remove_tree, self._tmp_path, ignore_errors=True
+        )
 
         # config for what events to be captured in emitted_events.
         self.capture_deferred_events = capture_deferred_events
