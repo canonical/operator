@@ -139,10 +139,12 @@ class _Candidate(NamedTuple):
 class Dispatch:
     """One event dispatched to one unit, as recorded in a settle trace.
 
-    It's a record of the event as it happened, with no live handles: it
-    describes the unit as it was at that point, however the model has moved
-    on since, and two ``Dispatch`` objects compare by value. The application
-    itself is ``juju.apps[dispatch.app_name]``, and the model is
+    It's a record of the event as it happened, with no handles to the live
+    model: it describes the unit as it was at that point, however the model
+    has moved on since, and two ``Dispatch`` objects compare by value. The
+    only other thing it keeps is the charm and its metadata, which are fixed
+    at deploy, for :meth:`to_context`. The application itself is
+    ``juju.apps[dispatch.app_name]``, and the model is
     ``dispatch.state_in.model``.
     """
 
