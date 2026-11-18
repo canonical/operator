@@ -177,3 +177,12 @@ def test_explicit_juju_info_network_override(mycharm: type[ops.CharmBase]):
         network = binding.network
         assert network is not None
         assert network.bind_address
+
+
+def test_default_bind_addresses_not_shared():
+    first = Network('foo')
+    second = Network('bar')
+    assert first.bind_addresses == second.bind_addresses
+    # BindAddress.addresses is a list, so a shared default would leak changes.
+    assert first.bind_addresses[0] is not second.bind_addresses[0]
+    assert first.bind_addresses[0].addresses is not second.bind_addresses[0].addresses

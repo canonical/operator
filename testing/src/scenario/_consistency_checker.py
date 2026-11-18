@@ -24,7 +24,7 @@ import marshal
 import os
 import re
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
@@ -128,6 +128,21 @@ def check_consistency(
         )
 
 
+def _duplicates(kind: str, field: str, keys: Iterable[Hashable]) -> list[str]:
+    """Describe each key that appears more than once.
+
+    Call this for each State collection whose entities must have unique identifiers,
+    such as ``(c.name for c in state.containers)``. The entities compare by every field,
+    so a State's frozenset can hold two that share an identifier but differ elsewhere,
+    which isn't possible with a real Juju.
+    """
+    return [
+        f'duplicate {kind} in State: {field} {key!r} appears {n} times.'
+        for key, n in Counter(keys).items()
+        if n > 1
+    ]
+
+
 def check_resource_consistency(
     *,
     state: State,
@@ -138,6 +153,7 @@ def check_resource_consistency(
     errors: list[str] = []
     warnings: list[str] = []
 
+    errors.extend(_duplicates('resource', 'name', (r.name for r in state.resources)))
     resources_from_meta = set(charm_spec.meta.get('resources', {}))
     resources_from_state = {resource.name for resource in state.resources}
     if not resources_from_meta.issuperset(resources_from_state):
@@ -489,7 +505,7 @@ def check_secrets_consistency(
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Secret` in the :class:`scenario.State`."""
-    errors: list[str] = []
+    errors = _duplicates('secret', 'id', (s.id for s in state.secrets))
     if not event._is_secret_event:
         return Results(errors, [])
 
@@ -518,7 +534,7 @@ def check_network_consistency(
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Network` in the :class:`scenario.State`."""
-    errors: list[str] = []
+    errors = _duplicates('network', 'binding_name', (n.binding_name for n in state.networks))
 
     meta_bindings = set(charm_spec.meta.get('extra-bindings', ()))
     # add the implicit juju-info binding so we can override its network without
@@ -673,7 +689,7 @@ def check_containers_consistency(
     state_containers = [c.name for c in state.containers]
     all_notices = {notice.id for c in state.containers for notice in c.notices}
     all_checks = {(c.name, check.name) for c in state.containers for check in c.check_infos}
-    errors: list[str] = []
+    errors = _duplicates('container', 'name', state_containers)
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's
     # not fine if:
