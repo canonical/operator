@@ -282,7 +282,9 @@ def test_push_encoding_round_trips(
 # ── what the properties found ───────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason='the email parser mangles the filename')
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason='the email parser mangles the filename'
+)
 @pytest.mark.parametrize('path', ['/srv/café', '/srv/file ', '/srv/file\t'])
 def test_pull_path_non_ascii_or_trailing_whitespace(path: str):
     boundary = 'b0undary'
@@ -302,7 +304,9 @@ def test_pull_path_non_ascii_or_trailing_whitespace(path: str):
         parser.remove_files()
 
 
-@pytest.mark.xfail(strict=True, reason="_encode_multipart doesn't escape '\\'")
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason="_encode_multipart doesn't escape '\\'"
+)
 @pytest.mark.parametrize('path', ['/srv/a\\\\b', '/srv/a\\/b', '/srv/a\\'])
 def test_push_path_with_backslash_before_tspecial(path: str):
     _, filename = _encode_push({}, path, b'data')
