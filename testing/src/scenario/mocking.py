@@ -827,17 +827,17 @@ class _MockModelBackend(_ModelBackend):
             '(and never will be: it was removed in Juju 3.6.11)'
         )
 
+    @_hook_command('resource-get', 'resource_name')
     def resource_get(self, resource_name: str) -> str:
         # We assume that there are few enough resources that a linear search
         # will perform well enough.
         for resource in self._state.resources:
             if resource.name == resource_name:
                 return str(resource.path)
-        # ops will not let us get there if the resource name is unknown from metadata.
-        # but if the user forgot to add it in State, then we remind you of that.
-        raise RuntimeError(
-            f'Inconsistent state: resource {resource_name} not found in State. please pass it.',
-        )
+        # Ops raises NameError before getting here if the resource isn't in the
+        # metadata. A declared resource with nothing attached is valid in Juju,
+        # for example a local deploy without --resource, and resource-get fails.
+        raise ModelError(f'could not download resource: {resource_name!r} not found')
 
     @_hook_command('credential-get')
     def credential_get(self) -> CloudSpec_Ops:

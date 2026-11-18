@@ -31,3 +31,13 @@ def test_get_resource():
         assert mgr.charm.model.resources.fetch('bar') == resource2.path
         with pytest.raises(NameError):
             mgr.charm.model.resources.fetch('baz')
+
+
+def test_get_missing_resource():
+    ctx = Context(
+        ResourceCharm,
+        meta={'name': 'resource-charm', 'resources': {'foo': {'type': 'file'}}},
+    )
+    with ctx(ctx.on.update_status(), state=State()) as mgr:
+        with pytest.raises(ops.ModelError, match='foo'):
+            mgr.charm.model.resources.fetch('foo')
