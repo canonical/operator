@@ -26,7 +26,6 @@ liveness
 manpages
 misconfiguration
 mitigations
-monorepo
 OAuth
 pathops
 Parca

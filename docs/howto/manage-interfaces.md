@@ -12,7 +12,7 @@ If an existing interface is close to what you need, consider extending it rather
 (register-an-interface)=
 ## Register an interface
 
-To register a new interface, add its definition to the `interfaces` directory of the [`charmlibs` monorepo](https://github.com/canonical/charmlibs) and open a pull request. The definition records:
+To register a new interface, add its definition to the `interfaces` directory of the [`charmlibs` repository](https://github.com/canonical/charmlibs) and open a pull request. The definition records:
 
 * The specification. This describes what charms on each side of the interface are expected to do.
 * The reference charms. These are the charms that implement the interface.
