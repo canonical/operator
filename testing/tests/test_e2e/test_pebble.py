@@ -510,9 +510,9 @@ def test_get_notices_by_type():
     state = State(containers={container})
     ctx = Context(Charm, meta={'name': 'foo', 'containers': {'foo': {}}})
     with ctx(ctx.on.start(), state) as mgr:
-        container = mgr.charm.unit.get_container('foo')
-        assert container.get_notices(types=[pebble.NoticeType.CUSTOM]) == [custom._to_ops()]
-        assert container.get_notices(types=['change-update']) == [change_update._to_ops()]
+        ops_container = mgr.charm.unit.get_container('foo')
+        assert ops_container.get_notices(types=[pebble.NoticeType.CUSTOM]) == [custom._to_ops()]
+        assert ops_container.get_notices(types=['change-update']) == [change_update._to_ops()]
 
 
 class CheckFailedCharm(ops.CharmBase):
