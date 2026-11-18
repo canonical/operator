@@ -84,6 +84,9 @@ class BindAddress:
 
     @classmethod
     def _from_dict(cls, d: BindAddressDict) -> BindAddress:
+        # Older Juju versions can send null for the addresses rather than an
+        # empty list (see canonical/operator#499), so `or` is used rather than
+        # a default.
         addresses = [Address._from_dict(addr) for addr in d.get('addresses') or []]
         return cls(
             mac_address=d.get('mac-address', ''),
@@ -116,10 +119,12 @@ class CloudCredential:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> CloudCredential:
         """Create a new CloudCredential object from a dictionary."""
+        # Juju omits the attributes and redacted list when they are empty, and
+        # never sends null for them.
         return cls(
             auth_type=d['auth-type'],
-            attributes=d.get('attrs') or {},
-            redacted=d.get('redacted') or [],
+            attributes=d.get('attrs', {}),
+            redacted=d.get('redacted', []),
         )
 
 
@@ -170,7 +175,9 @@ class CloudSpec:
             credential=CloudCredential._from_dict(d['credential'])
             if d.get('credential')
             else None,
-            ca_certificates=d.get('cacertificates') or [],
+            # Juju omits the CA certificates when there are none, and never
+            # sends null.
+            ca_certificates=d.get('cacertificates', []),
             skip_tls_verify=d.get('skip-tls-verify') or False,
             is_controller_cloud=d.get('is-controller-cloud') or False,
         )
@@ -339,8 +346,9 @@ class SecretInfo:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> SecretInfo:
         id, data = next(iter(d.items()))  # Juju returns dict of {secret_id: {info}}
-        # Juju omits the description and access when they are empty.
-        access: list[SecretAccessDict] = data.get('access') or []
+        # Juju omits the description and access when they are empty, and never
+        # sends null for them.
+        access: list[SecretAccessDict] = data.get('access', [])
         return cls(
             id=id,
             label=data.get('label', ''),
