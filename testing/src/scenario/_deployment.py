@@ -544,6 +544,15 @@ class Juju:
         deterministic. Each unit runs its own events in the order they were
         caused, and the units take turns, one event each.
 
+        The loop check looks at one unit at a time, not the whole model. A
+        deterministic charm given the same event and ``State`` again writes
+        what it wrote before, so it can't move the model on. In theory, a
+        unit could see an earlier view again while other units are still
+        making progress, for example if a peer sets a value and then clears
+        it. That would be reported as a loop, although waiting
+        ``relation-changed`` events are merged, which has so far kept that
+        from happening.
+
         Returns:
             The events dispatched, in order, each with the unit it went to and
             that unit's :class:`State` before and after.
@@ -553,8 +562,8 @@ class Juju:
                 the same unit with the same :class:`State` twice is a loop,
                 and is reported as soon as it happens; otherwise, the limit
                 grows with the number of units in the model, and with the
-                number of pairs of peers. The message ends
-                with the last events dispatched.
+                number of pairs of peers. The message ends with the last
+                events dispatched.
         """
         self._check_open()
         self._trace = []
