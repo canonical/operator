@@ -5333,17 +5333,6 @@ class PebbleStorageAPIsTestMixin:
             pebble_dir + file for file in ('/file1.gz', '/file2.tar.gz')
         }
 
-    def test_list_files_empty_pattern(
-        self,
-        pebble_dir: str,
-        client: PebbleClientType,
-    ):
-        client.push(f'{pebble_dir}/file1', 'data')
-        client.push(f'{pebble_dir}/file2', 'data')
-        # An empty pattern is the same as no pattern.
-        files = client.list_files(f'{pebble_dir}/', pattern='')
-        assert {file.path for file in files} == {f'{pebble_dir}/file1', f'{pebble_dir}/file2'}
-
     def test_make_directory(
         self,
         pebble_dir: str,

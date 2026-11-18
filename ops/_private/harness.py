@@ -3664,8 +3664,7 @@ class _TestingPebbleClient:
             except NotADirectoryError:
                 pass
 
-        # Pebble ignores an empty pattern, so it matches every file.
-        if pattern:
+        if pattern is not None:
             files = [file for file in files if fnmatch.fnmatch(file.name, pattern)]
 
         file_infos = [Container._build_fileinfo(file) for file in files]
