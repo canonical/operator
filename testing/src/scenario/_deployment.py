@@ -39,21 +39,20 @@ from .state import (
 if TYPE_CHECKING:
     from ops.charm import CharmBase
 
-#: The model identity a :class:`Juju` has when the test doesn't give one. Fixed,
-#: so that everything derived from it (such as secret IDs) is the same on every
-#: run.
+# The model identity a Juju has when the test doesn't give one. Fixed, so that
+# everything derived from it (such as secret IDs) is the same on every run.
 _DEFAULT_MODEL_NAME = 'test-model'
-_DEFAULT_MODEL_UUID = 'f2a1c9de-7b3e-4d6a-8c51-0e9b4d7a3f26'
+_DEFAULT_MODEL_UUID = '7e57ca5e-c0de-4a11-be57-5e771ed5eed5'
 _DEFAULT_CLOUD_SPEC = CloudSpec(type='kubernetes', name='localhost')
 
-#: Juju gives Kubernetes charms a cloud spec from this version on.
+# Juju gives Kubernetes charms a cloud spec from this version on.
 _K8S_CLOUD_SPEC_JUJU_VERSION = '3.6.10'
 
-#: ``State`` fields that describe a unit's place in the model. :class:`Juju`
-#: sets these itself, so a ``state_template`` may not.
+# State fields that describe a unit's place in the model. Juju sets these
+# itself, so a state_template may not.
 _JUJU_OWNED_FIELDS = ('leader', 'planned_units', 'model', 'config', 'relations', 'secrets')
 
-#: The Python types each config option type accepts, as ``Context`` checks them.
+# The Python types each config option type accepts, as Context checks them.
 _CONFIG_TYPES: dict[str, type | tuple[type, ...]] = {
     'string': str,
     'int': int,
@@ -62,7 +61,7 @@ _CONFIG_TYPES: dict[str, type | tuple[type, ...]] = {
     'secret': str,
 }
 
-#: The alphabet of a Juju secret ID: an xid, 20 characters of base32hex.
+# The alphabet of a Juju secret ID: an xid, 20 characters of base32hex.
 _XID_ALPHABET = '0123456789abcdefghijklmnopqrstuv'
 
 
