@@ -168,6 +168,21 @@ def _hook_command(cmd: str, *params: str, **renamed: str) -> Callable[[_F], _F]:
     return decorator
 
 
+def _insert_defaults(params: dict[str, Any], properties: dict[str, Any]) -> None:
+    """Fill in the defaults that ``params`` is missing, including inside objects, as Juju does."""
+    for name, schema in properties.items():
+        if name in params:
+            if isinstance(params[name], dict):
+                _insert_defaults(params[name], schema.get('properties', {}))
+        elif 'default' in schema:
+            params[name] = copy.deepcopy(schema['default'])
+        elif 'properties' in schema:
+            defaults: dict[str, Any] = {}
+            _insert_defaults(defaults, schema['properties'])
+            if defaults:
+                params[name] = defaults
+
+
 # pyright: reportIncompatibleMethodOverride=false
 class _MockModelBackend(_ModelBackend):
     def __init__(
@@ -745,7 +760,10 @@ class _MockModelBackend(_ModelBackend):
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-get',
             )
-        return copy.deepcopy(action.params)
+        params = copy.deepcopy(dict(action.params))
+        action_spec: dict[str, Any] = (self._charm_spec.actions or {}).get(action.name) or {}
+        _insert_defaults(params, action_spec.get('params', {}))
+        return params
 
     @_hook_command('storage-add', 'name', 'count')
     def storage_add(self, name: str, count: int = 1):
