@@ -26,6 +26,7 @@ from scenario import (
 )
 from scenario._deployment import App, CharmSpec, Dispatch, Juju
 from scenario._juju_errors import JujuError
+from scenario.errors import InconsistentScenarioError
 
 import ops
 
@@ -58,6 +59,25 @@ class SecretCharm(ops.CharmBase):
 
     def _on_leader_elected(self, _: ops.EventBase):
         self.app.add_secret({'password': 'hunter2'}, label='admin')
+
+
+class TwoSecretsCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.leader_elected, self._add_secret)
+        framework.observe(self.on.start, self._add_secret)
+
+    def _add_secret(self, event: ops.EventBase):
+        self.app.add_secret({'created': 'yes'}, label=event.handle.kind)
+
+
+class VersionCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.install, self._on_install)
+
+    def _on_install(self, _: ops.EventBase):
+        self.unit.status = ops.ActiveStatus(str(self.model.juju_version))
 
 
 class TrustCharm(ops.CharmBase):
@@ -201,6 +221,12 @@ def test_deploy_rejects_a_duplicate_app_name(juju: Juju):
         deploy_mycharm(juju)
 
 
+def test_deploy_needs_an_app_name_when_the_metadata_has_none(juju: Juju):
+    with pytest.raises(JujuError, match='pass app='):
+        juju.deploy(CharmSpec(MyCharm, meta={}))
+    assert not juju.apps
+
+
 def test_deploy_rejects_zero_units(juju: Juju):
     with pytest.raises(JujuError, match='at least 1'):
         deploy_mycharm(juju, num_units=0)
@@ -285,21 +311,29 @@ def test_deploy_takes_only_a_charm_class_or_a_charm_spec(juju: Juju):
 
 
 @pytest.mark.parametrize(
-    ('trust', 'juju_version', 'message'),
+    ('cloud_type', 'trust', 'juju_version', 'message'),
     [
-        (True, '3.6.10', 'cloud=localhost'),
-        (False, '3.6.10', 'not trusted'),
-        (True, '3.6.9', 'cloud spec is empty'),
+        ('kubernetes', True, '3.6.10', 'cloud=localhost'),
+        ('kubernetes', False, '3.6.10', 'not trusted'),
+        ('kubernetes', True, '3.6.9', 'cloud spec is empty'),
+        ('lxd', True, '3.6.9', 'cloud=localhost'),
     ],
 )
 def test_a_trusted_charm_gets_the_cloud_spec(
-    juju: Juju, trust: bool, juju_version: str, message: str
+    cloud_type: str, trust: bool, juju_version: str, message: str
 ):
-    app = juju.deploy(
-        CharmSpec(TrustCharm, meta={'name': 'trusty'}), trust=trust, juju_version=juju_version
-    )
-    juju.settle()
+    with Juju(cloud_spec=CloudSpec(type=cloud_type, name='localhost')) as j:
+        app = j.deploy(
+            CharmSpec(TrustCharm, meta={'name': 'trusty'}), trust=trust, juju_version=juju_version
+        )
+        j.settle()
     assert message in app.leader.state.unit_status.message
+
+
+def test_the_charm_sees_the_juju_version_it_was_deployed_with(juju: Juju):
+    app = juju.deploy(CharmSpec(VersionCharm, meta={'name': 'versioned'}), juju_version='3.5.4')
+    juju.settle()
+    assert app.leader.state.unit_status == ActiveStatus('3.5.4')
 
 
 TYPED_CONFIG: dict[str, Any] = {
@@ -353,6 +387,13 @@ def test_state_template_reaches_every_unit_including_those_added_later(juju: Juj
     juju.settle()
     for unit in app.units.values():
         assert unit.state.unit_status == ActiveStatus('updated')
+
+
+def test_state_template_containers_the_metadata_does_not_declare_are_reported(juju: Juju):
+    template = State(containers={Container('undeclared', can_connect=True)})
+    juju.deploy(spec(MyCharm), state_template=template)
+    with pytest.raises(InconsistentScenarioError, match='undeclared'):
+        juju.settle()
 
 
 def test_state_template_leaves_the_juju_owned_fields_to_juju(juju: Juju):
@@ -494,6 +535,12 @@ def test_a_secret_s_id_depends_only_on_its_unit_s_own_history():
     assert secret_id('secrets', 'after') == alone
 
 
+def test_each_secret_a_unit_creates_gets_its_own_id(juju: Juju):
+    app = juju.deploy(CharmSpec(TwoSecretsCharm, meta={'name': 'secrets'}))
+    juju.settle()
+    assert len({secret.id for secret in app.leader.state.secrets}) == 2
+
+
 # Lifecycle
 
 
@@ -501,6 +548,7 @@ def test_close_rejects_later_operations_and_can_be_repeated(juju: Juju):
     app = deploy_mycharm(juju)
     juju.close()
     juju.close()
+    assert not juju.apps
     with pytest.raises(JujuError, match='been closed'):
         deploy_mycharm(juju)
     with pytest.raises(JujuError, match='been closed'):

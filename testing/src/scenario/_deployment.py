@@ -462,10 +462,7 @@ class Juju:
             unit = app._units[next_unit[1]]
             queued = self._queues[app.name, unit.id].popleft()
             self._turn = (app._order, unit.id)
-            event = self._bind(unit, queued)
-            if event is None:
-                continue
-            self._dispatch(app, unit, event)
+            self._dispatch(app, unit, self._bind(unit, queued))
         return list(self._trace)
 
     def close(self) -> None:
@@ -496,14 +493,13 @@ class Juju:
         )
         return app_name, unit_id
 
-    def _bind(self, unit: Unit, queued: _Queued) -> Event | None:
-        """The event to dispatch for a queue entry, or ``None`` if it no longer applies."""
+    def _bind(self, unit: Unit, queued: _Queued) -> Event:
+        """The event to dispatch for a queue entry, bound to the unit's current state."""
         event, rebind = queued
         if rebind is None:
             return event
         bound = _bound_object(unit._state, rebind)
-        if bound is None:
-            return None
+        assert bound is not None  # A charm can't remove its own containers.
         return dataclasses.replace(event, **{f'_{rebind.kind}': bound})
 
     def _dispatch(self, app: App, unit: Unit, event: Event) -> None:
