@@ -1542,6 +1542,20 @@ def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.Fi
     assert secret.get_content() == content
 
 
+@pytest.mark.parametrize('charm_class', _test_config_classes)
+def test_config_with_empty_secret(
+    charm_class: type[ops.CharmBase], request: pytest.FixtureRequest
+):
+    # `juju config app my-secret=""` is accepted, and the charm gets the empty string.
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({'my-secret': ''})
+    harness.begin()
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = typing.cast('_ConfigProtocol', typed_config)
+    assert typed_config.my_secret is None
+
+
 def test_config_extra_args(request: pytest.FixtureRequest):
     @dataclasses.dataclass
     class Config:

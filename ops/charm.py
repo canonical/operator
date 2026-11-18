@@ -1620,6 +1620,10 @@ class CharmBase(Object):
             # same way that SecretEvent.secret is.
             if option_type and option_type.type == 'secret':
                 assert isinstance(value, str)  # Juju will have made sure of this.
+                # Juju accepts `juju config app opt=""` for a secret option and passes the
+                # empty string to the charm, so treat it as unset, as `--reset` would.
+                if not value:
+                    continue
                 value = model.Secret(
                     backend=self.model._backend,
                     id=value,
