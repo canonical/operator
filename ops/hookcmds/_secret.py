@@ -282,7 +282,7 @@ def secret_set(
     For more details, see:
     `Juju | Hook commands | secret-set <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-set/>`_
 
-    .. deprecated:: 3.9.0
+    .. deprecated:: 3.10.0
         The ``owner`` argument has no effect, as Juju ignores the owner when
         updating a secret.
 
