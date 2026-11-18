@@ -1845,7 +1845,9 @@ class Resource:
     If the charm fetches a resource that is declared in its metadata but not
     in :attr:`State.resources`, ``fetch()`` raises :class:`ops.ModelError`, as
     it does in Juju when a resource has nothing attached, for example if a
-    local charm is deployed without ``--resource``.
+    local charm is deployed without ``--resource``. On Kubernetes, Juju won't
+    deploy a local charm that's missing an ``oci-image`` resource, but Scenario
+    doesn't check this.
     """
 
     name: str
