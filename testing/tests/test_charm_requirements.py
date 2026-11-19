@@ -44,10 +44,7 @@ def test_detects_the_plugin_from_charmcraft_yaml(tmp_path: pathlib.Path, plugin:
     assert part[f'{plugin}-extra'] == 'x'
 
 
-CHARM_PLUGIN_ERROR = (
-    r'charm plugin, which is deprecated and isn\'t supported\. '
-    r'Move the charm to the uv or python plugin\.'
-)
+CHARM_PLUGIN_ERROR = r'deprecated charm plugin\. Move the charm to the uv or python plugin\.'
 
 
 def test_the_charm_plugin_is_an_error(tmp_path: pathlib.Path):
@@ -114,19 +111,19 @@ def test_more_than_one_python_part_is_an_error(tmp_path: pathlib.Path):
 @pytest.mark.parametrize('plugin', ['poetry', 'reactive'])
 def test_unsupported_plugins_are_an_error(tmp_path: pathlib.Path, plugin: str):
     root = _charmcraft(tmp_path, f'parts:\n  charm:\n    plugin: {plugin}\n')
-    with pytest.raises(_RequirementsError, match=rf"the {plugin} plugin isn't supported"):
+    with pytest.raises(_RequirementsError, match=rf"the {plugin} plugin, which isn't supported"):
         _charm_requirements.detect_plugin(root)
 
 
+@pytest.mark.parametrize('plugin', ['flask-framework', 'ruby', 'colcon'])
 @pytest.mark.parametrize('python_plugin', ['', '  deps:\n    plugin: uv\n'])
-def test_unknown_plugin_is_refused(tmp_path: pathlib.Path, python_plugin: str):
+def test_unknown_plugin_is_refused(tmp_path: pathlib.Path, python_plugin: str, plugin: str):
     # Even next to a Python part: the unknown one might install dependencies too.
     root = _charmcraft(
         tmp_path,
-        f'parts:\n{python_plugin}  web:\n    plugin: flask-framework\n'
-        '  files:\n    plugin: dump\n',
+        f'parts:\n{python_plugin}  web:\n    plugin: {plugin}\n  files:\n    plugin: dump\n',
     )
-    with pytest.raises(_RequirementsError, match=r'too: web \(flask-framework\)\.$'):
+    with pytest.raises(_RequirementsError, match=rf'dependencies: web \({plugin}\)\.$'):
         _charm_requirements.detect_plugin(root)
 
 
@@ -141,7 +138,7 @@ def test_other_craft_parts_plugins_are_skipped(tmp_path: pathlib.Path):
     [
         ('parts: [\n', 'Could not read'),
         ('[parts]\n', 'charmcraft.yaml is not a mapping'),
-        ('parts: [a, b]\n', 'parts in .* is not a mapping'),
+        ('parts: [a, b]\n', "'parts' in .* is not a mapping"),
         ('parts:\n  charm: x\n', "Part 'charm' in .* is not a mapping"),
     ],
 )
@@ -215,7 +212,7 @@ def test_a_list_option_that_is_not_a_list_is_an_error(
     plugin = key.partition('-')[0]
     root = _charmcraft(tmp_path, f'parts:\n  charm:\n    plugin: {plugin}\n    {key}: x.txt\n')
     (root / 'uv.lock').write_text('')
-    with pytest.raises(_RequirementsError, match=rf'{key} in .* is not a list'):
+    with pytest.raises(_RequirementsError, match=rf"'{key}' in .*charmcraft\.yaml is not a list"):
         _charm_requirements.charm_requirements(root)
 
 
@@ -538,6 +535,12 @@ def test_install_refuses_the_tests_own_environment(tmp_path: pathlib.Path):
     root = _charmcraft(tmp_path, 'parts:\n  charm:\n    plugin: python\n')
     with pytest.raises(_RequirementsError, match="test's own environment"):
         _charm_requirements.install_charm_requirements(root, pathlib.Path(sys.executable))
+
+
+def test_install_with_a_missing_python_is_an_error(tmp_path: pathlib.Path):
+    root = _charmcraft(tmp_path, 'parts:\n  charm:\n    plugin: python\n')
+    with pytest.raises(_RequirementsError, match="Can't run"):
+        _charm_requirements.install_charm_requirements(root, tmp_path / 'missing' / 'python')
 
 
 def test_install_with_no_dependencies(tmp_path: pathlib.Path, venv: pathlib.Path):

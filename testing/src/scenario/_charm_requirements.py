@@ -105,8 +105,8 @@ def install_charm_requirements(charm_root: pathlib.Path, python: pathlib.Path) -
     Raises:
         _RequirementsError: if the charm's dependencies can't be found (see
             :func:`charm_requirements`), installing them fails, or ``python``
-            is the interpreter running the tests, whose ``ops`` would be
-            removed.
+            can't be run, or is the interpreter running the tests, whose
+            ``ops`` would be removed.
     """
     if _prefix(python) == pathlib.Path(sys.prefix).resolve():
         raise _RequirementsError(
@@ -130,7 +130,10 @@ def _prefix(python: pathlib.Path) -> pathlib.Path:
     to the base one, so resolving the path finds the base installation.
     """
     cmd = [str(python), '-c', 'import sys; print(sys.prefix)']
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError as e:
+        raise _RequirementsError(f"Can't run {python}: {e.strerror}.") from e
     if result.returncode != 0:
         raise _RequirementsError(f'`{shlex.join(cmd)}` failed:\n{result.stderr.strip()}\n')
     return pathlib.Path(result.stdout.strip()).resolve()
@@ -152,6 +155,7 @@ def _pip(python: pathlib.Path, command: str, *args: str) -> list[str]:
 
 
 def _run(cmd: Sequence[str], cwd: pathlib.Path | None = None) -> None:
+    """Run ``cmd``, raising its command line and output as an error if it fails."""
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     if result.returncode != 0:
         # pip writes some failures, such as pip check's, to stdout rather than stderr.
@@ -184,9 +188,10 @@ def charm_requirements(charm_root: pathlib.Path) -> _Requirements:
     """
     plugin, part = detect_plugin(charm_root)
     directory = _build_directory(charm_root, part)
+    path = charm_root / 'charmcraft.yaml'
     if plugin == 'uv':
-        return _Requirements(directory, _uv_requirements(directory, part))
-    return _Requirements(directory, _python_requirements(directory, part), check=True)
+        return _Requirements(directory, _uv_requirements(path, directory, part))
+    return _Requirements(directory, _python_requirements(path, directory, part), check=True)
 
 
 def detect_plugin(charm_root: pathlib.Path) -> tuple[str, Mapping[str, Any]]:
@@ -203,9 +208,7 @@ def detect_plugin(charm_root: pathlib.Path) -> tuple[str, Mapping[str, Any]]:
     try:
         charmcraft: Any = yaml.safe_load(path.read_text()) or {}
     except FileNotFoundError:
-        raise _RequirementsError(
-            f'{charm_root} has no charmcraft.yaml, so its build plugin is unknown.'
-        ) from None
+        raise _RequirementsError(f'{charm_root} has no charmcraft.yaml.') from None
     except (OSError, yaml.YAMLError) as e:
         raise _RequirementsError(f'Could not read {path}: {e}') from None
     if not isinstance(charmcraft, dict):
@@ -216,14 +219,16 @@ def detect_plugin(charm_root: pathlib.Path) -> tuple[str, Mapping[str, Any]]:
         # depends on the base.
         raise _RequirementsError(
             f'{path} uses the {", ".join(map(str, extensions))} extension, which adds '
-            "parts that aren't in charmcraft.yaml, so finding the charm's dependencies "
-            "isn't supported."
+            "parts that aren't in charmcraft.yaml."
         )
     parts: Any = charmcraft.get('parts')
     if not parts:
-        raise _charm_plugin(f'{path} has no parts')
+        raise _RequirementsError(
+            f'{path} has no parts, so it uses the deprecated charm plugin. '
+            'Move the charm to the uv or python plugin.'
+        )
     if not isinstance(parts, dict):
-        raise _RequirementsError(f'parts in {path} is not a mapping.')
+        raise _RequirementsError(f"'parts' in {path} is not a mapping.")
     return _python_part(path, cast('dict[str, Any]', parts))
 
 
@@ -243,23 +248,25 @@ def _python_part(path: pathlib.Path, parts: dict[str, Any]) -> tuple[str, Mappin
         if plugin in _SUPPORTED_PLUGINS:
             found.append((name, plugin, part))
         elif plugin == 'charm':
-            raise _charm_plugin(f'Part {name!r} in {path} uses the charm plugin')
+            raise _RequirementsError(
+                f'Part {name!r} in {path} uses the deprecated charm plugin. '
+                'Move the charm to the uv or python plugin.'
+            )
         elif plugin in _UNSUPPORTED_PLUGINS:
             raise _RequirementsError(
-                f'Part {name!r} in {path} uses the {plugin} plugin: {_unsupported(plugin)}'
+                f"Part {name!r} in {path} uses the {plugin} plugin, which isn't supported."
             )
         elif plugin not in _OTHER_PLUGINS:
             unknown.append(f'{name} ({plugin})')
     if unknown:
         raise _RequirementsError(
-            f"Can't find the dependencies of the charm in {path}, because these parts use "
-            f'plugins that might install Python dependencies too: {", ".join(unknown)}.'
+            f'Parts in {path} use plugins that might install Python dependencies: '
+            f'{", ".join(unknown)}.'
         )
     if len(found) > 1:
         names = ', '.join(f'{name} ({plugin})' for name, plugin, _ in found)
         raise _RequirementsError(
-            f'More than one part in {path} installs Python dependencies: {names}. '
-            "Finding the dependencies of a charm with more than one isn't supported."
+            f'More than one part in {path} installs Python dependencies: {names}.'
         )
     if found:
         _, plugin, part = found[0]
@@ -267,32 +274,18 @@ def _python_part(path: pathlib.Path, parts: dict[str, Any]) -> tuple[str, Mappin
     raise _RequirementsError(f'No part in {path} uses the python or uv plugin.')
 
 
-def _unsupported(plugin: str) -> str:
-    return f"finding the dependencies of a charm built with the {plugin} plugin isn't supported."
-
-
-def _charm_plugin(reason: str) -> _RequirementsError:
-    return _RequirementsError(
-        f"{reason}, so it's built with the charm plugin, which is deprecated and "
-        "isn't supported. Move the charm to the uv or python plugin."
-    )
-
-
 def _build_directory(charm_root: pathlib.Path, part: Mapping[str, Any]) -> pathlib.Path:
-    """The directory charmcraft builds the part in: its ``source`` and ``source-subdir``.
+    """Where charmcraft builds the part: its ``source``, or the ``source-subdir`` in it.
 
     A ``source`` may lead out of the charm, up to the root of the git repository
     it's in: charmcraft's experimental monorepo mode mounts the whole repository,
-    and its documentation has charms use ``source: ../..`` with a
+    and the charmcraft docs tell charms to use ``source: ../..`` with a
     ``source-subdir`` back to the charm. Nothing outside the repository is ever
-    available to charmcraft, so that's refused.
+    available to charmcraft, so that's refused here too.
     """
     source = str(part.get('source', '.'))
     if '://' in source or source.startswith('git@'):
-        raise _RequirementsError(
-            f"The part's source, {source}, isn't a local directory, so finding the "
-            "charm's dependencies isn't supported."
-        )
+        raise _RequirementsError(f"The part's source, {source}, isn't a local directory.")
     directory = (charm_root / source / str(part.get('source-subdir', ''))).resolve()
     if not directory.is_relative_to(_repository_root(charm_root.resolve())):
         raise _RequirementsError(
@@ -300,10 +293,7 @@ def _build_directory(charm_root: pathlib.Path, part: Mapping[str, Any]) -> pathl
             "so charmcraft can't build it."
         )
     if not directory.is_dir():
-        raise _RequirementsError(
-            f"The part's source is {directory}, which isn't a directory, so finding the "
-            "charm's dependencies isn't supported."
-        )
+        raise _RequirementsError(f"The part's source, {directory}, isn't a directory.")
     return directory
 
 
@@ -315,11 +305,13 @@ def _repository_root(charm_root: pathlib.Path) -> pathlib.Path:
     return charm_root
 
 
-def _python_requirements(directory: pathlib.Path, part: Mapping[str, Any]) -> tuple[str, ...]:
+def _python_requirements(
+    path: pathlib.Path, directory: pathlib.Path, part: Mapping[str, Any]
+) -> tuple[str, ...]:
     """The arguments charmcraft's ``python`` plugin passes to ``pip install --no-deps``."""
-    constraints = _list(part, 'python-constraints')
-    requirements = _list(part, 'python-requirements')
-    packages = _list(part, 'python-packages')
+    constraints = _list(path, part, 'python-constraints')
+    requirements = _list(path, part, 'python-requirements')
+    packages = _list(path, part, 'python-packages')
     for name, kind in [(c, 'constraints') for c in constraints] + [
         (r, 'requirements') for r in requirements
     ]:
@@ -335,18 +327,20 @@ def _python_requirements(directory: pathlib.Path, part: Mapping[str, Any]) -> tu
     )
 
 
-def _list(part: Mapping[str, Any], key: str) -> list[str]:
+def _list(path: pathlib.Path, part: Mapping[str, Any], key: str) -> list[str]:
     """A list option of the part."""
     value = part.get(key, [])
     if not isinstance(value, list):
-        raise _RequirementsError(f'{key} in charmcraft.yaml is not a list.')
+        raise _RequirementsError(f'{key!r} in {path} is not a list.')
     return [str(item) for item in cast('list[Any]', value)]
 
 
-def _uv_requirements(directory: pathlib.Path, part: Mapping[str, Any]) -> tuple[str, ...]:
+def _uv_requirements(
+    path: pathlib.Path, directory: pathlib.Path, part: Mapping[str, Any]
+) -> tuple[str, ...]:
     """The requirements ``uv export`` gives from the charm's lockfile."""
-    extras = _list(part, 'uv-extras')
-    groups = _list(part, 'uv-groups')
+    extras = _list(path, part, 'uv-extras')
+    groups = _list(path, part, 'uv-groups')
     if not (directory / 'uv.lock').exists():
         raise _RequirementsError(
             f'{directory} is built with the uv plugin but has no uv.lock. Run `uv lock` in it.'
