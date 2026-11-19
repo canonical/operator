@@ -210,6 +210,35 @@ def test_pull_parser_reassembles_any_chunking(
         parser.remove_files()
 
 
+def test_pull_parser_reassembles_at_every_split_point():
+    """Splitting the body in two at any byte gives the same file and response."""
+    boundary = 'b0undary'
+    path = '/srv/file'
+    # Longer than the parser's boundary lookback, so file data is written
+    # out before the closing delimiter arrives.
+    content = b'x' * 200
+    response = {'type': 'sync', 'status-code': 200, 'result': [{'path': path}]}
+    body = b''.join([
+        b'--b0undary \t\r\n',
+        _pull_files_part(path, content),
+        b'\r\n--b0undary\r\n',
+        b'Content-Disposition: form-data; name="response"\r\n\r\n',
+        json.dumps(response).encode(),
+        b'\r\n--b0undary-- \r\n',
+    ])
+    for split in range(1, len(body)):
+        parser = pebble._FilesParser(boundary)
+        try:
+            parser.feed(body[:split])
+            parser.feed(body[split:])
+            assert parser.get_response() == response
+            assert parser.filenames() == [path]
+            with parser.get_file(path, encoding=None) as f:
+                assert f.read() == content
+        finally:
+            parser.remove_files()
+
+
 # ── push: Client._encode_multipart ──────────────────────────────────────────
 
 
