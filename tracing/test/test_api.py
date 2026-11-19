@@ -80,6 +80,17 @@ def test_destination_check_on_commit_does_not_fail_the_hook(
     mock_destination.assert_not_called()
 
 
+def test_destination_check_on_start_fails_the_hook(
+    sample_charm: type[ops.CharmBase],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    get_destination = Mock(side_effect=ops.ModelError('denied'))
+    monkeypatch.setattr(ops.tracing.Tracing, '_get_destination', get_destination)
+    ctx = ops.testing.Context(sample_charm)
+    with pytest.raises(ops.testing.errors.UncaughtCharmError):
+        ctx.run(ctx.on.start(), ops.testing.State())
+
+
 @pytest.mark.parametrize('relation_to_poke', [0, 1])
 def test_https_tracing_destination(
     sample_charm: type[ops.CharmBase],
