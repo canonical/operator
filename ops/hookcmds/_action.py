@@ -71,7 +71,7 @@ def format_result_dict(
     return output_
 
 
-def action_fail(message: str | None = None):
+def action_fail(message: str | None = None) -> None:
     """Set action fail status with message.
 
     For more details, see:
@@ -116,7 +116,7 @@ def action_get(key: str | None = None) -> dict[str, Any] | Any:
     return result
 
 
-def action_log(message: str):
+def action_log(message: str) -> None:
     """Record a progress message for the current action.
 
     For more details, see:
@@ -129,7 +129,7 @@ def action_log(message: str):
     run('action-log', '--', message, redacted_cmd=['action-log', '--', '<redacted>'])
 
 
-def action_set(results: Mapping[str, Any]):
+def action_set(results: Mapping[str, Any]) -> None:
     """Set action results.
 
     For more details, see:
