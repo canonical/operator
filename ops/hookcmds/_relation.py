@@ -194,7 +194,7 @@ def relation_set(
     *,
     endpoint: str | None = None,
     app: bool = False,
-):
+) -> None:
     """Set relation settings.
 
     Setting the value for a key to the empty string deletes that key. The data
