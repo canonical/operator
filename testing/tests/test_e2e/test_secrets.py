@@ -161,6 +161,37 @@ def test_add(app: bool):
     assert secret.label == 'mylabel'
 
 
+def test_secrets_juju_2():
+    # Juju 2.9 has no secret hook commands, so ops raises FileNotFoundError, as in production.
+    secret = Secret({'a': 'b'}, owner='unit')
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version='2.9.44')
+    with ctx(ctx.on.update_status(), State(secrets={secret})) as mgr:
+        with pytest.raises(FileNotFoundError):
+            mgr.charm.unit.add_secret({'foo': 'bar'})
+        with pytest.raises(FileNotFoundError):
+            mgr.charm.model.get_secret(id=secret.id).get_content()
+        mgr.run()
+
+
+@pytest.mark.parametrize('juju_version', ['3.0.0', '3.0.2'])
+def test_secrets_juju_before_3_0_3(juju_version: str):
+    # The secret hook commands changed in 3.0.2 and 3.0.3, and ops supports secrets from 3.0.3.
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version=juju_version)
+    with ctx(ctx.on.update_status(), State()) as mgr:
+        with pytest.raises(ops.ModelError, match=r'3\.0\.3'):
+            mgr.charm.unit.add_secret({'foo': 'bar'})
+        mgr.run()
+
+
+def test_secrets_juju_3_0_3():
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version='3.0.3')
+    with ctx(ctx.on.update_status(), State()) as mgr:
+        mgr.charm.unit.add_secret({'foo': 'bar'}, label='mylabel')
+        output = mgr.run()
+
+    assert output.get_secret(label='mylabel').latest_content == {'foo': 'bar'}
+
+
 def test_set_legacy_behaviour():
     # in juju < 3.1.7, secret owners always used to track the latest revision.
     # ref: https://bugs.launchpad.net/juju/+bug/2037120

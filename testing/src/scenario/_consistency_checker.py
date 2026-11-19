@@ -517,10 +517,10 @@ def check_secrets_consistency(
             f'(a secret with the same ID is not sufficient - you must pass the object '
             f'in the state to the event).',
         )
-    elif juju_version < '3.0':
+    elif not juju_version.has_secrets:
         errors.append(
             f'secrets are not supported in the specified juju version {juju_version}. '
-            f'Should be at least 3.0.',
+            f'Should be at least 3.0.3.',
         )
 
     return Results(errors, [])

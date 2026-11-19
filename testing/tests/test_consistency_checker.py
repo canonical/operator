@@ -406,6 +406,24 @@ def test_config_secret_old_juju(juju_version: str):
     )
 
 
+@pytest.mark.parametrize(
+    'juju_version,consistent', [('2.9', False), ('3.0.2', False), ('3.0.3', True)]
+)
+def test_secret_event_juju_version(juju_version: str, consistent: bool):
+    # ops supports secrets from Juju 3.0.3 (see JujuVersion.has_secrets).
+    secret = Secret({'a': 'b'})
+    args = (
+        State(secrets={secret}),
+        Event('secret_changed', _secret=secret),
+        _CharmSpec(MyCharm, {}),
+        juju_version,
+    )
+    if consistent:
+        assert_consistent(*args)
+    else:
+        assert_inconsistent(*args)
+
+
 @pytest.mark.skip(
     "The right exception is raised but pytest.raises doesn't catch it - figure this out!"
 )
@@ -449,11 +467,13 @@ def test_secret_not_in_state():
         State(),
         Event('secret_changed', _secret=secret),
         _CharmSpec(MyCharm, {}),
+        juju_version='3.0.3',
     )
     assert_consistent(
         State(secrets={secret}),
         Event('secret_changed', _secret=secret),
         _CharmSpec(MyCharm, {}),
+        juju_version='3.0.3',
     )
 
 
