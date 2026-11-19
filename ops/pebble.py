@@ -1534,11 +1534,29 @@ class LogTarget:
     """Represents a log target in a Pebble configuration layer."""
 
     name: str
+    """Name of the log target."""
+
     override: str
+    """How this log target combines with a log target of the same name in earlier layers.
+
+    Either ``'merge'`` or ``'replace'``, or an empty string if not set.
+    """
+
     type: str
+    """Type of the log target, for example ``'loki'`` or ``'opentelemetry'``."""
+
     location: str
+    """URL of the log target's endpoint."""
+
     services: list[str]
+    """Services whose logs are forwarded to this log target.
+
+    ``'all'`` selects all services, and a ``-`` prefix removes a service selected by
+    an earlier layer.
+    """
+
     labels: dict[str, str]
+    """Labels to add to the logs sent to this log target."""
 
     def __init__(self, name: str, raw: LogTargetDict | None = None):
         self.name = name
