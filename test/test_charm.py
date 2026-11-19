@@ -741,6 +741,13 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
         {'a': {(1, 2): 'c'}},
         {'a': {None: 'c'}},
         {'aBc': 'd'},
+        # Juju checks each dot-separated part of the key.
+        {'a..b': 'c'},
+        {'a-.c': 'd'},
+        {'x.-y': 'z'},
+        {'a.': 'b'},
+        {'.a': 'b'},
+        {'a': {'b..c': 'd'}},
     ],
 )
 def test_invalid_action_results(

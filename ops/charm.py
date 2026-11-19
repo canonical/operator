@@ -179,9 +179,11 @@ class ActionEvent(EventBase):
 
             {'a': {'b': 'c'}, 'a.b': 'c'}
 
-        Note that the resulting keys must start and end with lowercase
-        alphanumeric, and can only contain lowercase alphanumeric, hyphens
-        and periods.
+        Note that each dot-separated part of the resulting keys must start and
+        end with lowercase alphanumeric, and can only contain lowercase
+        alphanumeric and hyphens. Juju reserves ``stdout``, ``stderr``,
+        ``stdout-encoding`` and ``stderr-encoding``, so none of these can be a
+        part of a key.
 
         Because results are passed to Juju using the command line, the maximum
         size is around 100KB. However, actions results are designed to be

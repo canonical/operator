@@ -13,6 +13,7 @@ from scenario.state import State, _Action, _next_action_id
 from ops._private.harness import ActionFailed
 from ops.charm import ActionEvent, CharmBase
 from ops.framework import Framework
+from ops.model import ModelError
 
 
 @pytest.fixture(scope='function')
@@ -90,6 +91,48 @@ def test_action_event_results_valid(mycharm: type[CharmBase], res_value: dict[st
 
     ctx.run(ctx.on.action('foo'), State())
 
+    assert ctx.action_results == res_value
+
+
+@pytest.mark.parametrize(
+    'res_value,reserved',
+    [
+        ({'stdout': 'x'}, 'stdout'),
+        ({'stderr-encoding': 'x'}, 'stderr-encoding'),
+        ({'a': {'stdout': 'x'}}, 'stdout'),
+        ({'stderr.a': 'x'}, 'stderr'),
+    ],
+)
+def test_action_event_results_reserved_key(
+    mycharm: type[CharmBase], res_value: dict[str, Any], reserved: str
+):
+    def handle_evt(charm: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        # Juju rejects these names as any part of a key.
+        with pytest.raises(ModelError, match=f'cannot set reserved action key "{reserved}"'):
+            evt.set_results(res_value)
+
+    mycharm._evt_handler = handle_evt  # type: ignore
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    ctx.run(ctx.on.action('foo'), State())
+    assert ctx.action_results is None
+
+
+@pytest.mark.parametrize(
+    'res_value', [{'stdoutx': 'x'}, {'my-stdout': 'x'}, {'a': {'b-stderr': 'c'}}]
+)
+def test_action_event_results_not_reserved(mycharm: type[CharmBase], res_value: dict[str, Any]):
+    def handle_evt(charm: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        evt.set_results(res_value)
+
+    mycharm._evt_handler = handle_evt  # type: ignore
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    ctx.run(ctx.on.action('foo'), State())
     assert ctx.action_results == res_value
 
 
