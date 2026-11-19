@@ -188,6 +188,33 @@ def test_action_set_stores_a_copy(mycharm: type[CharmBase]):
     assert ctx.action_results == {'a': '1', 'b': '2'}
 
 
+def test_action_set_results_shared_dict_survives_context_reuse():
+    """Reusing a Context must not empty a results dict the charm still holds."""
+    # A dict the charm passes to set_results on every run, as a charm that
+    # keeps a module-level results dict would do.
+    shared_results = {'a': '1'}
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_action, self._on_foo_action)
+
+        def _on_foo_action(self, event: ActionEvent):
+            event.set_results(shared_results)
+
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    ctx.run(ctx.on.action('foo'), State())
+    assert shared_results == {'a': '1'}
+    assert ctx.action_results == {'a': '1'}
+
+    # Not recommended, but run another action in the same context.
+    ctx.run(ctx.on.action('foo'), State())
+    # Clearing the recorded results at the start of the second run must not
+    # empty the charm's dict, which is still the same object.
+    assert shared_results == {'a': '1'}
+    assert ctx.action_results == {'a': '1'}
+
+
 def test_action_event_has_id(mycharm: type[CharmBase]):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):

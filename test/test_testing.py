@@ -5387,6 +5387,8 @@ class PebbleStorageAPIsTestMixin:
         assert next(f for f in files if f.path == f'{pebble_dir}/dir2').permissions == 0o777
         assert next(f for f in files if f.path == f'{pebble_dir}/dir0').permissions == 0
         assert next(f for f in files if f.path == f'{pebble_dir}/dir_default').permissions == 0o755
+        # Remove the mode 0 directory, otherwise the real Pebble fixture can't clean up.
+        client.remove_path(f'{pebble_dir}/dir0')
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
@@ -5684,9 +5686,6 @@ class TestFilesystem:
         assert (container_fs_root / 'a').stat().st_mode & 0o777 == 0
         (container_fs_root / 'a').chmod(0o700)
         assert (container_fs_root / 'a/b').stat().st_mode & 0o777 == 0
-
-        # Allow the temporary directory to be cleaned up.
-        (container_fs_root / 'a/b').chmod(0o700)
 
     def test_pull(self, container: ops.Container, container_fs_root: pathlib.Path):
         (container_fs_root / 'foo').write_text('foo')

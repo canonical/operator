@@ -170,6 +170,9 @@ def test_fs_make_dir_permissions():
         assert zero.permissions == 0
         default = container.list_files('/d755', itself=True)[0]
         assert default.permissions == 0o755
+        # A mode 0 directory cannot be removed by the fixture's cleanup, which
+        # would leave a /tmp/scenario-* directory behind.
+        container.remove_path('/d0')
 
     trigger(
         State(containers={Container(name='foo', can_connect=True)}),

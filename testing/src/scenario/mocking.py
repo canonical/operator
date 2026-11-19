@@ -721,7 +721,7 @@ class _MockModelBackend(_ModelBackend):
         # but then we will store it in its unformatted,
         # original form for testing ease
         if self._context.action_results:
-            self._context.action_results.update(results)
+            self._context.action_results.update(copy.deepcopy(results))
         else:
             # Store a copy so that later changes to the charm's dict do not
             # leak into the recorded results.
