@@ -317,7 +317,7 @@ class JujuStorage:
         for row in notice_list:
             if event_path and row[0] != event_path:
                 continue
-            yield cast('_Notice', tuple(row))
+            yield row
 
     def _load_notice_list(self) -> _Notices:
         """Load a notice list from current key.
