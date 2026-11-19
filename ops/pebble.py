@@ -102,7 +102,7 @@ ServiceDict = typing.TypedDict(
         'on-failure': str,
         'on-check-failure': dict[str, Any],
         'backoff-delay': str,
-        'backoff-factor': int | None,
+        'backoff-factor': float | None,
         'backoff-limit': str,
         'kill-delay': str | None,
     },
@@ -247,7 +247,7 @@ _IOSource: TypeAlias = str | bytes | _AnyStrFileLikeIO
 _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
 
 if TYPE_CHECKING:
-    from typing_extensions import NotRequired, Self
+    from typing_extensions import NotRequired
 
     _CheckInfoDict = TypedDict(
         '_CheckInfoDict',
@@ -372,7 +372,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
 
     def __init__(
         self, host: str, socket_path: str, timeout: _NotProvidedFlag | float = _not_provided
-    ) -> None:
+    ):
         if timeout is _not_provided:
             super().__init__(host)
         else:
@@ -393,7 +393,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
 class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
     """Implementation of HTTPHandler that uses a named Unix socket."""
 
-    def __init__(self, socket_path: str) -> None:
+    def __init__(self, socket_path: str):
         super().__init__()
         self.socket_path = socket_path
 
@@ -452,7 +452,7 @@ def _force_close_websocket(ws: _WebSocket) -> None:
 class Error(Exception):
     """Base class of most errors raised by the Pebble client."""
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} {self.args}>'
 
 
@@ -495,15 +495,15 @@ class PathError(Error):
     message: str
     """Human-readable error message from the API."""
 
-    def __init__(self, kind: str, message: str) -> None:
+    def __init__(self, kind: str, message: str):
         """This shouldn't be instantiated directly."""
         self.kind = kind  # type: ignore
         self.message = message
 
-    def __str__(self) -> str:
+    def __str__(self):
         return f'{self.kind} - {self.message}'
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'PathError({self.kind!r}, {self.message!r})'
 
 
@@ -522,7 +522,7 @@ class APIError(Error):
     message: str
     """Human-readable error message from the API."""
 
-    def __init__(self, body: dict[str, Any], code: int, status: str, message: str) -> None:
+    def __init__(self, body: dict[str, Any], code: int, status: str, message: str):
         """This shouldn't be instantiated directly."""
         super().__init__(message)  # Makes str(e) return message
         self.body = body
@@ -530,7 +530,7 @@ class APIError(Error):
         self.status = status
         self.message = message
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'APIError({self.body!r}, {self.code!r}, {self.status!r}, {self.message!r})'
 
 
@@ -543,12 +543,12 @@ class ChangeError(Error):
     change: Change
     """Change object associated with this error."""
 
-    def __init__(self, err: str, change: Change) -> None:
+    def __init__(self, err: str, change: Change):
         """This shouldn't be instantiated directly."""
         self.err = err
         self.change = change
 
-    def __str__(self) -> str:
+    def __str__(self):
         parts = [self.err]
 
         # Append any task logs to the error message
@@ -563,7 +563,7 @@ class ChangeError(Error):
 
         return ''.join(parts)
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'ChangeError({self.err!r}, {self.change!r})'
 
 
@@ -602,13 +602,13 @@ class ExecError(Error, Generic[AnyStr]):
         exit_code: int,
         stdout: AnyStr | None,
         stderr: AnyStr | None,
-    ) -> None:
+    ):
         self.command = command
         self.exit_code = exit_code
         self.stdout = stdout
         self.stderr = stderr
 
-    def __str__(self) -> str:
+    def __str__(self):
         message = f'non-zero exit code {self.exit_code} executing {self.command[0]!r}'
 
         for name, out in [('stdout', self.stdout), ('stderr', self.stderr)]:
@@ -642,15 +642,15 @@ class SystemInfo:
     version: str
     """Version of the Pebble daemon."""
 
-    def __init__(self, version: str) -> None:
+    def __init__(self, version: str):
         self.version = version
 
     @classmethod
-    def from_dict(cls, d: _SystemInfoDict) -> Self:
+    def from_dict(cls, d: _SystemInfoDict) -> SystemInfo:
         """Create new SystemInfo object from dict parsed from JSON."""
         return cls(version=d['version'])
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'SystemInfo(version={self.version!r})'
 
 
@@ -683,7 +683,7 @@ class Warning:
         last_shown: datetime.datetime | None,
         expire_after: str,
         repeat_after: str,
-    ) -> None:
+    ):
         self.message = message
         self.first_added = first_added
         self.last_added = last_added
@@ -692,7 +692,7 @@ class Warning:
         self.repeat_after = repeat_after
 
     @classmethod
-    def from_dict(cls, d: _WarningDict) -> Self:
+    def from_dict(cls, d: _WarningDict) -> Warning:
         """Create new Warning object from dict parsed from JSON."""
         return cls(
             message=d['message'],
@@ -707,7 +707,7 @@ class Warning:
             repeat_after=d['repeat-after'],
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return (
             'Warning('
             f'message={self.message!r}, '
@@ -736,13 +736,13 @@ class TaskProgress:
         label: str,
         done: int,
         total: int,
-    ) -> None:
+    ):
         self.label = label
         self.done = done
         self.total = total
 
     @classmethod
-    def from_dict(cls, d: _ProgressDict) -> Self:
+    def from_dict(cls, d: _ProgressDict) -> TaskProgress:
         """Create new TaskProgress object from dict parsed from JSON."""
         return cls(
             label=d['label'],
@@ -750,14 +750,14 @@ class TaskProgress:
             total=d['total'],
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'TaskProgress(label={self.label!r}, done={self.done!r}, total={self.total!r})'
 
 
 class TaskID(str):
     """Task ID (a more strongly-typed string)."""
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'TaskID({str(self)!r})'
 
 
@@ -802,7 +802,7 @@ class Task:
         spawn_time: datetime.datetime,
         ready_time: datetime.datetime | None,
         data: dict[str, Any] | None = None,
-    ) -> None:
+    ):
         self.id = id
         self.kind = kind
         self.summary = summary
@@ -814,7 +814,7 @@ class Task:
         self.data = data or {}
 
     @classmethod
-    def from_dict(cls, d: _TaskDict) -> Self:
+    def from_dict(cls, d: _TaskDict) -> Task:
         """Create new Task object from dict parsed from JSON."""
         return cls(
             id=TaskID(d['id']),
@@ -832,7 +832,7 @@ class Task:
             data=d.get('data') or {},
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return (
             'Task('
             f'id={self.id!r}, '
@@ -850,7 +850,7 @@ class Task:
 class ChangeID(str):
     """Change ID (a more strongly-typed string)."""
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'ChangeID({str(self)!r})'
 
 
@@ -899,7 +899,7 @@ class Change:
         spawn_time: datetime.datetime,
         ready_time: datetime.datetime | None,
         data: dict[str, Any] | None = None,
-    ) -> None:
+    ):
         self.id = id
         self.kind = kind
         self.summary = summary
@@ -912,7 +912,7 @@ class Change:
         self.data = data or {}
 
     @classmethod
-    def from_dict(cls, d: _ChangeDict) -> Self:
+    def from_dict(cls, d: _ChangeDict) -> Change:
         """Create new Change object from dict parsed from JSON."""
         return cls(
             id=ChangeID(d['id']),
@@ -931,7 +931,7 @@ class Change:
             data=d.get('data') or {},
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return (
             'Change('
             f'id={self.id!r}, '
@@ -955,21 +955,23 @@ class Plan:
     https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
 
-    def __init__(self, raw: str | PlanDict | None = None) -> None:
-        d: PlanDict
+    _services: dict[str, Service]
+    _checks: dict[str, Check]
+    _log_targets: dict[str, LogTarget]
+
+    def __init__(self, raw: str | PlanDict | None = None):
         if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
-            d = yaml.safe_load(raw) or {}
+            d = yaml.safe_load(raw) or {}  # type: ignore
         else:
             d = raw or {}
+        d = typing.cast('PlanDict', d)
 
         self._raw = raw
-        self._services: dict[str, Service] = {
+        self._services = {
             name: Service(name, service) for name, service in d.get('services', {}).items()
         }
-        self._checks: dict[str, Check] = {
-            name: Check(name, check) for name, check in d.get('checks', {}).items()
-        }
-        self._log_targets: dict[str, LogTarget] = {
+        self._checks = {name: Check(name, check) for name, check in d.get('checks', {}).items()}
+        self._log_targets = {
             name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
         }
 
@@ -1016,7 +1018,7 @@ class Plan:
 
     __str__ = to_yaml
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'Plan({self.to_dict()!r})'
 
     def __eq__(self, other: PlanDict | Plan) -> bool:
@@ -1045,12 +1047,12 @@ class Layer:
     #: Mapping of target to :class:`LogTarget` defined by this layer.
     log_targets: dict[str, LogTarget]
 
-    def __init__(self, raw: str | LayerDict | None = None) -> None:
-        d: LayerDict
+    def __init__(self, raw: str | LayerDict | None = None):
         if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
-            d = yaml.safe_load(raw) or {}
+            d = yaml.safe_load(raw) or {}  # type: ignore
         else:
             d = raw or {}
+        d = typing.cast('LayerDict', d)
 
         self.summary = d.get('summary', '')
         self.description = d.get('description', '')
@@ -1106,12 +1108,12 @@ class Service:
     """Longer description of the service."""
 
     startup: str
-    """Startup mode, ``'enabled'`` or ``'disabled'``."""
+    """Startup mode, ``'enabled'`` or ``'disabled'``, or an empty string if not set."""
 
     override: str
     """How this service combines with a service of the same name in earlier layers.
 
-    Either ``'merge'`` or ``'replace'``.
+    Either ``'merge'`` or ``'replace'``, or an empty string if not set.
     """
 
     command: str
@@ -1162,7 +1164,7 @@ class Service:
     backoff_delay: str
     """Initial delay before restarting the service, for example ``'500ms'``."""
 
-    backoff_factor: int | None
+    backoff_factor: float | None
     """Factor by which the backoff delay increases after each restart."""
 
     backoff_limit: str
@@ -1171,7 +1173,7 @@ class Service:
     kill_delay: str | None
     """Time to wait after sending SIGTERM before sending SIGKILL, for example ``'5s'``."""
 
-    def __init__(self, name: str, raw: ServiceDict | None = None) -> None:
+    def __init__(self, name: str, raw: ServiceDict | None = None):
         self.name = name
         dct: ServiceDict = raw or {}
         self.summary = dct.get('summary', '')
@@ -1251,7 +1253,7 @@ class Service:
     def __repr__(self) -> str:
         return f'Service({self.to_dict()!r})'
 
-    def __eq__(self, other: dict[Any, Any] | ServiceDict | Service) -> bool:
+    def __eq__(self, other: ServiceDict | Service) -> bool:
         """Reports whether this service configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1293,7 +1295,7 @@ class ServiceInfo:
         name: str,
         startup: ServiceStartup | str,
         current: ServiceStatus | str,
-    ) -> None:
+    ):
         self.name = name
         self.startup = startup
         self.current = current
@@ -1303,7 +1305,7 @@ class ServiceInfo:
         return self.current == ServiceStatus.ACTIVE
 
     @classmethod
-    def from_dict(cls, d: _ServiceInfoDict) -> Self:
+    def from_dict(cls, d: _ServiceInfoDict) -> ServiceInfo:
         """Create new ServiceInfo object from dict parsed from JSON."""
         try:
             startup = ServiceStartup(d['startup'])
@@ -1319,41 +1321,74 @@ class ServiceInfo:
             current=current,
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'ServiceInfo(name={self.name!r}, startup={self.startup}, current={self.current})'
 
 
 class Check:
     """Represents a check in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: CheckDict | None = None) -> None:
-        self.name: str = name
+    name: str
+    """Name of the check."""
+
+    override: str
+    """How this check combines with a check of the same name in earlier layers.
+
+    Either ``'merge'`` or ``'replace'``, or an empty string if not set.
+    """
+
+    level: CheckLevel | str
+    """Level of the check, or the raw string if the level is unknown."""
+
+    startup: CheckStartup
+    """Startup mode of the check. :attr:`CheckStartup.UNSET` is treated as enabled."""
+
+    period: str | None
+    """How often to run the check, for example ``'10s'``."""
+
+    timeout: str | None
+    """How long to wait for the check to complete before it fails, for example ``'3s'``."""
+
+    threshold: int | None
+    """Number of consecutive failures before the check is considered down."""
+
+    http: HttpDict | None
+    """Configuration for an HTTP check, or ``None`` if this isn't an HTTP check."""
+
+    tcp: TcpDict | None
+    """Configuration for a TCP check, or ``None`` if this isn't a TCP check."""
+
+    exec: ExecDict | None
+    """Configuration for an exec check, or ``None`` if this isn't an exec check."""
+
+    def __init__(self, name: str, raw: CheckDict | None = None):
+        self.name = name
         dct: CheckDict = raw or {}
-        self.override: str = dct.get('override', '')
+        self.override = dct.get('override', '')
         try:
             level: CheckLevel | str = CheckLevel(dct.get('level', ''))
         except ValueError:
             level = dct.get('level', '')
-        self.level: CheckLevel | str = level
-        self.startup: CheckStartup = CheckStartup(dct.get('startup', ''))
-        self.period: str | None = dct.get('period', '')
-        self.timeout: str | None = dct.get('timeout', '')
-        self.threshold: int | None = dct.get('threshold')
+        self.level = level
+        self.startup = CheckStartup(dct.get('startup', ''))
+        self.period = dct.get('period', '')
+        self.timeout = dct.get('timeout', '')
+        self.threshold = dct.get('threshold')
 
         http = dct.get('http')
         if http is not None:
             http = copy.deepcopy(http)
-        self.http: HttpDict | None = http
+        self.http = http
 
         tcp = dct.get('tcp')
         if tcp is not None:
             tcp = copy.deepcopy(tcp)
-        self.tcp: TcpDict | None = tcp
+        self.tcp = tcp
 
         exec_ = dct.get('exec')
         if exec_ is not None:
             exec_ = copy.deepcopy(exec_)
-        self.exec: ExecDict | None = exec_
+        self.exec = exec_
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
@@ -1498,16 +1533,23 @@ class CheckStartup(enum.Enum):
 class LogTarget:
     """Represents a log target in a Pebble configuration layer."""
 
-    def __init__(self, name: str, raw: LogTargetDict | None = None) -> None:
-        self.name: str = name
+    name: str
+    override: str
+    type: str
+    location: str
+    services: list[str]
+    labels: dict[str, str]
+
+    def __init__(self, name: str, raw: LogTargetDict | None = None):
+        self.name = name
         dct: LogTargetDict = raw or {}
-        self.override: str = dct.get('override', '')
-        self.type: str = dct.get('type', '')
-        self.location: str = dct.get('location', '')
-        self.services: list[str] = list(dct.get('services', []))
+        self.override = dct.get('override', '')
+        self.type = dct.get('type', '')
+        self.location = dct.get('location', '')
+        self.services = list(dct.get('services', []))
         labels = dct.get('labels')
         labels = copy.deepcopy(labels) if labels is not None else {}
-        self.labels: dict[str, str] = labels
+        self.labels = labels
 
     def to_dict(self) -> LogTargetDict:
         """Convert this log target object to its dict representation."""
@@ -1521,10 +1563,10 @@ class LogTarget:
         dct = {name: value for name, value in fields if value}
         return typing.cast('LogTargetDict', dct)
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return f'LogTarget({self.to_dict()!r})'
 
-    def __eq__(self, other: dict[Any, Any] | LogTargetDict | LogTarget) -> bool:
+    def __eq__(self, other: LogTargetDict | LogTarget) -> bool:
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, LogTarget):
@@ -1607,7 +1649,7 @@ class FileInfo:
         user: str | None,
         group_id: int | None,
         group: str | None,
-    ) -> None:
+    ):
         self.path = path
         self.name = name
         self.type = type
@@ -1620,7 +1662,7 @@ class FileInfo:
         self.group = group
 
     @classmethod
-    def from_dict(cls, d: _FileInfoDict) -> Self:
+    def from_dict(cls, d: _FileInfoDict) -> FileInfo:
         """Create new FileInfo object from dict parsed from JSON."""
         try:
             file_type = FileType(d['type'])
@@ -1639,7 +1681,7 @@ class FileInfo:
             group=d.get('group'),
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return (
             'FileInfo('
             f'path={self.path!r}, '
@@ -1730,7 +1772,7 @@ class CheckInfo:
         threshold: int = 0,
         change_id: ChangeID | None = None,
         startup: CheckStartup = CheckStartup.ENABLED,
-    ) -> None:
+    ):
         self.name = name
         self.level = level
         self.startup = startup
@@ -1741,7 +1783,7 @@ class CheckInfo:
         self.change_id = change_id
 
     @classmethod
-    def from_dict(cls, d: _CheckInfoDict) -> Self:
+    def from_dict(cls, d: _CheckInfoDict) -> CheckInfo:
         """Create new :class:`CheckInfo` object from dict parsed from JSON."""
         try:
             level = CheckLevel(d.get('level', ''))
@@ -1767,7 +1809,7 @@ class CheckInfo:
             change_id=change_id,
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return (
             'CheckInfo('
             f'name={self.name!r}, '
@@ -1910,7 +1952,7 @@ class Notice:
     """How long since one of these last occurred until Pebble will drop the notice."""
 
     @classmethod
-    def from_dict(cls, d: _NoticeDict) -> Self:
+    def from_dict(cls, d: _NoticeDict) -> Notice:
         """Create new Notice object from dict parsed from JSON."""
         try:
             notice_type = NoticeType(d['type'])
@@ -1988,7 +2030,7 @@ class ExecProcess(Generic[AnyStr]):
         cancel_stdin: Callable[[], None] | None,
         cancel_reader: int | None,
         threads: list[threading.Thread],
-    ) -> None:
+    ):
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
@@ -2005,7 +2047,7 @@ class ExecProcess(Generic[AnyStr]):
         self._threads = threads
         self._waited = False
 
-    def __del__(self) -> None:
+    def __del__(self):
         if not self._waited:
             msg = 'ExecProcess instance garbage collected without call to wait() or wait_output()'
             warnings.warn(msg, ResourceWarning)
@@ -2257,7 +2299,7 @@ def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str
 class _WebsocketWriter(io.BufferedIOBase):
     """A writable file-like object that sends what's written to it to a websocket."""
 
-    def __init__(self, ws: _WebSocket) -> None:
+    def __init__(self, ws: _WebSocket):
         self.ws = ws
 
     def writable(self) -> bool:
@@ -2431,7 +2473,7 @@ class LocalIdentity:
     user_id: int
 
     @classmethod
-    def from_dict(cls, d: LocalIdentityDict) -> Self:
+    def from_dict(cls, d: LocalIdentityDict) -> LocalIdentity:
         """Create new LocalIdentity from dict parsed from JSON."""
         return cls(user_id=d['user-id'])
 
@@ -2454,7 +2496,7 @@ class BasicIdentity:
     """
 
     @classmethod
-    def from_dict(cls, d: BasicIdentityDict) -> Self:
+    def from_dict(cls, d: BasicIdentityDict) -> BasicIdentity:
         """Create new BasicIdentity from dict parsed from JSON."""
         return cls(password=d['password'])
 
@@ -2481,7 +2523,7 @@ class Identity:
             raise ValueError('at least one of "local" or "basic" must be provided')
 
     @classmethod
-    def from_dict(cls, d: IdentityDict) -> Self:
+    def from_dict(cls, d: IdentityDict) -> Identity:
         """Create new Identity from dict parsed from JSON."""
         try:
             access = IdentityAccess(d['access'])
@@ -2550,7 +2592,7 @@ class Client:
         opener: urllib.request.OpenerDirector | None = None,
         base_url: str = 'http://localhost',
         timeout: float = 5.0,
-    ) -> None:
+    ):
         if not isinstance(socket_path, str):
             raise TypeError(f'`socket_path` should be a string, not: {type(socket_path)}')
         if opener is None:
@@ -2561,7 +2603,7 @@ class Client:
         self.timeout = timeout
 
     @contextlib.contextmanager
-    def _start_span(self, span_name: str) -> Generator[Any, None, None]:
+    def _start_span(self, span_name: str) -> Generator[Any]:
         """Start a tracing span, annotated with the Pebble socket path."""
         with tracer.start_as_current_span(span_name) as span:
             span.set_attribute('pebble.socket_path', self.socket_path)
@@ -2607,7 +2649,7 @@ class Client:
     def _ensure_content_type(
         headers: email.message.Message,
         expected: Literal['multipart/form-data', 'application/json'],
-    ) -> dict[str, Any]:
+    ) -> dict[str, str]:
         """Parse Content-Type header from headers and ensure it's equal to expected.
 
         Return a dict of any options in the header, e.g., {'boundary': ...}.
@@ -3211,7 +3253,7 @@ class Client:
         path_escaped = path.replace('"', '\\"').encode('utf-8')
         content_type = f'multipart/form-data; boundary="{boundary.decode("utf-8")}"'
 
-        def generator() -> Generator[bytes, None, None]:
+        def generator() -> Generator[bytes]:
             yield b''.join([
                 b'--',
                 boundary,
@@ -3926,7 +3968,7 @@ class Client:
 class _FilesParser:
     """A limited purpose multi-part parser backed by files for memory efficiency."""
 
-    def __init__(self, boundary: bytes | str) -> None:
+    def __init__(self, boundary: bytes | str):
         self._response: _FilesResponse | None = None  # externally managed
         self._part_type: Literal['response', 'files'] | None = None  # externally managed
         self._headers: email.message.Message | None = None  # externally managed
@@ -4009,7 +4051,7 @@ class _FilesParser:
 
     def _prepare_tempfile(self, filename: str) -> None:
         tf = tempfile.NamedTemporaryFile(delete=False)  # ruff: ignore[open-file-with-context-handler]
-        self._files[filename] = tf  # we have a custom protocol for it
+        self._files[filename] = tf
         self.current_filename = filename
 
     def _get_open_tempfile(self) -> _Tempfile:
@@ -4048,7 +4090,7 @@ class _MultipartParser:
         handle_body: _BodyHandler,
         max_lookahead: int = 0,
         max_boundary_length: int = 0,
-    ) -> None:
+    ):
         r"""Configures a parser for mime multipart messages.
 
         Args:
