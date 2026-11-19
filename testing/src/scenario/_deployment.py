@@ -277,12 +277,14 @@ class App:
     def _container_names(self) -> tuple[str, ...]:
         return tuple(self._charm.metadata.get('containers') or {})
 
-    def _containers(self, *, can_connect: bool) -> list[Container]:
-        """Each unit's starting containers: the template's, or a default."""
+    def _containers(self) -> list[Container]:
+        """Each unit's starting containers: the template's, or a default.
+
+        None can be connected to until its ``pebble-ready``.
+        """
         from_template = {c.name: c for c in self._state_template.containers}
         containers = [
-            from_template.pop(name, Container(name=name, can_connect=can_connect))
-            for name in self._container_names
+            from_template.pop(name, Container(name=name)) for name in self._container_names
         ]
         # Anything left names a container the metadata doesn't declare; keep
         # it, so that Context's consistency check reports it to the test.
@@ -403,6 +405,11 @@ class Juju:
         come before ``install`` in a machine model, and after ``start`` in a
         Kubernetes model.
 
+        A container can be connected to from its ``pebble-ready`` on, as in
+        Juju, where that's when the unit agent has seen the container's
+        Pebble come up. Before that, and always in a machine model,
+        ``can_connect`` is false.
+
         Args:
             charm: A :class:`CharmSpec`, or a charm class, which is shorthand
                 for a ``CharmSpec`` with its metadata loaded from the files
@@ -422,7 +429,9 @@ class Juju:
                 state. ``Juju`` sets each unit's ``leader``,
                 ``planned_units``, ``model``, ``config``, ``relations``,
                 ``secrets`` and ``storages`` itself, so the template may not
-                set those.
+                set those. ``Juju`` also decides when a container can be
+                connected to, so a template container may not set
+                ``can_connect``.
             trust: Whether the application has Juju trust, as with
                 ``juju deploy --trust``.
             num_units: How many units to deploy. Unit ``0`` is the leader.
@@ -431,7 +440,8 @@ class Juju:
         Raises:
             JujuError: if an application of this name already exists,
                 ``num_units`` is not positive, the charm has no metadata,
-                the template sets a field ``Juju`` owns, ``config`` doesn't
+                the template sets a field ``Juju`` owns (including a
+                container's ``can_connect``), ``config`` doesn't
                 match the charm's config options, or ``storage`` doesn't
                 match the charm's stores.
         """
@@ -531,6 +541,11 @@ class Juju:
         event, rebind = queued
         if rebind is None:
             return event
+        if event.name.endswith('_pebble_ready'):
+            # Juju runs pebble-ready once it has seen the container's Pebble
+            # come up. Pebble may be up a little before that, but a charm
+            # can't rely on it, so the model only connects it here.
+            unit._state = _with_connectable(unit._state, rebind.key)
         bound = _bound_object(unit._state, rebind)
         assert bound is not None  # A charm can't remove its own containers.
         return dataclasses.replace(event, **{f'_{rebind.kind}': bound})
@@ -559,7 +574,7 @@ class Juju:
         state = dataclasses.replace(
             app._state_template,
             config=dict(app._config),
-            containers=frozenset(app._containers(can_connect=is_k8s)),
+            containers=frozenset(app._containers()),
             storages=frozenset(storages),
             leader=unit_id == app._leader_id,
             model=self._model_for(app._charm.juju_version),
@@ -774,6 +789,12 @@ def _check_state_template(template: State) -> None:
         'config': ' Pass config= to deploy() instead.',
         'storages': ' Pass storage= to deploy() instead.',
     }
+    for container in template.containers:
+        if container.can_connect:
+            raise JujuError(
+                f'state_template may not set can_connect on container {container.name!r}: '
+                'Juju makes a container connectable at its pebble-ready.'
+            )
     for name in _JUJU_OWNED_FIELDS:
         value = getattr(template, name)
         if name == 'model':
@@ -789,3 +810,12 @@ def _check_state_template(template: State) -> None:
 def _bound_object(state: State, rebind: _Rebind) -> Container | None:
     """The object an event should carry, from the state it will run against."""
     return next((c for c in state.containers if c.name == rebind.key), None)
+
+
+def _with_connectable(state: State, container_name: str) -> State:
+    """A copy of ``state`` in which the named container can be connected to."""
+    containers = [
+        dataclasses.replace(c, can_connect=True) if c.name == container_name else c
+        for c in state.containers
+    ]
+    return dataclasses.replace(state, containers=frozenset(containers))

@@ -27,7 +27,7 @@ from scenario import (
 )
 from scenario._deployment import App, CharmSpec, Dispatch, Juju
 from scenario._juju_errors import JujuError
-from scenario.errors import InconsistentScenarioError
+from scenario.errors import InconsistentScenarioError, UncaughtCharmError
 
 import ops
 
@@ -104,6 +104,33 @@ class ExecCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus(stdout.strip())
 
 
+class WaitingCharm(ops.CharmBase):
+    """Waits for its container, as a charm should, and records what it saw."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        for event in (self.on.install, self.on.config_changed, self.on.start):
+            framework.observe(event, self._on_any)
+        framework.observe(self.on['workload'].pebble_ready, self._on_any)
+
+    def _on_any(self, event: ops.EventBase):
+        if self.unit.get_container('workload').can_connect():
+            self.unit.status = ops.ActiveStatus(f'{event.handle.kind}: connected')
+        else:
+            self.unit.status = ops.MaintenanceStatus(f'{event.handle.kind}: waiting')
+
+
+class UnguardedCharm(ops.CharmBase):
+    """Calls Pebble in install without checking it can connect."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.install, self._on_install)
+
+    def _on_install(self, _: ops.EventBase):
+        self.unit.get_container('workload').replan()
+
+
 class NoMetadataCharm(ops.CharmBase):
     pass
 
@@ -113,7 +140,6 @@ EXEC_TEMPLATE = State(
     containers={
         Container(
             'workload',
-            can_connect=True,
             execs={Exec(['update-ca-certificates'], stdout='updated\n')},
         )
     },
@@ -239,6 +265,60 @@ def test_deploy_creates_containers_and_runs_pebble_ready(juju: Juju):
     trace = juju.settle()
     assert trace[-1].event.name == 'workload_pebble_ready'
     assert {c.name for c in app.leader.state.containers} == {'workload'}
+
+
+def connectable_now(state: State) -> dict[str, bool]:
+    return {c.name: c.can_connect for c in state.containers}
+
+
+def connectable(dispatch: Dispatch) -> dict[str, bool]:
+    return connectable_now(dispatch.state_in)
+
+
+def test_a_container_can_be_connected_to_from_its_pebble_ready(juju: Juju):
+    app = juju.deploy(CharmSpec(WaitingCharm, meta=EXEC_META))
+    trace = juju.settle()
+    assert [(d.event.name, connectable(d)) for d in trace] == [
+        ('install', {'workload': False}),
+        ('leader_elected', {'workload': False}),
+        ('config_changed', {'workload': False}),
+        ('start', {'workload': False}),
+        ('workload_pebble_ready', {'workload': True}),
+    ]
+    assert trace[-1].event._container == Container('workload', can_connect=True)
+    assert app.leader.state.unit_status == ActiveStatus('workload_pebble_ready: connected')
+
+
+def test_a_charm_that_calls_pebble_in_install_fails(juju: Juju):
+    juju.deploy(CharmSpec(UnguardedCharm, meta=EXEC_META))
+    with pytest.raises(UncaughtCharmError, match='Cannot connect to Pebble'):
+        juju.settle()
+
+
+def test_each_container_is_connected_by_its_own_pebble_ready(juju: Juju):
+    meta: dict[str, Any] = {'name': 'two', 'containers': {'first': {}, 'second': {}}}
+    juju.deploy(CharmSpec(MyCharm, meta={**meta, 'config': CONFIG}))
+    trace = juju.settle()
+    assert [(d.event.name, connectable(d)) for d in trace[-2:]] == [
+        ('first_pebble_ready', {'first': True, 'second': False}),
+        ('second_pebble_ready', {'first': True, 'second': True}),
+    ]
+
+
+def test_a_unit_added_later_waits_for_its_own_pebble_ready(juju: Juju):
+    app = juju.deploy(CharmSpec(WaitingCharm, meta=EXEC_META))
+    juju.settle()
+    unit = juju.add_unit(app)
+    assert connectable_now(unit.state) == {'workload': False}
+    assert connectable_now(app.leader.state) == {'workload': True}
+    trace = juju.settle()
+    assert [(d.event.name, connectable(d)) for d in trace] == [
+        ('install', {'workload': False}),
+        ('leader_settings_changed', {'workload': False}),
+        ('config_changed', {'workload': False}),
+        ('start', {'workload': False}),
+        ('workload_pebble_ready', {'workload': True}),
+    ]
 
 
 def test_a_machine_model_has_unconnectable_containers_and_no_pebble_ready():
@@ -512,7 +592,7 @@ def test_state_template_reaches_every_unit_including_those_added_later(juju: Juj
 
 
 def test_state_template_containers_the_metadata_does_not_declare_are_reported(juju: Juju):
-    template = State(containers={Container('undeclared', can_connect=True)})
+    template = State(containers={Container('undeclared')})
     juju.deploy(spec(MyCharm), state_template=template)
     with pytest.raises(InconsistentScenarioError, match='undeclared'):
         juju.settle()
@@ -542,6 +622,13 @@ def test_state_template_leaves_the_juju_owned_fields_to_juju(juju: Juju):
 def test_state_template_may_not_set_juju_owned_fields(juju: Juju, field: str, template: State):
     with pytest.raises(JujuError, match=f'may not set {field}'):
         juju.deploy(spec(MyCharm), state_template=template)
+
+
+def test_state_template_may_not_make_a_container_connectable(juju: Juju):
+    template = State(containers={Container('workload', can_connect=True)})
+    with pytest.raises(JujuError, match="may not set can_connect on container 'workload'"):
+        juju.deploy(CharmSpec(WaitingCharm, meta=EXEC_META), state_template=template)
+    assert not juju.apps
 
 
 # add_unit
