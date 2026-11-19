@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import collections
 import datetime
+import re
 from typing import Literal, cast
 from unittest.mock import ANY
 
 import pytest
-from scenario import Context, Relation, Secret, State
+from scenario import Context, Relation, Secret, State, errors
 
 import ops
 from test.charms.test_secrets.src.charm import Result, SecretsCharm
@@ -185,6 +186,43 @@ def test_add_secret_label_used_in_same_hook(first_owner: str, second_owner: str)
         output = mgr.run()
 
     assert len(output.secrets) == 1
+
+
+@pytest.mark.parametrize(
+    'owner,juju_version,message',
+    [
+        ('unit', '3.6.14', 'cannot apply changes: creating secrets: secret with label "mylabel"'),
+        ('app', '3.6.14', 'cannot apply changes: creating secrets: secret with label "mylabel"'),
+        ('unit', '4.0.0', 'cannot apply changes: create secrets: creating secret "'),
+        ('app', '4.0.0', 'cannot apply changes: executing leadership func: create secrets: '),
+    ],
+)
+def test_add_secret_label_used_in_earlier_hook(
+    owner: Literal['unit', 'app'],
+    juju_version: str,
+    message: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    # The hook's changes are rejected when Juju commits them, so this is never wrapped.
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    existing = Secret({'foo': 'bar'}, label='mylabel', owner=owner)
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version=juju_version)
+    with ctx(ctx.on.update_status(), State(leader=True, secrets={existing})) as mgr:
+        # In Juju, secret-add succeeds: the label is only checked when the hook ends.
+        getattr(mgr.charm, owner).add_secret({'foo': 'baz'}, label='mylabel')
+        with pytest.raises(errors.HookCommitError, match=re.escape(message)):
+            mgr.run()
+
+
+def test_add_secret_label_used_by_observed_secret():
+    # A label on a secret the charm only observes is a consumer label, which isn't checked.
+    observed = Secret({'foo': 'bar'}, label='mylabel')
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=True, secrets={observed})) as mgr:
+        mgr.charm.unit.add_secret({'foo': 'baz'}, label='mylabel')
+        output = mgr.run()
+
+    assert len(output.secrets) == 2
 
 
 def test_add_secret_label_free_after_remove():
