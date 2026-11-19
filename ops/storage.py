@@ -26,7 +26,7 @@ import subprocess
 from collections.abc import Callable, Generator
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeAlias, cast
 
 import yaml
 
@@ -37,17 +37,17 @@ from ._private.yaml import _SafeLoader
 logger = logging.getLogger()
 
 # _Notice = Tuple[event_path, observer_path, method_name]
-_Notice = tuple[str, str, str]
-_Notices = list[_Notice]
+_Notice: TypeAlias = tuple[str, str, str]
+_Notices: TypeAlias = list[_Notice]
 
 # This is a function that takes a Tuple and returns a yaml node.
 # it replaces a method, so the first argument passed to the function
 # (Any) is 'self'.
-_TupleRepresenterType = Callable[[Any, tuple[Any, ...]], yaml.Node]
-_NoticeGenerator = Generator['_Notice', None, None]
+_TupleRepresenterType: TypeAlias = Callable[[Any, tuple[Any, ...]], yaml.Node]
+_NoticeGenerator: TypeAlias = Generator[_Notice]
 
 
-def _run(args: list[str], **kw: Any):
+def _run(args: list[str], **kw: Any) -> subprocess.CompletedProcess[str]:
     cmd: str | None = shutil.which(args[0])
     if cmd is None:
         raise FileNotFoundError(args[0])
@@ -84,7 +84,7 @@ class SQLiteStorage:
             self._db.close()
             raise
 
-    def _ensure_db_permissions(self, filename: str):
+    def _ensure_db_permissions(self, filename: str) -> None:
         """Make sure that the DB file has appropriately secure permissions."""
         mode = stat.S_IRUSR | stat.S_IWUSR
         if os.path.exists(filename):
@@ -100,7 +100,7 @@ class SQLiteStorage:
             raise RuntimeError(f'Unable to adjust access permission of {filename!r}') from e
         os.close(fd)
 
-    def _setup(self):
+    def _setup(self) -> None:
         """Make the database ready to be used as storage."""
         # Make sure that the database is locked until the connection is closed,
         # not until the transaction ends.
@@ -165,14 +165,14 @@ class SQLiteStorage:
             return pickle.loads(row[0])  # ruff: ignore[suspicious-pickle-usage]
         raise NoSnapshotError(handle_path)
 
-    def drop_snapshot(self, handle_path: str):
+    def drop_snapshot(self, handle_path: str) -> None:
         """Part of the Storage API, remove a snapshot that was previously saved.
 
         Dropping a snapshot that doesn't exist is treated as a no-op.
         """
         self._db.execute('DELETE FROM snapshot WHERE handle=?', (handle_path,))
 
-    def list_snapshots(self) -> Generator[str, None, None]:
+    def list_snapshots(self) -> Generator[str]:
         """Return the name of all snapshots that are currently saved."""
         c = self._db.cursor()
         c.execute('SELECT handle FROM snapshot')
@@ -269,7 +269,7 @@ class JujuStorage:
         """
         self._backend.set(handle_path, snapshot_data)
 
-    def load_snapshot(self, handle_path: str):
+    def load_snapshot(self, handle_path: str) -> Any:
         """Part of the Storage API, retrieve a snapshot that was previously saved.
 
         Args:
@@ -284,26 +284,26 @@ class JujuStorage:
             raise NoSnapshotError(handle_path) from None
         return content
 
-    def drop_snapshot(self, handle_path: str):
+    def drop_snapshot(self, handle_path: str) -> None:
         """Part of the Storage API, remove a snapshot that was previously saved.
 
         Dropping a snapshot that doesn't exist is treated as a no-op.
         """
         self._backend.delete(handle_path)
 
-    def save_notice(self, event_path: str, observer_path: str, method_name: str):
+    def save_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
         """Part of the Storage API, record a notice (event and observer)."""
         notice_list = self._load_notice_list()
         notice_list.append((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)
 
-    def drop_notice(self, event_path: str, observer_path: str, method_name: str):
+    def drop_notice(self, event_path: str, observer_path: str, method_name: str) -> None:
         """Part of the Storage API, remove a notice that was previously recorded."""
         notice_list = self._load_notice_list()
         notice_list.remove((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)
 
-    def notices(self, event_path: str | None = None):
+    def notices(self, event_path: str | None = None) -> _NoticeGenerator:
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -317,7 +317,7 @@ class JujuStorage:
         for row in notice_list:
             if event_path and row[0] != event_path:
                 continue
-            yield tuple(row)
+            yield cast('_Notice', tuple(row))
 
     def _load_notice_list(self) -> _Notices:
         """Load a notice list from current key.
@@ -436,6 +436,8 @@ class _JujuStorageBackend:
 
 class NoSnapshotError(Exception):
     """Exception to flag that there is no snapshot for the given handle_path."""
+
+    handle_path: str
 
     def __init__(self, handle_path: str):
         self.handle_path = handle_path
