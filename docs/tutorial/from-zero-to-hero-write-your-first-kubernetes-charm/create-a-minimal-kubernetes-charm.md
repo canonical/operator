@@ -114,8 +114,6 @@ Replace the contents of `src/charm.py` with:
 
 import ops
 
-import fastapi_demo
-
 
 class FastAPIDemoCharm(ops.CharmBase):
     """Charm the service."""
@@ -211,7 +209,11 @@ In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready`
 :end-at: self.unit.set_workload_version(version)
 ```
 
-Then, still in `src/charm.py`, add `import time` and `import urllib.error` in the imports at the top of the file.
+Then, still in `src/charm.py`, add the following lines at the top of the file:
+
+- `import time`
+- `import urllib.error`
+- `import fastapi_demo`
 
 We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju.
 
