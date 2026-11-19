@@ -399,10 +399,8 @@ class _MockModelBackend(_ModelBackend):
     def network_get(self, binding_name: str, relation_id: int | None = None):
         # validation:
         extra_bindings = self._charm_spec.meta.get('extra-bindings', ())
-        all_endpoints = self._charm_spec.get_all_relations()
-        non_sub_relations = {
-            name for name, meta in all_endpoints if meta.get('scope') != 'container'
-        }
+        # Juju binds every relation endpoint, including container-scoped ones.
+        relation_endpoints = {name for name, _ in self._charm_spec.get_all_relations()}
 
         # - is binding_name a valid binding name?
         if binding_name in extra_bindings:
@@ -418,8 +416,8 @@ class _MockModelBackend(_ModelBackend):
         elif binding_name == 'juju-info':
             # implicit relation that always exists
             pass
-        # - verify that the binding is a relation endpoint name, but not a subordinate one
-        elif binding_name not in non_sub_relations:
+        # - verify that the binding is a relation endpoint name
+        elif binding_name not in relation_endpoints:
             logger.error(
                 f'cannot get network binding for {binding_name}: is not a valid relation '
                 f'endpoint name nor an extra-binding.',

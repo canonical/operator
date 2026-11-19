@@ -88,7 +88,7 @@ def test_ip_get(mycharm: type[ops.CharmBase]):
         assert str(network.bind_address) == '4.4.4.4'
 
 
-def test_no_sub_binding(mycharm: type[ops.CharmBase]):
+def test_sub_binding(mycharm: type[ops.CharmBase]):
     ctx: Context[ops.CharmBase] = Context(
         mycharm,
         meta={
@@ -97,17 +97,15 @@ def test_no_sub_binding(mycharm: type[ops.CharmBase]):
         },
     )
 
-    with ctx(
-        ctx.on.update_status(),
-        State(
-            relations=[
-                SubordinateRelation('bar'),
-            ]
-        ),
-    ) as mgr:
-        with pytest.raises(ops.RelationNotFoundError):
-            # sub relations have no network
-            mgr.charm.model.get_binding('bar').network  # ruff: ignore[useless-expression]  # Used to trigger the error.
+    # Juju binds every relation endpoint, including container-scoped ones.
+    state = State(
+        relations=[SubordinateRelation('bar')],
+        networks={Network('bar', bind_addresses=[BindAddress([Address('4.4.4.4')])])},
+    )
+    with ctx(ctx.on.update_status(), state) as mgr:
+        binding = mgr.charm.model.get_binding('bar')
+        assert binding is not None
+        assert str(binding.network.bind_address) == '4.4.4.4'
 
 
 def test_no_relation_error(mycharm: type[ops.CharmBase]):
