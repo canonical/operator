@@ -7057,6 +7057,21 @@ class PebbleNoticesMixin:
         assert notices[1].key == key3
         assert notices[0].last_repeated < notices[1].last_repeated
 
+    def test_get_notices_by_type(self, client: PebbleClientType):
+        key = 'example.com/' + os.urandom(16).hex()
+        client.notify(pebble.NoticeType.CUSTOM, key)
+
+        notices = client.get_notices(types=[pebble.NoticeType.CUSTOM], keys=[key])
+        assert len(notices) == 1
+        assert notices[0].key == key
+
+        notices = client.get_notices(types=['custom'], keys=[key])
+        assert len(notices) == 1
+        assert notices[0].key == key
+
+        notices = client.get_notices(types=[pebble.NoticeType.CHANGE_UPDATE], keys=[key])
+        assert notices == []
+
 
 class TestNotices(PebbleNoticesMixin):
     @pytest.fixture
