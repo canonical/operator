@@ -272,8 +272,8 @@ def _uv_args(root: pathlib.Path) -> list[str]:
 
 def test_uv_plugin_leaves_out_the_dev_group(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path)
-    # Editable dependencies aren't editable, and the charm itself, ops and
-    # ops-tracing aren't included.
+    # The `editable` dependency is exported without `-e`.
+    # The charm code, ops, and ops-tracing don't appear.
     assert _uv_args(root) == ['./deps/base', './deps/editable']
 
 
@@ -303,7 +303,7 @@ def test_uv_plugin_uses_the_source_subdir(tmp_path: pathlib.Path):
 
 
 def test_uv_plugin_in_a_monorepo(tmp_path: pathlib.Path):
-    # The layout charmcraft's experimental monorepo mode documents: the part's
+    # The layout expected by charmcraft's experimental monorepo mode: the part's
     # source is the repository root, and the charm uses shared code from it.
     repo = tmp_path / 'repo'
     (repo / '.git').mkdir(parents=True)

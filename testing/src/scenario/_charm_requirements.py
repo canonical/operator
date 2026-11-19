@@ -308,7 +308,7 @@ def _build_directory(charm_root: pathlib.Path, part: Mapping[str, Any]) -> pathl
 
 
 def _repository_root(charm_root: pathlib.Path) -> pathlib.Path:
-    """The root of the git repository the charm is in, or the charm itself if it isn't in one."""
+    """The root of the charm's git repository, or ``charm_root`` if there's no repository."""
     for directory in (charm_root, *charm_root.parents):
         if (directory / '.git').exists():
             return directory
@@ -336,7 +336,7 @@ def _python_requirements(directory: pathlib.Path, part: Mapping[str, Any]) -> tu
 
 
 def _list(part: Mapping[str, Any], key: str) -> list[str]:
-    """A list option of the part, which is empty if it isn't set."""
+    """A list option of the part."""
     value = part.get(key, [])
     if not isinstance(value, list):
         raise _RequirementsError(f'{key} in charmcraft.yaml is not a list.')
