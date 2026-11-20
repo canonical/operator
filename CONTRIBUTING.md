@@ -113,7 +113,7 @@ Changes should include tests. Where reasonable, prefer to write 'Scenario' tests
 
 Harness is in maintenance mode. We only change it for security fixes, for significant bugs, and where it shares code with Scenario. If a difference between Harness and Juju or Pebble breaks a real charm's tests, open an issue that names the charm before opening a PR. We'll close PRs that only change how Harness behaves without one.
 
-Scenario and Harness simulate Juju and Pebble. If your change makes them behave more like Juju or Pebble, link to the behaviour you're matching in the PR description. A permalink to the Juju or Pebble source at a specific commit is best. Output from a real Juju controller or Pebble server also works.
+Scenario and Harness both simulate Juju and Pebble. When changing their behaviour to more accurately simulate Juju or Pebble, cite the real behaviour in the PR description. Good evidence would be a permalink to the Juju or Pebble source at a specific commit, or output from a real controller or Pebble server, or ideally both.
 
 Tests for Ops should go in the test module corresponding to the code. For example, a feature added in `ops/main.py` would go in `test/test_main.py`. However, when adding a large number of logically related tests, consider putting these in their own file, named accordingly. For example, if adding a feature `foo` in `ops/main.py`, the tests might go in `test/test_main_foo.py`.
 
