@@ -8,6 +8,7 @@ import os
 import pathlib
 from tempfile import TemporaryDirectory
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from scenario import ActiveStatus, Context
@@ -279,6 +280,18 @@ def test_load_config_blocked_in_init_manager():
         state_out = mgr.run()
     assert not ctx.emitted_events
     assert state_out.unit_status == ops.BlockedStatus('Invalid config: port out of range')
+
+
+def test_load_config_blocked_in_init_finalises_once(monkeypatch: pytest.MonkeyPatch):
+    shutdown = Mock()
+    monkeypatch.setattr(ops.tracing, '_shutdown', shutdown)
+    ctx = Context(
+        LoadConfigBlockedCharm,
+        meta={'name': 'foo'},
+        config={'options': {'port': {'type': 'int', 'default': 8080}}},
+    )
+    ctx.run(ctx.on.config_changed(), State(config={'port': 0}))
+    shutdown.assert_called_once()
 
 
 @pytest.mark.parametrize('exit_code', (-1, 1, 42))

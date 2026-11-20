@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import Mock
 
 import ops
@@ -57,6 +58,39 @@ def test_http_tracing_destination(
     mock_destination.assert_called_with(url='http://tracing.example:4318/v1/traces', ca=None)
 
 
+def test_destination_restored_by_unrelated_event(
+    sample_charm: type[ops.CharmBase], mock_destination: Mock, http_relation: ops.testing.Relation
+):
+    ctx = ops.testing.Context(sample_charm)
+    state = ops.testing.State(relations={http_relation})
+    ctx.run(ctx.on.update_status(), state)
+    mock_destination.assert_called_with(url='http://tracing.example:4318/v1/traces', ca=None)
+
+
+def test_destination_check_on_commit_does_not_fail_the_hook(
+    sample_charm: type[ops.CharmBase],
+    mock_destination: Mock,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    get_destination = Mock(side_effect=ops.ModelError('restricted'))
+    monkeypatch.setattr(ops.tracing.Tracing, '_get_destination', get_destination)
+    ctx = ops.testing.Context(sample_charm)
+    ctx.run(ctx.on.update_status(), ops.testing.State())
+    get_destination.assert_called()
+    mock_destination.assert_not_called()
+
+
+def test_destination_check_on_start_fails_the_hook(
+    sample_charm: type[ops.CharmBase],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    get_destination = Mock(side_effect=ops.ModelError('denied'))
+    monkeypatch.setattr(ops.tracing.Tracing, '_get_destination', get_destination)
+    ctx = ops.testing.Context(sample_charm)
+    with pytest.raises(ops.testing.errors.UncaughtCharmError):
+        ctx.run(ctx.on.start(), ops.testing.State())
+
+
 @pytest.mark.parametrize('relation_to_poke', [0, 1])
 def test_https_tracing_destination(
     sample_charm: type[ops.CharmBase],
@@ -69,3 +103,27 @@ def test_https_tracing_destination(
     state = ops.testing.State(relations={https_relation, ca_relation})
     ctx.run(ctx.on.relation_changed([https_relation, ca_relation][relation_to_poke]), state)
     mock_destination.assert_called_with(url='https://tls.example/v1/traces', ca='FIRST\nSECOND')
+
+
+@pytest.mark.parametrize('relation_to_poke', [0, 1])
+def test_https_tracing_destination_with_v0_ca_provider(
+    sample_charm: type[ops.CharmBase],
+    mock_destination: Mock,
+    https_relation: ops.testing.Relation,
+    relation_to_poke: int,
+):
+    # A v0 provider only puts the certificates in its unit databag.
+    ca_relation = ops.testing.Relation(
+        'receive-ca-cert',
+        remote_units_data={
+            0: {
+                'ca': json.dumps('CA'),
+                'certificate': json.dumps('CERT'),
+                'chain': json.dumps(['CHAIN']),
+            }
+        },
+    )
+    ctx = ops.testing.Context(sample_charm)
+    state = ops.testing.State(relations={https_relation, ca_relation})
+    ctx.run(ctx.on.relation_changed([https_relation, ca_relation][relation_to_poke]), state)
+    mock_destination.assert_called_with(url='https://tls.example/v1/traces', ca='CHAIN')
