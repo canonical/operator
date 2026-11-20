@@ -214,6 +214,19 @@ def test_add_secret_label_used_in_earlier_hook(
             mgr.run()
 
 
+def test_add_secret_label_used_in_earlier_hook_and_removed(monkeypatch: pytest.MonkeyPatch):
+    # Juju creates a hook's secrets before it removes any, so removing the old
+    # secret first doesn't free its label for a new one in the same hook.
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    existing = Secret({'foo': 'bar'}, label='mylabel', owner='unit')
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=True, secrets={existing})) as mgr:
+        mgr.charm.model.get_secret(label='mylabel').remove_all_revisions()
+        mgr.charm.unit.add_secret({'foo': 'baz'}, label='mylabel')
+        with pytest.raises(errors.HookCommitError, match='secret with label "mylabel"'):
+            mgr.run()
+
+
 def test_add_secret_label_used_by_observed_secret():
     # A label on a secret the charm only observes is a consumer label, which isn't checked.
     observed = Secret({'foo': 'bar'}, label='mylabel')

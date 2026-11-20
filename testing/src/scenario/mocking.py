@@ -187,6 +187,16 @@ class _MockModelBackend(_ModelBackend):
         self._added_secret_ids: set[str] = set()
         # Why Juju would fail the hook when it commits the hook's changes, if it would.
         self._commit_errors: list[str] = []
+        # The labels of the secrets the charm owned when the hook started. Juju
+        # creates a hook's secrets before it removes any, so removing one of these
+        # secrets in the hook doesn't free its label for a secret created in the
+        # same hook. Secrets the charm only observes don't count: their labels are
+        # consumer labels.
+        self._owned_labels_at_start = {
+            secret.label
+            for secret in state.secrets
+            if secret.owner is not None and secret.label is not None
+        }
 
     def opened_ports(self) -> set[Port_Ops]:
         return {
@@ -527,10 +537,7 @@ class _MockModelBackend(_ModelBackend):
             raise ModelError(f'ERROR secret with label "{label}" already exists')
         # A label that one of the charm's secrets from an earlier hook has is only
         # rejected when Juju commits the hook's changes, so secret-add still succeeds.
-        # Secrets the charm only observes don't count: their labels are consumer labels.
-        label_in_use = label is not None and any(
-            secret.owner is not None and secret.label == label for secret in self._state.secrets
-        )
+        label_in_use = label is not None and label in self._owned_labels_at_start
 
         secret = Secret(
             content,
