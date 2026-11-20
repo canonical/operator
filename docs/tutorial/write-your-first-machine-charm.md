@@ -290,7 +290,7 @@ if __name__ == "__main__":  # pragma: nocover
     ops.main(TinyproxyCharm)
 ```
 
-We'll refer to `TinyproxyCharm` as the "charm class". When your charm receives the "install" event from Juju, Ops instantiates the charm class, then runs the `_on_install` method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
+We'll refer to `TinyproxyCharm` as the "charm class". When your charm receives the "install" event from Juju, Ops runs the `_on_install` method, which tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
 
 As you write your charm, keep in mind that the charm code only runs when there's an event to handle.
 
