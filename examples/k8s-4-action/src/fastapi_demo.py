@@ -28,7 +28,7 @@ def get_version(port: int = 8000) -> str:
     """Get the version of fastapi_demo that is running.
 
     Args:
-        port: The port where fastapi_demo web server is listening. Default is 8000.
+        port: The port where fastapi_demo web server is listening. Defaults to 8000.
     """
     response = urllib.request.urlopen(f"http://localhost:{port}/version")
     data = json.loads(response.read())

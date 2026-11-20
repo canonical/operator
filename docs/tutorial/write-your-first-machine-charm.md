@@ -277,7 +277,7 @@ class TinyproxyCharm(ops.CharmBase):
             version = tinyproxy.get_version()
             self.unit.set_workload_version(version)
 
-    def _on_start(self, event: ops.StartEvent):
+    def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
         pass  # We'll implement this later.
 
