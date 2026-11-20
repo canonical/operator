@@ -562,6 +562,7 @@ class _MockModelBackend(_ModelBackend):
         # The wording differs between Juju 3 and Juju 4.
         if JujuVersion(self._context.juju_version).major < 4:
             return f'cannot apply changes: creating secrets: secret with label "{label}" already exists'  # ruff: ignore[line-too-long]
+        # The ID can be "secret:ID" or "secret://model-uuid/ID"; Juju's message has only the ID.
         short_id = secret_id.rsplit('/', 1)[-1].rsplit(':', 1)[-1]
         message = (
             f'create secrets: creating secret "{short_id}": '
