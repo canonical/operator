@@ -388,5 +388,5 @@ class Runtime(Generic[CharmType]):
         # has finished, so this isn't a charm error and isn't wrapped as one.
         backend = typing.cast('_MockModelBackend', ops._model_backend)
         if backend._commit_errors:
-            raise HookCommitError('; '.join(backend._commit_errors))
+            raise HookCommitError(list(backend._commit_errors))
         context._set_output_state(ops.state)

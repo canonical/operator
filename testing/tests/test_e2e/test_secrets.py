@@ -227,6 +227,23 @@ def test_add_secret_label_used_in_earlier_hook_and_removed(monkeypatch: pytest.M
             mgr.run()
 
 
+def test_add_secret_labels_used_in_earlier_hook_messages(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    first = Secret({'foo': 'bar'}, label='first', owner='unit')
+    second = Secret({'foo': 'bar'}, label='second', owner='unit')
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version='3.6.14')
+    with ctx(ctx.on.update_status(), State(leader=True, secrets={first, second})) as mgr:
+        mgr.charm.unit.add_secret({'foo': 'baz'}, label='first')
+        mgr.charm.unit.add_secret({'foo': 'baz'}, label='second')
+        with pytest.raises(errors.HookCommitError) as exc_info:
+            mgr.run()
+
+    assert exc_info.value.messages == [
+        'cannot apply changes: creating secrets: secret with label "first" already exists',
+        'cannot apply changes: creating secrets: secret with label "second" already exists',
+    ]
+
+
 def test_add_secret_label_used_by_observed_secret():
     # A label on a secret the charm only observes is a consumer label, which isn't checked.
     observed = Secret({'foo': 'bar'}, label='mylabel')
