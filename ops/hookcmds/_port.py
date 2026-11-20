@@ -44,7 +44,7 @@ def close_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-):
+) -> None:
     """Register a request to close a port or port range.
 
     For more details, see:
@@ -89,7 +89,7 @@ def open_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-):
+) -> None:
     """Register a request to open a port or port range.
 
     For more details, see:

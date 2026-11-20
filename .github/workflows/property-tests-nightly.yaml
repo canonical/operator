@@ -1,0 +1,61 @@
+name: ops Property Tests (nightly)
+
+# The property tests live on the long-lived property-tests branch, and that
+# branch's own workflow runs them on its pushes and pull requests. GitHub only
+# schedules workflows from the default branch, so the nightly run is here: it
+# checks property-tests out and gives the tests a large budget with fresh
+# randomness, to look for inputs nobody has tried yet.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 15 * * *'
+
+permissions: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # The test step has its own budget; this caps setup and the merge too.
+    timeout-minutes: 75
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: property-tests
+          fetch-depth: 0
+          persist-credentials: false
+      # Test the property tests against today's main, not whatever main was
+      # when it was last merged into property-tests. A conflict fails the run,
+      # which says the branch needs merging by hand.
+      - name: Merge main
+        run: |
+          git fetch origin main
+          git merge --no-commit --no-ff FETCH_HEAD || {
+            echo "::error title=property-tests needs merging::main doesn't merge cleanly into property-tests; merge it by hand"
+            exit 1
+          }
+        env:
+          # git wants an identity even for a merge it doesn't commit.
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - run: uv tool install tox --with tox-uv
+
+      - name: Run property tests
+        run: tox -e property
+        env:
+          HYPOTHESIS_PROFILE: nightly
+        timeout-minutes: 60
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [test]
+    permissions:
+      issues: write
+      actions: read  # for ai-failure-enrich.yaml
+    secrets:
+      # For ai-failure-enrich.yaml -- can only be read in the ai-failure-triage environment.
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    uses: $/.github/workflows/notify-scheduled-failure.yaml

@@ -22,7 +22,7 @@ from ._types import CloudSpec, GoalState, GoalStateDict, Network
 from ._utils import run
 
 
-def app_version_set(version: str):
+def app_version_set(version: str) -> None:
     """Specify which version of the application is deployed.
 
     For more details, see:
@@ -115,7 +115,7 @@ def juju_log(
     message: str,
     *,
     level: Literal['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO',
-):
+) -> None:
     """Write a message to the juju log.
 
     For more details, see:
@@ -129,7 +129,7 @@ def juju_log(
     run('juju-log', '--log-level', level, '--', message)
 
 
-def juju_reboot(*, now: bool = False):
+def juju_reboot(*, now: bool = False) -> None:
     """Reboot the host machine.
 
     For more details, see:

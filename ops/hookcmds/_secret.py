@@ -160,7 +160,7 @@ def secret_get(
     return result
 
 
-def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
+def secret_grant(id: str, relation_id: int, *, unit: str | None = None) -> None:
     """Grant access to a secret.
 
     For more details, see:
@@ -221,7 +221,7 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
     return SecretInfo._from_dict(result)
 
 
-def secret_remove(id: str, *, revision: int | None = None):
+def secret_remove(id: str, *, revision: int | None = None) -> None:
     """Remove an existing secret.
 
     For more details, see:
@@ -244,7 +244,7 @@ def secret_revoke(
     relation_id: int | None = None,
     app: str | None = None,
     unit: str | None = None,
-):
+) -> None:
     """Revoke access to a secret.
 
     For more details, see:
@@ -276,7 +276,7 @@ def secret_set(
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
     owner: Literal['application', 'unit'] | None = None,
-):
+) -> None:
     """Update an existing secret.
 
     For more details, see:
