@@ -60,7 +60,6 @@ def test_pebble_layer(mock_version):
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Expected plan after Pebble ready with default config.
     expected_plan = ops.pebble.Plan(ROCK_LAYER.to_dict())
-    expected_plan.services["fastapi"].override = "merge"
 
     # Check that we have the plan we expected:
     assert state_out.get_container(container.name).plan == expected_plan

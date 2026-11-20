@@ -191,17 +191,7 @@ juju status
 
 Since we added a new feature to configure `server-port` and use it in the Pebble layer dynamically, we should write tests for the feature.
 
-First, in `tests/unit/test_charm.py`, find the `expected_plan = ` line then add a line that sets `override` for the `fastapi` service:
-
-```{literalinclude} ../../../examples/k8s-2-configurable/tests/unit/test_charm.py
-:language: python
-:start-at: "# Expected plan after Pebble ready with default config."
-:end-at: expected_plan.services["fastapi"].override = "merge"
-```
-
-This is needed because the charm's `_get_pebble_layer` method sets `override` to `merge` in the layer that it constructs.
-
-Next, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the Pebble layer:
+Add a test that sets the port in the input state and asserts that the port is used in the service's command in the Pebble layer:
 
 ```{literalinclude} ../../../examples/k8s-2-configurable/tests/unit/test_charm.py
 :language: python
