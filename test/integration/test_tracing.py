@@ -34,8 +34,9 @@ from test.integration.conftest import (
 def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
     """The traced charm is connected to the trace data collector directly."""
     charm_path = build_tracing_charm()
-    # Only the leader can read its own application databag, so make sure that
-    # a non-leader unit also sends trace data.
+    # Only the leader can read its own application databag, so a non-leader
+    # unit takes a different path when reading the tracing relation (see
+    # #2918). Make sure that it also sends trace data.
     tracing_juju.deploy(charm_path, num_units=2)
     tracing_juju.integrate('test-tracing', 'tempo')
     tracing_juju.wait(jubilant.all_active)
