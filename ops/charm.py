@@ -1557,7 +1557,8 @@ class CharmBase(Object):
           than the secret ID. Note that the secret object is not validated by
           Juju at this time, so may raise :class:`SecretNotFoundError` when it
           is used later (if the secret does not exist or the unit does not have
-          permission to access it).
+          permission to access it). An empty value is treated as if the
+          option were unset.
         * dashes in names are converted to underscores.
 
         For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
