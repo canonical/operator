@@ -186,7 +186,7 @@ With these changes, we've made sure that our application knows how to access the
 When Pebble starts or restarts the service:
 
 * If there's a database relation and database authentication data is available from the relation, our application can get the database authentication data from environment variables.
-* If there's no database relation or database authentication data, our application can't connect to the database. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
+* If there's no database relation or database authentication data, our application can't connect to the database. In this case, we'd like the unit to show `blocked` or `waiting` status, depending on whether the Juju user needs to take action.
 
 ```{note}
 The service defined in [rockcraft.yaml](https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml) has an environment variable related to logging. When Pebble combines the rock's layer with our constructed layer, the final service has environment variables from both layers (because our constructed layer sets `override` to `merge`).
@@ -215,6 +215,8 @@ And define a method that does the various checks, adding appropriate statuses. T
 :language: python
 :pyobject: FastAPIDemoCharm._on_collect_status
 ```
+
+The relation is created as soon as the Juju user runs `juju integrate`, but PostgreSQL might take a while longer to create the database and share the authentication data. We use `self.database.is_resource_created()` to check whether PostgreSQL has shared the authentication data. Until it has, the unit shows `waiting` status instead of `active`.
 
 We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). If you missed doing so above, in `_replan_workload`, remove the lines:
 
@@ -327,6 +329,13 @@ In this chapter, we also defined a new method `_on_collect_status` that checks v
 ```{literalinclude} ../../../examples/k8s-3-postgresql/tests/unit/test_charm.py
 :language: python
 :pyobject: test_no_database_blocked
+```
+
+If the relation exists but PostgreSQL hasn't shared the authentication data yet, the unit should be in `waiting` status. Let's add a test for this case too:
+
+```{literalinclude} ../../../examples/k8s-3-postgresql/tests/unit/test_charm.py
+:language: python
+:pyobject: test_database_not_ready_waiting
 ```
 
 Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`. Replace the `assert state_out.unit_status` line by:
