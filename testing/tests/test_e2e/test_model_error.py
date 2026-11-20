@@ -11,7 +11,11 @@ from scenario import Context, Relation, Secret, State
 
 import ops
 
-META = {'name': 'local', 'requires': {'db': {'interface': 'db'}}}
+META = {
+    'name': 'local',
+    'requires': {'db': {'interface': 'db'}},
+    'resources': {'foo': {'type': 'file', 'filename': 'foo.txt'}},
+}
 ACTIONS: dict[str, dict[str, object]] = {'back-up': {}}
 
 
@@ -72,6 +76,14 @@ def test_secret_info_get_records_id_only():
     assert _notes(error) == [
         f"Hook command 'secret-info-get' (id={secret.id!r}) "
         "failed during the 'update-status' hook."
+    ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='exception notes need Python 3.11')
+def test_resource_get():
+    error = _run('update_status', lambda charm: charm.model.resources.fetch('foo'), State())
+    assert _notes(error) == [
+        "Hook command 'resource-get' (resource_name='foo') failed during the 'update-status' hook."
     ]
 
 
