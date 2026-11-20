@@ -193,7 +193,7 @@ class _MockModelBackend(_ModelBackend):
         # same hook. Secrets the charm only observes don't count: their labels are
         # consumer labels.
         self._owned_labels_at_start = {
-            secret.label
+            secret.label: secret.owner
             for secret in state.secrets
             if secret.owner is not None and secret.label is not None
         }
@@ -537,7 +537,7 @@ class _MockModelBackend(_ModelBackend):
             raise ModelError(f'ERROR secret with label "{label}" already exists')
         # A label that one of the charm's secrets from an earlier hook has is only
         # rejected when Juju commits the hook's changes, so secret-add still succeeds.
-        label_in_use = label is not None and label in self._owned_labels_at_start
+        existing_owner = None if label is None else self._owned_labels_at_start.get(label)
 
         secret = Secret(
             content,
@@ -552,19 +552,30 @@ class _MockModelBackend(_ModelBackend):
         secrets.add(secret)
         self._state._update_secrets(frozenset(secrets))
         self._added_secret_ids.add(secret.id)
-        if label_in_use:
+        if existing_owner is not None:
             self._commit_errors.append(
-                self._label_in_use_message(secret.id, label, app_owned=owner != 'unit')
+                self._label_in_use_message(
+                    secret.id,
+                    label,
+                    app_owned=owner != 'unit',
+                    existing_app_owned=existing_owner == 'app',
+                )
             )
         return secret.id
 
-    def _label_in_use_message(self, secret_id: str, label: str | None, *, app_owned: bool) -> str:
+    def _label_in_use_message(
+        self, secret_id: str, label: str | None, *, app_owned: bool, existing_app_owned: bool
+    ) -> str:
         # The wording differs between Juju 3 and Juju 4.
         if JujuVersion(self._context.juju_version).major < 4:
-            return (
-                'cannot apply changes: creating secrets: '
-                f'secret with label "{label}" already exists'
-            )
+            # Juju 3 checks a label against the other kind of owner first, with its own wording.
+            if app_owned and not existing_app_owned:
+                reason = f'secret label "{label}" for a unit of application "{self.app_name}"'
+            elif not app_owned and existing_app_owned:
+                reason = f'secret label "{label}" for application "{self.app_name}"'
+            else:
+                reason = f'secret with label "{label}"'
+            return f'cannot apply changes: creating secrets: {reason} already exists'
         # The ID can be "secret:ID" or "secret://model-uuid/ID"; Juju's message has only the ID.
         short_id = secret_id.rsplit('/', 1)[-1].rsplit(':', 1)[-1]
         message = (
