@@ -49,7 +49,7 @@ def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju:
         assert 'StartEvent' in event_names
 
         spans = wait_spans(endpoint, ready=lambda spans: units <= get_units(spans))
-        assert units <= get_units(spans)
+        assert units <= get_units(spans), f'no spans from {units - get_units(spans)}'
 
         checkpoint = time.time()
         arg_value = 'the-one-action-arg-value'
