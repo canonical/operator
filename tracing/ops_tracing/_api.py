@@ -27,7 +27,6 @@ from .vendor.charms.certificate_transfer_interface.v1.certificate_transfer impor
 )
 from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
     AmbiguousRelationUsageError,
-    ProtocolNotRequestedError,
     TracingEndpointRequirer,
 )
 
@@ -164,12 +163,20 @@ class Tracing(ops.Object):
 
     def _get_destination(self) -> Destination:
         try:
-            if not self._tracing.is_ready():
+            endpoints = self._tracing.get_all_endpoints()
+            if endpoints is None:
                 return Destination(None, None)
 
-            base_url = self._tracing.get_endpoint('otlp_http')
+            # Don't use get_endpoint(): when the receiver is missing, it reads this
+            # app's databag, which only the leader can do.
+            base_url = None
+            for receiver in endpoints.receivers:
+                if receiver.protocol.name == 'otlp_http':
+                    base_url = receiver.url
+                    break
 
             if not base_url:
+                logger.debug("The tracing provider doesn't offer an 'otlp_http' receiver")
                 return Destination(None, None)
 
             if not base_url.startswith(('http://', 'https://')):
@@ -192,10 +199,8 @@ class Tracing(ops.Object):
         except (
             ops.TooManyRelatedAppsError,
             AmbiguousRelationUsageError,
-            ProtocolNotRequestedError,
         ):
-            # These should not really happen, as we've set up a single relation
-            # and requested the protocol explicitly.
+            # These should not really happen, as we've set up a single relation.
             logger.exception('Error getting the tracing destination')
             return Destination(None, None)
 

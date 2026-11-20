@@ -101,14 +101,16 @@ def test_requirer_awaits_provider_endpoints(
 
 # "Is expected to push traces to one or more of the provided endpoints using
 # the corresponding encoding/protocol."
+@pytest.mark.parametrize('leader', [True, False])
 def test_requirer_uses_provided_endpoint(
     sample_charm: type[ops.CharmBase],
     mock_destination: Mock,
     http_relation: ops.testing.Relation,
+    leader: bool,
 ):
     """When the provider advertises our requested protocol, we point at it."""
     ctx = ops.testing.Context(sample_charm)
-    state = ops.testing.State(leader=True, relations={http_relation})
+    state = ops.testing.State(leader=leader, relations={http_relation})
     ctx.run(ctx.on.relation_changed(http_relation), state)
     # `otlp_http`'s OTLP/HTTP path is /v1/traces (per the OTLP spec); our
     # _get_destination appends it to the base URL the provider advertises.
@@ -117,8 +119,9 @@ def test_requirer_uses_provided_endpoint(
 
 # "Is expected to handle cases where none of the requested protocols is
 # supported."
+@pytest.mark.parametrize('leader', [True, False])
 def test_requirer_handles_no_supported_protocol(
-    sample_charm: type[ops.CharmBase], mock_destination: Mock
+    sample_charm: type[ops.CharmBase], mock_destination: Mock, leader: bool
 ):
     """Provider only offers protocols we did NOT request: degrade quietly."""
     # We request otlp_http; provider only advertises otlp_grpc.
@@ -134,10 +137,11 @@ def test_requirer_handles_no_supported_protocol(
         },
     )
     ctx = ops.testing.Context(sample_charm)
-    state = ops.testing.State(leader=True, relations={relation})
+    state = ops.testing.State(leader=leader, relations={relation})
     # Must not raise; we're "expected to handle" this case.
     ctx.run(ctx.on.relation_changed(relation), state)
     mock_destination.assert_called_with(url=None, ca=None)
+    assert any("doesn't offer an 'otlp_http' receiver" in log.message for log in ctx.juju_log)
 
 
 # ---------------------------------------------------------------------------
