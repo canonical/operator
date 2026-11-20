@@ -1874,9 +1874,9 @@ class Relation:
                 relation.save(data, self.unit)
 
         A Pydantic field that has a ``serialization_alias`` is saved with that
-        alias as the key. :meth:`load` reads the field's validation alias, so if
-        the data needs to be loaded back, use ``alias`` rather than a
-        ``serialization_alias`` that differs from the validation alias.
+        alias as the key. :meth:`load` looks for the field's ``alias``, or its
+        name if it has none, so if the data needs to be loaded back, use
+        ``alias`` rather than ``serialization_alias``.
 
         If a Pydantic model's ``model_dump`` method omits any field (e.g. if its
         value is Pydantic's ``MISSING`` sentinel) the field will be erased from
