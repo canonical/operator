@@ -128,7 +128,9 @@ def get_spans(endpoint: tuple[str, int], since: float = 0, https: bool = False):
     base_url = f'{"https" if https else "http"}://{host}:{port}/api/'
     # Insecure HTTPS because we don't want to fetch CA list from self-signed-certificates
     with httpx.Client(base_url=base_url, timeout=5, verify=False) as client:  # ruff: ignore[request-with-no-cert-validation]
-        response = client.get('search?tags=service.name=test-tracing')
+        # Tempo returns at most 20 traces unless asked for more, and with two
+        # units those 20 can all come from the same one.
+        response = client.get('search?tags=service.name=test-tracing&limit=1000')
         response.raise_for_status()
         for trace in response.json()['traces']:
             if float(trace['startTimeUnixNano']) / 1e9 < since:
