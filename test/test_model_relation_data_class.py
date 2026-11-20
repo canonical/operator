@@ -477,6 +477,15 @@ def test_juju_fields_pydantic_dataclass_without_is_pydantic_dataclass():
     assert ops.charm._juju_fields(Data) == {'fooBar': 'fooBar'}
 
 
+def test_juju_fields_skips_init_false():
+    @dataclasses.dataclass
+    class Data:
+        a: int
+        double_a: int = dataclasses.field(init=False)
+
+    assert ops.charm._juju_fields(Data) == {'a': 'a'}
+
+
 def test_relation_load_extra_args():
     @dataclasses.dataclass
     class Data:
