@@ -128,7 +128,7 @@ if __name__ == "__main__":  # pragma: nocover
 
 As you can see, a charm is a pure Python class that inherits from the [`CharmBase`](ops.CharmBase) class of Ops and which we pass to [](ops.main). We'll refer to `FastAPIDemoCharm` as the "charm class".
 
-Before continuing, delete `tests/unit/test_charm.py`. That file depends on the version of `src/charm.py` you just replaced. Deleting `test_charm.py` ensures that `tox -e lint` doesn't report unhelpful errors. We'll recreate `test_charm.py` later in the tutorial.
+Before continuing, run `tox -e lint`. You'll see errors about unknown imports, which occur because `tests/unit/test_charm.py` depends on the version of `src/charm.py` you just replaced. Delete `tests/unit/test_charm.py` for now; we'll recreate `test_charm.py` later in the tutorial.
 
 ### Add logger functionality
 

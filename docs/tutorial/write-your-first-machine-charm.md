@@ -298,7 +298,7 @@ As you write your charm, keep in mind that the charm code only runs when there's
 Juju executes `charm.py` on every event, with event data in the environment. Your call to `ops.main` creates a fresh instance of the charm class, then Ops runs the appropriate method on the charm class. You can't persist data between Juju events by storing it in memory.
 ```
 
-Before continuing, delete `tests/unit/test_charm.py`. That file depends on the version of `src/charm.py` you just replaced. Deleting `test_charm.py` ensures that `tox -e lint` doesn't report unhelpful errors. We'll recreate `test_charm.py` later in the tutorial.
+Before continuing, run `tox -e lint`. You'll see errors about unknown imports, which occur because `tests/unit/test_charm.py` depends on the version of `src/charm.py` you just replaced. Delete `tests/unit/test_charm.py` for now; we'll recreate `test_charm.py` later in the tutorial.
 
 ### Define a configuration option
 
