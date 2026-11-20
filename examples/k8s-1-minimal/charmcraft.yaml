@@ -42,6 +42,31 @@ config:
         Acceptable values are: "info", "debug", "warning", "error" and "critical"
       default: "info"
       type: string
+    # A config option that points to a user-provided secret containing an API token.
+    # See https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-secrets/
+    api-token:
+      description: |
+        URI of a Juju user secret containing the API token for the workload.
+        The secret must have a 'token' key.
+
+        Create the secret: juju add-secret my-api-token token=<value>
+                           (returns a URI)
+        Grant access:      juju grant-secret <uri> fastapi-demo
+        Set this option:   juju config fastapi-demo api-token=<uri>
+      type: secret
+
+# (Optional) Actions that an operator can run against a unit.
+# More information on this section at:
+# https://canonical.com/juju/docs/charmcraft/stable/reference/files/charmcraft-yaml-file/#actions
+# General actions documentation:
+# https://canonical.com/juju/docs/juju-cli/3.6/reference/action/
+actions:
+  restart:
+    description: |
+      Restart the workload service in the container.
+
+      Use this to apply a change that the workload only picks up on startup,
+      or to recover a workload that has stopped responding.
 
 containers:
   demo-server:

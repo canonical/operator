@@ -86,7 +86,7 @@ Replace the content of `src/fastapi_demo.py` with:
 
 ```{literalinclude} ../../../examples/k8s-1-minimal/src/fastapi_demo.py
 :language: python
-:start-at: import json
+:start-at: '"""Functions for interacting with the workload.'
 ```
 
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
@@ -114,8 +114,6 @@ Replace the contents of `src/charm.py` with:
 
 import ops
 
-import fastapi_demo
-
 
 class FastAPIDemoCharm(ops.CharmBase):
     """Charm the service."""
@@ -129,6 +127,8 @@ if __name__ == "__main__":  # pragma: nocover
 ```
 
 As you can see, a charm is a pure Python class that inherits from the [`CharmBase`](ops.CharmBase) class of Ops and which we pass to [](ops.main). We'll refer to `FastAPIDemoCharm` as the "charm class".
+
+Before continuing, run `tox -e lint`. You'll see errors about unknown imports, which occur because `tests/unit/test_charm.py` depends on the version of `src/charm.py` you just replaced. Delete `tests/unit/test_charm.py` for now; we'll recreate `test_charm.py` later in the tutorial.
 
 ### Add logger functionality
 
@@ -209,7 +209,11 @@ In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready`
 :end-at: self.unit.set_workload_version(version)
 ```
 
-Then, still in `src/charm.py`, add `import time` and `import urllib.error` in the imports at the top of the file.
+Then, still in `src/charm.py`, add the following lines at the top of the file:
+
+- `import time`
+- `import urllib.error`
+- `import fastapi_demo`
 
 We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju.
 
@@ -339,7 +343,7 @@ In this section we'll write a test to check that the `fastapi` service is starte
 
 ### Write a test
 
-Replace the contents of `tests/unit/test_charm.py` with:
+Create a file `tests/unit/test_charm.py` containing:
 
 ```{literalinclude} ../../../examples/k8s-1-minimal/tests/unit/test_charm.py
 :language: python
