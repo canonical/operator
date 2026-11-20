@@ -32,7 +32,7 @@ jobs:
       issue: ${{ steps.notify.outputs.issue }}
       origin: ${{ steps.notify.outputs.origin }}
     steps:
-      - name: Create or comment on issue, deduping coarsely by workflow name
+      - name: Create or comment on issue, deduping by workflow name
         id: notify
         env:
           GH_TOKEN: ${{ github.token }}
@@ -44,10 +44,20 @@ jobs:
           set -euo pipefail
           marker="<!-- ai-failure-notifications:run=$RUN_ID:origin="
 
-          # Search for the workflow name in issue bodies or titles.
+          # Find an open issue with a "Workflow: <name>" footer line, in its
+          # body or in a comment. Enrichment rewrites the title and body but
+          # always keeps this footer, and the issue this job opens has it too.
+          # Search ignores the colon and matches any issue containing the
+          # phrase "workflow <name>". That also matches a workflow whose name
+          # starts with this one, so keep only exact footer lines.
           match=$(gh issue list --repo "$REPO" --state open \
-            --search "\"$WORKFLOW_NAME\"" \
-            --json number --limit 1 -q '.[0].number // empty')
+            --search "\"Workflow: $WORKFLOW_NAME\"" \
+            --json number,body,comments --limit 20 \
+            | jq -r --arg line "Workflow: $WORKFLOW_NAME" '
+                [.[] | select([.body, .comments[].body]
+                  | map(split("\n")[] | rtrimstr("\r"))
+                  | any(. == $line))]
+                | .[0].number // empty')
 
           if [[ -n "$match" ]]; then
             comment_body="Scheduled workflow '$WORKFLOW_NAME' failed again: $RUN_URL"$'\n\n'"${marker}comment -->"
@@ -55,7 +65,7 @@ jobs:
             echo "issue=$match" >> "$GITHUB_OUTPUT"
             echo "origin=comment" >> "$GITHUB_OUTPUT"
           else
-            issue_body="Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"$'\n\n'"${marker}new -->"
+            issue_body="Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"$'\n\n'"Workflow: $WORKFLOW_NAME"$'\n\n'"${marker}new -->"
             # `gh issue create` prints the new issue's URL; the number is its
             # last path segment.
             issue_url=$(gh issue create --repo "$REPO" \
