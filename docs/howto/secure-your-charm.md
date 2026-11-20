@@ -67,9 +67,21 @@ Avoid unnecessary or low-value runtime dependencies. Every dependency you add is
 
 Machine charms and Kubernetes charms manage permissions in different ways.
 
-**Machine charms.** Set an explicit `os.umask()` before creating files or directories the workload will use, so that permissions are not inherited from whatever the calling context happened to be. Set ownership on files and directories the charm creates for the workload user.
+### Machine charms
 
-**Kubernetes charms.** Prefer running the charm and its sidecar containers as a non-root user. Set the {external+charmcraft:ref}`charm-user key in charmcraft.yaml <charmcraft-yaml-key-charm-user>` to `non-root`, and set an explicit `uid` and `gid` on each container in `charmcraft.yaml`.
+Set an explicit `os.umask()` before creating files or directories the workload will use, so that permissions are not inherited from whatever the calling context happened to be. Set ownership on files and directories the charm creates for the workload user.
+
+### Kubernetes charms
+
+Prefer running the charm code as a non-root user. Set {external+charmcraft:ref}`charm-user <charmcraft-yaml-key-charm-user>` to `non-root` in `charmcraft.yaml`.
+
+If the charm code needs elevated privileges, and you can't rewrite the charm code to avoid this, set `charm-user` to `sudoer` or `root`. Don't leave `charm-user` unset.
+
+For each workload container, decide how to run Pebble and its services. The simplest approach is to have Pebble and the services run as the same user -- ideally a non-root user such as `_daemon_`. However, this approach isn't necessarily the most secure: a compromised service could reconfigure Pebble and modify other services. Consider running Pebble as root and configuring each service to run as a unique non-root user. Also consider putting services in separate containers.
+
+To specify which user and group Pebble runs as, set {external+charmcraft:ref}`uid and gid for the container <charmcraft-yaml-key-containers>` in `charmcraft.yaml`. These values override the user and group that the container image declares (for example, the value of {external+rockcraft:ref}`run-user <project.run_user>` in a rock). It's clearest to explicitly set `uid` and `gid` for each container. Use 584792 for `_daemon_` or 0 for root.
+
+By default, each service runs as the same user and group as Pebble. To specify a different user or group, set `user`, `user-id`, `group`, or `group-id` for the service. See {external+pebble:ref}`Pebble | Layer specification <layer-specification>`.
 
 ## Harden the workload
 

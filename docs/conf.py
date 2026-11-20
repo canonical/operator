@@ -329,6 +329,7 @@ intersphinx_mapping = {
     "concierge": ("https://canonical.com/juju/docs/concierge/", None),
     "multipass": ("https://canonical.com/multipass/docs/latest", None),
     "pebble": ("https://ubuntu.com/docs/pebble", None),
+    "rockcraft": ("https://ubuntu.com/containers/rockcraft/docs/latest", None),
     "otel": ("https://opentelemetry-python.readthedocs.io/en/latest/", None),
 }
 

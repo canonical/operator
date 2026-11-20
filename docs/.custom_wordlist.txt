@@ -50,6 +50,7 @@ teardown
 tinyproxy
 traceback
 tracebacks
+uid
 uniter
 untyped
 unpatched
