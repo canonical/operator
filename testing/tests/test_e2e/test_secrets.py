@@ -185,7 +185,8 @@ def test_add_secret_label_used_in_same_hook(first_owner: str, second_owner: str)
             getattr(charm, second_owner).add_secret({'foo': 'baz'}, label='mylabel')
         output = mgr.run()
 
-    assert len(output.secrets) == 1
+    (secret,) = output.secrets
+    assert secret.latest_content == {'foo': 'bar'}
 
 
 @pytest.mark.parametrize(
