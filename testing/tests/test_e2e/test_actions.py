@@ -48,6 +48,86 @@ def test_action_event(mycharm: type[CharmBase], baz_value: bool):
     assert evt.params['baz'] is baz_value
 
 
+def test_action_params_defaults(mycharm: type[CharmBase]):
+    ctx: Context[CharmBase] = Context(
+        mycharm,
+        meta={'name': 'foo'},
+        actions={
+            'foo': {
+                'params': {
+                    'compress': {'type': 'boolean', 'default': True},
+                    'level': {'type': 'integer', 'default': 5},
+                    'name': {'type': 'string'},
+                    'tag': {'type': 'string'},
+                },
+            },
+        },
+    )
+    ctx.run(ctx.on.action('foo', params={'name': 'x', 'level': 9}), State())
+
+    evt = ctx.emitted_events[0]
+    assert isinstance(evt, ActionEvent)
+    assert evt.params == {'compress': True, 'level': 9, 'name': 'x'}
+
+
+@pytest.mark.parametrize(
+    'params,expected',
+    [
+        ({}, {'compression': {'kind': 'gzip', 'quality': 5}}),
+        ({'compression': {'kind': 'xz'}}, {'compression': {'kind': 'xz', 'quality': 5}}),
+    ],
+)
+def test_action_params_nested_defaults(
+    mycharm: type[CharmBase], params: dict[str, Any], expected: dict[str, Any]
+):
+    ctx: Context[CharmBase] = Context(
+        mycharm,
+        meta={'name': 'foo'},
+        actions={
+            'foo': {
+                'params': {
+                    'compression': {
+                        'type': 'object',
+                        'properties': {
+                            'kind': {'type': 'string', 'default': 'gzip'},
+                            'quality': {'type': 'integer', 'default': 5},
+                        },
+                    },
+                    'options': {
+                        'type': 'object',
+                        'properties': {'verbose': {'type': 'boolean'}},
+                    },
+                },
+            },
+        },
+    )
+    ctx.run(ctx.on.action('foo', params=params), State())
+
+    evt = ctx.emitted_events[0]
+    assert isinstance(evt, ActionEvent)
+    assert evt.params == expected
+
+
+def test_action_params_default_is_copied():
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_action, self._on_foo_action)
+
+        def _on_foo_action(self, event: ActionEvent):
+            event.set_results({'tags': ','.join(event.params['tags'])})
+            event.params['tags'].append('extra')
+
+    ctx = Context(
+        MyCharm,
+        meta={'name': 'foo'},
+        actions={'foo': {'params': {'tags': {'type': 'array', 'default': ['a']}}}},
+    )
+    ctx.run(ctx.on.action('foo'), State())
+    ctx.run(ctx.on.action('foo'), State())
+    assert ctx.action_results == {'tags': 'a'}
+
+
 def test_action_no_results():
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
