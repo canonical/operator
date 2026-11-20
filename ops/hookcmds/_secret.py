@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime
 import json
 import tempfile
+import warnings
 from typing import Any, Literal, overload
 
 from ._types import SecretInfo, SecretRotate
@@ -33,7 +34,7 @@ def secret_add(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['application', 'unit'] = 'application',
+    owner: Literal['application', 'unit'] | None = 'application',
 ) -> str:
     """Add a new secret.
 
@@ -47,6 +48,7 @@ def secret_add(
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
         owner: The owner of the secret, either the application or the unit.
+            ``None`` leaves the choice to Juju, which defaults to the application.
     """
     args: list[str] = []
     if label is not None:
@@ -60,12 +62,15 @@ def secret_add(
             args.extend(['--expire', datetime_to_rfc3339(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
-    args.extend(['--owner', owner])
+    if owner is not None:
+        args.extend(['--owner', owner])
     with tempfile.TemporaryDirectory() as tmp:
-        for k, v in content.items():
-            with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+        # The files are numbered rather than named after the keys, so that the
+        # keys are only ever validated by Juju, not used as paths.
+        for i, (k, v) in enumerate(content.items()):
+            with open(f'{tmp}/{i}', mode='w', encoding='utf-8') as f:
                 f.write(v)
-            args.append(f'{k}#file={tmp}/{k}')
+            args.append(f'{k}#file={tmp}/{i}')
         stdout = run('secret-add', *args)
     return stdout.strip()
 
@@ -155,7 +160,7 @@ def secret_get(
     return result
 
 
-def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
+def secret_grant(id: str, relation_id: int, *, unit: str | None = None) -> None:
     """Grant access to a secret.
 
     For more details, see:
@@ -216,7 +221,7 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
     return SecretInfo._from_dict(result)
 
 
-def secret_remove(id: str, *, revision: int | None = None):
+def secret_remove(id: str, *, revision: int | None = None) -> None:
     """Remove an existing secret.
 
     For more details, see:
@@ -234,8 +239,12 @@ def secret_remove(id: str, *, revision: int | None = None):
 
 
 def secret_revoke(
-    id: str, *, relation_id: int | None, app: str | None = None, unit: str | None = None
-):
+    id: str,
+    *,
+    relation_id: int | None = None,
+    app: str | None = None,
+    unit: str | None = None,
+) -> None:
     """Revoke access to a secret.
 
     For more details, see:
@@ -266,12 +275,16 @@ def secret_set(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['application', 'unit'] = 'application',
-):
+    owner: Literal['application', 'unit'] | None = None,
+) -> None:
     """Update an existing secret.
 
     For more details, see:
     `Juju | Hook commands | secret-set <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-set/>`_
+
+    .. deprecated:: 3.10.0
+        The ``owner`` argument has no effect, as Juju ignores the owner when
+        updating a secret, so it is not passed to ``secret-set``.
 
     Args:
         id: The ID of the secret to update.
@@ -280,8 +293,16 @@ def secret_set(
         description: The secret description.
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
-        owner: The owner of the secret, either the application or the unit.
+        owner: Deprecated, has no effect, and is not passed to Juju. The owner
+            set by :func:`secret_add` is kept.
     """
+    if owner is not None:
+        warnings.warn(
+            'The owner argument to secret_set has no effect, as Juju does not '
+            'change the owner of an existing secret.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
     args: list[str] = []
     if label is not None:
         args.extend(['--label', label])
@@ -294,15 +315,14 @@ def secret_set(
             args.extend(['--expire', datetime_to_rfc3339(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
-    args.extend(['--owner', owner])
     args.append(id)
 
     # Always use "key#file" arguments to provide the content to avoid secret data
     # ending up in the command line, where it may be logged and also is visible
     # via /proc.
     with tempfile.TemporaryDirectory() as tmp:
-        for k, v in (content or {}).items():
-            with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+        for i, (k, v) in enumerate((content or {}).items()):
+            with open(f'{tmp}/{i}', mode='w', encoding='utf-8') as f:
                 f.write(v)
-            args.append(f'{k}#file={tmp}/{k}')
+            args.append(f'{k}#file={tmp}/{i}')
         run('secret-set', *args)
