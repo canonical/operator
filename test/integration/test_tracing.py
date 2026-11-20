@@ -140,7 +140,7 @@ def get_spans(endpoint: tuple[str, int], since: float = 0, https: bool = False):
             for resource in response.json()['trace']['resourceSpans']:
                 for scope in resource['scopeSpans']:
                     for span in scope['spans']:
-                        span['resource'] = resource['resource']
+                        span['resource'] = resource.get('resource', {})
                         spans.append(span)
     return spans
 
