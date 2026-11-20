@@ -36,7 +36,7 @@ This is a mature, production framework used by thousands of charms. Changes requ
 
 ### Harness and the Testing Fakes
 - Harness (`ops/_private/harness.py`) is in maintenance mode: only change it for security fixes, significant bugs, or code it shares with Scenario
-- Don't open PRs that only change Harness behaviour - they will be closed
+- If Harness differs from Juju or Pebble in a way that breaks a real charm's tests, open an issue naming the charm before opening a PR; PRs that only change Harness behaviour without one will be closed
 - When changing how Scenario or Harness simulates Juju or Pebble, cite the real behaviour in the PR description: a permalink to the Juju or Pebble source at a specific commit, or output from a real controller or Pebble server
 
 ## When Making Changes
