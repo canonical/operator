@@ -3696,19 +3696,20 @@ class _TestingPebbleClient:
         dir_path = self._root / path[1:]
         if not dir_path.parent.exists() and not make_parents:
             raise pebble.PathError('not-found', f'parent directory not found: {path}')
-        # A permissions argument of 0 is valid, so only fall back to the
-        # default when it is None, as real Pebble does.
-        mode = 0o755 if permissions is None else permissions
+        if not dir_path.parent.exists() and make_parents:
+            self.make_dir(
+                os.path.dirname(path),
+                make_parents=True,
+                permissions=permissions,
+                user_id=user_id,
+                user=user,
+                group_id=group_id,
+                group=group,
+            )
         try:
-            to_create = [dir_path]
-            while not to_create[-1].parent.exists():
-                to_create.append(to_create[-1].parent)
-            # Create every missing directory before changing any mode: a parent
-            # with mode 0 cannot be traversed to create its child.
-            for new_dir in reversed(to_create):
-                new_dir.mkdir()
-            for new_dir in to_create:
-                os.chmod(new_dir, mode)
+            permissions = permissions if permissions else 0o755
+            dir_path.mkdir()
+            os.chmod(dir_path, permissions)
         except FileExistsError:
             if not make_parents:
                 raise pebble.PathError(

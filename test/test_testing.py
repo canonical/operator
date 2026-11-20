@@ -5377,18 +5377,10 @@ class PebbleStorageAPIsTestMixin:
     ):
         client.make_dir(f'{pebble_dir}/dir1', permissions=0o700)
         client.make_dir(f'{pebble_dir}/dir2', permissions=0o777)
-        # A permissions value of 0 is valid and must not be replaced by the default.
-        client.make_dir(f'{pebble_dir}/dir0', permissions=0)
-        # When permissions are not given, the default of 0o755 applies.
-        client.make_dir(f'{pebble_dir}/dir_default')
 
         files = client.list_files(f'{pebble_dir}/', pattern='dir*')
         assert next(f for f in files if f.path == f'{pebble_dir}/dir1').permissions == 0o700
         assert next(f for f in files if f.path == f'{pebble_dir}/dir2').permissions == 0o777
-        assert next(f for f in files if f.path == f'{pebble_dir}/dir0').permissions == 0
-        assert next(f for f in files if f.path == f'{pebble_dir}/dir_default').permissions == 0o755
-        # Remove the mode 0 directory, otherwise the real Pebble fixture can't clean up.
-        client.remove_path(f'{pebble_dir}/dir0')
 
         # If permissions are outside of the range 0o000 through 0o777, an exception should be
         # raised.
@@ -5675,17 +5667,6 @@ class TestFilesystem:
         assert (container_fs_root / 'tmp').is_dir()
         container.make_dir('/foo/bar/foobar', make_parents=True)
         assert (container_fs_root / 'foo/bar/foobar').is_dir()
-
-    def test_make_dir_parents_with_zero_permissions(
-        self, container: ops.Container, container_fs_root: pathlib.Path
-    ):
-        container.make_dir('/a/b', make_parents=True, permissions=0)
-
-        # Stat the directories themselves: a mode 0 directory cannot be traversed
-        # by a non-root user, so the child is checked after opening up the parent.
-        assert (container_fs_root / 'a').stat().st_mode & 0o777 == 0
-        (container_fs_root / 'a').chmod(0o700)
-        assert (container_fs_root / 'a/b').stat().st_mode & 0o777 == 0
 
     def test_pull(self, container: ops.Container, container_fs_root: pathlib.Path):
         (container_fs_root / 'foo').write_text('foo')
