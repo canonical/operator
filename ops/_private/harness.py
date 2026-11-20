@@ -3549,7 +3549,8 @@ class _TestingPebbleClient:
         self._check_connection()
         services = self._render_services()
         infos: list[pebble.ServiceInfo] = []
-        if names is None:
+        # Pebble treats an empty list of names the same as no names: return all services.
+        if not names:
             names = sorted(services.keys())
         for name in sorted(names):
             try:
@@ -3907,10 +3908,11 @@ class _TestingPebbleClient:
     ) -> list[pebble.CheckInfo]:
         if names is not None:
             names = frozenset(names)
+        # Pebble treats an empty set of names the same as no names: return all checks.
         return [
             info
             for info in self._check_infos.values()
-            if (level is None or level == info.level) and (names is None or info.name in names)
+            if (level is None or level == info.level) and (not names or info.name in names)
         ]
 
     def start_checks(self, names: list[str]) -> list[str]:
@@ -4060,16 +4062,17 @@ class _TestingPebbleClient:
         types: set[str] | None = None,
         keys: set[str] | None = None,
     ) -> bool:
-        # Same logic as NoticeFilter.matches in Pebble.
+        # Same logic as NoticeFilter.matches in Pebble, which treats an empty
+        # list of types or keys the same as no filter.
         # For example: if user_id filter is set and it doesn't match, return False.
         if user_id is not None and not (notice.user_id is None or user_id == notice.user_id):
             return False
         notice_type = (
             notice.type.value if isinstance(notice.type, pebble.NoticeType) else notice.type
         )
-        if types is not None and notice_type not in types:
+        if types and notice_type not in types:
             return False
-        if keys is not None and notice.key not in keys:
+        if keys and notice.key not in keys:
             return False
         return True
 
