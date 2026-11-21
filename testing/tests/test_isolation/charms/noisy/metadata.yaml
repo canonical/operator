@@ -1,0 +1,3 @@
+name: noisy
+summary: Writes to file descriptor 1.
+description: Writes to file descriptor 1.
