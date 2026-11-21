@@ -3601,10 +3601,13 @@ def _format_action_result_dict(
             # technically a type error, but for consistency with the
             # other exceptions raised on key validation...
             raise ValueError(f'invalid key {key!r}; must be a string')
-        if not all(_ACTION_RESULT_KEY_SEGMENT_REGEX.fullmatch(part) for part in key.split('.')):
-            raise ValueError(
-                f"key {key!r} is invalid: must be similar to 'key', 'some-key2', or 'some.key'"
-            )
+        for part in key.split('.'):
+            if not _ACTION_RESULT_KEY_SEGMENT_REGEX.fullmatch(part):
+                raise ValueError(
+                    f'key {key!r} is invalid: part {part!r} must start and end with a '
+                    'lowercase letter or digit, and contain only lowercase letters, '
+                    "digits, and hyphens (similar to 'key', 'some-key2', or 'some.key')"
+                )
 
         if parent_key:
             key = f'{parent_key}.{key}'

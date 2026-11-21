@@ -775,6 +775,11 @@ def test_invalid_action_results(
         charm.on.foo_bar_action.emit(id='1')
 
 
+def test_invalid_action_result_key_names_part():
+    with pytest.raises(ValueError, match=r"key 'a\.b-\.c' is invalid: part 'b-'"):
+        ops.model._format_action_result_dict({'a.b-.c': 'd'})
+
+
 @pytest.mark.parametrize(
     'event,kwargs',
     [
