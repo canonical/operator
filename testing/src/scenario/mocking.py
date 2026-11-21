@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import datetime
+import errno
 import functools
 import inspect
 import io
@@ -249,13 +250,27 @@ class _MockModelBackend(_ModelBackend):
             raise RelationNotFoundError()
         return relation
 
-    def _get_secret(self, id: str | None = None, label: str | None = None):
-        if JujuVersion(self._context.juju_version) < '3.0.2':
-            raise ModelError(
-                'secrets are only available in juju >= 3.0.2.'
-                'Set ``Context.juju_version`` to 3.0.2+ to use them.',
+    def _check_secrets_available(self, command: str):
+        version = JujuVersion(self._context.juju_version)
+        if version.has_secrets:
+            return
+        if version.major < 3:
+            # The secret hook commands don't exist, so ops raises FileNotFoundError,
+            # as it does in production.
+            raise FileNotFoundError(
+                errno.ENOENT,
+                f'No such file or directory (Juju {version} has no secret hook commands: '
+                'set Context.juju_version to 3.0.3 or later to use secrets)',
+                command,
             )
+        # The hook commands exist, but they changed in 3.0.2 and 3.0.3, and ops
+        # only supports secrets from 3.0.3.
+        raise ModelError(
+            f'secrets in Juju {version} work differently from later versions, so ops.testing '
+            'only simulates them from Juju 3.0.3: set Context.juju_version to 3.0.3 or later',
+        )
 
+    def _get_secret(self, id: str | None = None, label: str | None = None):
         canonicalize_id = Secret_Ops._canonicalize_id
 
         if id:
@@ -504,6 +519,7 @@ class _MockModelBackend(_ModelBackend):
         rotate: SecretRotate | None = None,
         owner: Literal['unit', 'application'] | None = None,
     ) -> str:
+        self._check_secrets_available('secret-add')
         from .state import Secret
 
         secret = Secret(
@@ -548,6 +564,7 @@ class _MockModelBackend(_ModelBackend):
         refresh: bool = False,
         peek: bool = False,
     ) -> dict[str, str]:
+        self._check_secrets_available('secret-get')
         secret = self._get_secret(id, label)
         # If both the id and label are provided, then update the label.
         if id is not None and label is not None:
@@ -574,6 +591,7 @@ class _MockModelBackend(_ModelBackend):
         label: str | None = None,
     ) -> SecretInfo:
         try:
+            self._check_secrets_available('secret-info-get')
             secret = self._get_secret(id, label)
             # If both the id and label are provided, then update the label.
             if id is not None and label is not None:
@@ -610,6 +628,7 @@ class _MockModelBackend(_ModelBackend):
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
     ):
+        self._check_secrets_available('secret-set')
         secret = self._get_secret(id, label)
         self._check_can_manage_secret(secret)
 
@@ -632,6 +651,7 @@ class _MockModelBackend(_ModelBackend):
 
     @_hook_command('secret-grant', 'id', 'relation_id', 'unit')
     def secret_grant(self, id: str, relation_id: int, *, unit: str | None = None):
+        self._check_secrets_available('secret-grant')
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
 
@@ -645,6 +665,7 @@ class _MockModelBackend(_ModelBackend):
 
     @_hook_command('secret-revoke', 'id', 'relation_id', 'unit')
     def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None):
+        self._check_secrets_available('secret-revoke')
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
 
@@ -660,6 +681,7 @@ class _MockModelBackend(_ModelBackend):
 
     @_hook_command('secret-remove', 'id', 'revision')
     def secret_remove(self, id: str, *, revision: int | None = None):
+        self._check_secrets_available('secret-remove')
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
 
