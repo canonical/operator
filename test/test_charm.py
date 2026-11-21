@@ -748,6 +748,9 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
         {'a.': 'b'},
         {'.a': 'b'},
         {'a': {'b..c': 'd'}},
+        # Python's $ would match before this trailing newline, but Juju's doesn't.
+        {'a\n': 'b'},
+        {'a': {'b\n': 'c'}},
     ],
 )
 def test_invalid_action_results(
