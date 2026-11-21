@@ -107,6 +107,28 @@ def test_sub_binding(mycharm: type[ops.CharmBase]):
         assert binding is not None
         assert str(binding.network.bind_address) == '4.4.4.4'
 
+        relation = mgr.charm.model.get_relation('bar')
+        assert relation is not None
+        binding = mgr.charm.model.get_binding(relation)
+        assert binding is not None
+        assert str(binding.network.bind_address) == '4.4.4.4'
+
+
+def test_sub_binding_default_network(mycharm: type[ops.CharmBase]):
+    ctx: Context[ops.CharmBase] = Context(
+        mycharm,
+        meta={
+            'name': 'foo',
+            'requires': {'bar': {'interface': 'foo', 'scope': 'container'}},
+        },
+    )
+
+    state = State(relations=[SubordinateRelation('bar')])
+    with ctx(ctx.on.update_status(), state) as mgr:
+        binding = mgr.charm.model.get_binding('bar')
+        assert binding is not None
+        assert str(binding.network.bind_address) == '192.0.2.0'
+
 
 def test_no_relation_error(mycharm: type[ops.CharmBase]):
     """Attempting to call get_binding on a non-existing relation -> RelationNotFoundError"""
