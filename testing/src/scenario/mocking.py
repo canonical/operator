@@ -590,8 +590,8 @@ class _MockModelBackend(_ModelBackend):
         id: str | None = None,
         label: str | None = None,
     ) -> SecretInfo:
-        self._check_secrets_available('secret-info-get')
         try:
+            self._check_secrets_available('secret-info-get')
             secret = self._get_secret(id, label)
             # If both the id and label are provided, then update the label.
             if id is not None and label is not None:
