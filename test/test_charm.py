@@ -780,6 +780,16 @@ def test_invalid_action_result_key_names_part():
         ops.model._format_action_result_dict({'a.b-.c': 'd'})
 
 
+@pytest.mark.parametrize('key', ['stdout', 'stderr', 'stdout-encoding', 'stderr-encoding'])
+def test_reserved_action_result_keys_left_to_juju(key: str):
+    # Juju rejects the reserved names with an error, which reaches the charm
+    # as a ModelError, so ops doesn't check them itself.
+    assert ops.model._format_action_result_dict({key: 'x', 'a': {key: 'y'}}) == {
+        key: 'x',
+        f'a.{key}': 'y',
+    }
+
+
 @pytest.mark.parametrize(
     'event,kwargs',
     [
