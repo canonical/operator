@@ -12,7 +12,7 @@ See first:
 - {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
 
 ```{note}
-Added in Juju 3.0.2.
+Ops supports secrets from Juju 3.0.3.
 ```
 
 This document shows how to use secrets in a charm -- both when the charm is the secret owner as well as when it is merely an observer.
