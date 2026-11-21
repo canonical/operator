@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import collections
 import datetime
+from collections.abc import Callable
 from typing import Literal, cast
 from unittest.mock import ANY
 
@@ -180,6 +181,32 @@ def test_secrets_juju_before_3_0_3(juju_version: str):
     with ctx(ctx.on.update_status(), State()) as mgr:
         with pytest.raises(ops.ModelError, match=r'3\.0\.3'):
             mgr.charm.unit.add_secret({'foo': 'bar'})
+        mgr.run()
+
+
+_SECRET_COMMANDS: dict[str, Callable[[ops.model._ModelBackend, str], object]] = {
+    'secret-add': lambda backend, id: backend.secret_add({'a': 'b'}),
+    'secret-get': lambda backend, id: backend.secret_get(id=id),
+    'secret-info-get': lambda backend, id: backend.secret_info_get(id=id),
+    'secret-set': lambda backend, id: backend.secret_set(id, content={'a': 'c'}),
+    'secret-grant': lambda backend, id: backend.secret_grant(id, 1),
+    'secret-revoke': lambda backend, id: backend.secret_revoke(id, 1),
+    'secret-remove': lambda backend, id: backend.secret_remove(id),
+}
+
+
+@pytest.mark.parametrize('command', _SECRET_COMMANDS)
+@pytest.mark.parametrize(
+    'juju_version,error', [('2.9.44', FileNotFoundError), ('3.0.2', ops.ModelError)]
+)
+def test_secret_commands_unsupported_juju_version(
+    command: str, juju_version: str, error: type[Exception]
+):
+    secret = Secret({'a': 'b'}, owner='unit')
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version=juju_version)
+    with ctx(ctx.on.update_status(), State(secrets={secret})) as mgr:
+        with pytest.raises(error):
+            _SECRET_COMMANDS[command](mgr.charm.model._backend, secret.id)
         mgr.run()
 
 
