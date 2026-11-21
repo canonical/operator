@@ -130,6 +130,7 @@ This API for testing was previously called 'Scenario'.
 .. autoclass:: ops.testing.errors.AlreadyEmittedError
 .. autoclass:: ops.testing.errors.ScenarioRuntimeError
 .. autoclass:: ops.testing.errors.UncaughtCharmError
+.. autoclass:: ops.testing.errors.HookCommitError
 .. autoclass:: ops.testing.errors.InconsistentScenarioError
 .. autoclass:: ops.testing.errors.StateValidationError
 .. autoclass:: ops.testing.errors.MetadataNotFoundError

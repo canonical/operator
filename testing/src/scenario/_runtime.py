@@ -21,7 +21,7 @@ from ops import JujuContext, pebble
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
 
-from .errors import NoObserverError, UncaughtCharmError
+from .errors import HookCommitError, NoObserverError, UncaughtCharmError
 from .logger import logger as scenario_logger
 from .state import (
     CharmType,
@@ -33,6 +33,7 @@ from .state import (
 if TYPE_CHECKING:  # pragma: no cover
     from ._ops_main_mock import Ops
     from .context import Context
+    from .mocking import _MockModelBackend
     from .state import Event, State, _CharmSpec
 
 logger = scenario_logger.getChild('runtime')
@@ -383,4 +384,9 @@ class Runtime(Generic[CharmType]):
 
         logger.info('event dispatched. done.')
         assert ops is not None
+        # Juju fails the hook when it commits the hook's changes, after the charm
+        # has finished, so this isn't a charm error and isn't wrapped as one.
+        backend = typing.cast('_MockModelBackend', ops._model_backend)
+        if backend._commit_errors:
+            raise HookCommitError(list(backend._commit_errors))
         context._set_output_state(ops.state)

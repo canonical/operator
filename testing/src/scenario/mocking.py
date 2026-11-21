@@ -183,6 +183,20 @@ class _MockModelBackend(_ModelBackend):
         self._event = event
         self._context = context
         self._charm_spec = charm_spec
+        # The IDs of the secrets that the charm has created in this hook.
+        self._added_secret_ids: set[str] = set()
+        # Why Juju would fail the hook when it commits the hook's changes, if it would.
+        self._commit_errors: list[str] = []
+        # The labels of the secrets the charm owned when the hook started. Juju
+        # creates a hook's secrets before it removes any, so removing one of these
+        # secrets in the hook doesn't free its label for a secret created in the
+        # same hook. Secrets the charm only observes don't count: their labels are
+        # consumer labels.
+        self._owned_labels_at_start = {
+            secret.label: secret.owner
+            for secret in state.secrets
+            if secret.owner is not None and secret.label is not None
+        }
 
     def opened_ports(self) -> set[Port_Ops]:
         return {
@@ -506,6 +520,25 @@ class _MockModelBackend(_ModelBackend):
     ) -> str:
         from .state import Secret
 
+        # secret-add's default owner is the application, so None needs the leader too.
+        if owner != 'unit' and not self.is_leader():
+            understandable_error = SecretNotFoundError(
+                'Only the leader unit can create an app-owned secret.',
+            )
+            # Charm-facing side: the error that Juju's secret-add gives.
+            raise ModelError('ERROR this unit is not the leader') from understandable_error
+
+        # Juju rejects a label that a secret created earlier in the same hook has,
+        # whatever its owner. A secret that has since been removed doesn't count.
+        if label is not None and any(
+            secret.id in self._added_secret_ids and secret.label == label
+            for secret in self._state.secrets
+        ):
+            raise ModelError(f'ERROR secret with label "{label}" already exists')
+        # A label that one of the charm's secrets from an earlier hook has is only
+        # rejected when Juju commits the hook's changes, so secret-add still succeeds.
+        existing_owner = None if label is None else self._owned_labels_at_start.get(label)
+
         secret = Secret(
             content,
             label=label,
@@ -518,7 +551,40 @@ class _MockModelBackend(_ModelBackend):
         secrets = set(self._state.secrets)
         secrets.add(secret)
         self._state._update_secrets(frozenset(secrets))
+        self._added_secret_ids.add(secret.id)
+        if existing_owner is not None:
+            self._commit_errors.append(
+                self._label_in_use_message(
+                    secret.id,
+                    label,
+                    app_owned=owner != 'unit',
+                    existing_app_owned=existing_owner == 'app',
+                )
+            )
         return secret.id
+
+    def _label_in_use_message(
+        self, secret_id: str, label: str | None, *, app_owned: bool, existing_app_owned: bool
+    ) -> str:
+        # The wording differs between Juju 3 and Juju 4.
+        if JujuVersion(self._context.juju_version).major < 4:
+            # Juju 3 checks a label against the other kind of owner first, with its own wording.
+            if app_owned and not existing_app_owned:
+                reason = f'secret label "{label}" for a unit of application "{self.app_name}"'
+            elif not app_owned and existing_app_owned:
+                reason = f'secret label "{label}" for application "{self.app_name}"'
+            else:
+                reason = f'secret with label "{label}"'
+            return f'cannot apply changes: creating secrets: {reason} already exists'
+        # The ID can be "secret:ID" or "secret://model-uuid/ID"; Juju's message has only the ID.
+        short_id = secret_id.rsplit('/', 1)[-1].rsplit(':', 1)[-1]
+        message = (
+            f'create secrets: creating secret "{short_id}": '
+            f'secret with label "{label}" already exists'
+        )
+        if app_owned:
+            message = f'executing leadership func: {message}'
+        return f'cannot apply changes: {message}'
 
     def _check_can_manage_secret(
         self,

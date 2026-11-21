@@ -31,6 +31,26 @@ class UncaughtCharmError(ScenarioRuntimeError):
     """
 
 
+class HookCommitError(ScenarioRuntimeError):
+    """Error raised when Juju would fail the hook while committing the charm's changes.
+
+    Juju applies most of the changes a charm makes, such as creating secrets, when
+    the hook ends, after the charm's code has finished. If Juju rejects them (for
+    example, a new secret has a label that another of the charm's secrets
+    already has), the hook fails, the unit goes into error, and none of those
+    changes are made. The charm itself can't catch this error, and
+    :meth:`ops.testing.Context.run` doesn't return an output state.
+
+    Attributes:
+        messages: The reason for each change that Juju would reject, in the
+            order the charm made the changes.
+    """
+
+    def __init__(self, messages: list[str]):
+        super().__init__('; '.join(messages))
+        self.messages = messages
+
+
 class InconsistentScenarioError(ScenarioRuntimeError):
     """Error raised when the combination of state and event is inconsistent."""
 
