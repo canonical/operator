@@ -1257,7 +1257,15 @@ class CheckInfo:
 
 @dataclasses.dataclass(frozen=True, init=False)
 class Container:
-    """A Kubernetes container where a charm's workload runs."""
+    """A Kubernetes container where a charm's workload runs.
+
+    The container's filesystem calls (``push``, ``pull``, ``list_files``,
+    ``make_dir`` and ``remove_path``) behave like a Pebble running as a
+    non-root user: permissions are enforced against the user running the
+    tests. For example, pushing into a directory created with mode ``0o555``
+    raises :class:`ops.pebble.PathError`, where a Pebble running as root would
+    succeed.
+    """
 
     name: str
     """Name of the container, as found in the charm metadata."""

@@ -14,6 +14,7 @@ from scenario import Context
 from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
 
 import ops
+import ops.testing
 from ops import CharmBase, Framework, pebble
 from ops.log import _get_juju_log_and_app_id
 
@@ -157,6 +158,105 @@ def test_fs_pull(tmp_path: pathlib.Path, make_dirs: bool):
         # nothing has changed
         out_purged = dataclasses.replace(out, stored_states=state.stored_states)
         assert not state_delta(out_purged, state)
+
+
+def test_fs_errors_match_real_pebble(tmp_path: pathlib.Path):
+    # _MockPebbleClient inherits the filesystem behaviour of
+    # _TestingPebbleClient, which mirrors real Pebble: a path below a
+    # regular file raises a PathError rather than a raw OSError, and
+    # removing a symlink unlinks it instead of failing or following it.
+    source_file = tmp_path / 'source.txt'
+    source_file.write_text('old')
+
+    def callback(self: ops.CharmBase):
+        container = self.unit.get_container('foo')
+        container.push('/file', 'x')
+
+        with pytest.raises(ops.pebble.PathError) as excinfo:
+            container.pull('/file/child')
+        assert excinfo.value.kind == 'generic-file-error'
+        assert 'not a directory' in excinfo.value.message
+
+        # A symlink created inside the container, not a Mount, is unlinked
+        # itself: its target is left alone.
+        container.make_dir('/dir')
+        fs_root = state.get_container('foo').get_filesystem(ctx)
+        (fs_root / 'link').symlink_to('dir')
+        container.remove_path('/link')
+        assert not container.exists('/link')
+        assert container.isdir('/dir')
+
+        # Pushing to a mounted file writes through to its source.
+        container.push('/config.yaml', 'new')
+        assert source_file.read_text() == 'new'
+
+    container = ops.testing.Container(
+        name='foo',
+        can_connect=True,
+        mounts={'cfg': ops.testing.Mount(location='/config.yaml', source=source_file)},
+    )
+    state = ops.testing.State(containers={container})
+    ctx = ops.testing.Context(
+        charm_type=Charm,
+        meta={'name': 'foo', 'containers': {'foo': {}}},
+    )
+    with ctx(ctx.on.start(), state=state) as mgr:
+        mgr.run()
+        callback(mgr.charm)
+
+
+def test_fs_mounts_behave_like_mount_points(tmp_path: pathlib.Path):
+    # Scenario Mounts model real mount points: pushing to a mounted file
+    # writes through to the source, mounted entries are listed as their
+    # target's type, and a mount point itself cannot be removed.
+    source_file = tmp_path / 'source.txt'
+    source_file.write_text('old')
+    source_dir = tmp_path / 'source-dir'
+    source_dir.mkdir()
+
+    def callback(self: ops.CharmBase):
+        container = self.unit.get_container('foo')
+
+        # Pushing to a mounted file updates the source in place.
+        container.push('/mounted-file', 'new')
+        assert source_file.read_text() == 'new'
+        with container.pull('/mounted-file') as f:
+            assert f.read() == 'new'
+
+        # Pushing inside a mounted directory writes through, too.
+        container.push('/mounted-dir/inner.txt', 'inner')
+        assert (source_dir / 'inner.txt').read_text() == 'inner'
+
+        # A mount point cannot be removed, with or without recursive.
+        for mount_path in ('/mounted-file', '/mounted-dir'):
+            for recursive in (False, True):
+                with pytest.raises(ops.pebble.PathError) as excinfo:
+                    container.remove_path(mount_path, recursive=recursive)
+                assert excinfo.value.kind == 'generic-file-error'
+                assert 'device or resource busy' in excinfo.value.message
+
+        # Mount points are listed as their target's type, not as symlinks.
+        types = {info.name: info.type for info in container.list_files('/')}
+        assert types['mounted-file'] == ops.pebble.FileType.FILE
+        assert types['mounted-dir'] == ops.pebble.FileType.DIRECTORY
+        # The mounted directory still lists its (mounted) contents.
+        assert [i.name for i in container.list_files('/mounted-dir')] == ['inner.txt']
+
+    container = ops.testing.Container(
+        name='foo',
+        can_connect=True,
+        mounts={
+            'file': ops.testing.Mount(location='/mounted-file', source=source_file),
+            'dir': ops.testing.Mount(location='/mounted-dir', source=source_dir),
+        },
+    )
+    ctx = ops.testing.Context(
+        charm_type=Charm,
+        meta={'name': 'foo', 'containers': {'foo': {}}},
+    )
+    with ctx(ctx.on.start(), state=ops.testing.State(containers={container})) as mgr:
+        mgr.run()
+        callback(mgr.charm)
 
 
 LS = """

@@ -14,13 +14,14 @@ import datetime
 import functools
 import inspect
 import io
-import shutil
+import os
 import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    BinaryIO,
     Literal,
     NoReturn,
     TextIO,
@@ -39,7 +40,7 @@ from ops import (
     SecretRotate,
     pebble,
 )
-from ops._private.harness import ExecArgs, _TestingPebbleClient
+from ops._private.harness import ExecArgs, ReadableBuffer, _TestingPebbleClient
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import Port as Port_Ops
 from ops.model import Secret as Secret_Ops  # lol
@@ -50,6 +51,7 @@ from ops.model import (
 )
 from ops.pebble import Client, ExecError
 
+from . import _pebble_filesystem
 from .errors import ActionMissingFromContextError
 from .logger import logger as scenario_logger
 from .state import (
@@ -884,7 +886,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                     container_name,
                 )
             # Path.rmdir will fail if root is nonempty
-            shutil.rmtree(container_root)
+            _pebble_filesystem.remove_tree(container_root)
 
         # initialize simulated filesystem
         container_root.mkdir(parents=True)
@@ -986,6 +988,93 @@ class _MockPebbleClient(_TestingPebbleClient):
         stopped = super().stop_checks(names)
         self._update_state_check_infos()
         return stopped
+
+    # The filesystem methods below override the Harness parent's
+    # implementations: ops.testing aligns with a non-root Pebble's behaviour,
+    # while Harness is deprecated and deliberately unchanged (see ops#2830
+    # and ops#2380). The implementation lives in `_pebble_filesystem`.
+
+    @property
+    def _mount_locations(self) -> frozenset[str]:
+        return frozenset(
+            os.path.normpath(str(mount.location)) for mount in self._container.mounts.values()
+        )
+
+    def pull(self, path: str | Path, *, encoding: str | None = 'utf-8') -> BinaryIO | TextIO:
+        self._check_connection()
+        path = str(path)
+        self._check_absolute_path(path)
+        return _pebble_filesystem.pull(self._root, path, encoding=encoding)
+
+    def push(
+        self,
+        path: str | Path,
+        source: ReadableBuffer,
+        *,
+        encoding: str = 'utf-8',
+        make_dirs: bool = False,
+        permissions: int | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
+    ) -> None:
+        self._check_connection()
+        path = str(path)
+        if permissions is not None and not (0 <= permissions <= 0o777):
+            raise pebble.PathError(
+                'generic-file-error', f'permissions not within 0o000 to 0o777: {permissions:#o}'
+            )
+        self._check_absolute_path(path)
+        _pebble_filesystem.push(
+            self._root,
+            path,
+            source,
+            encoding=encoding,
+            make_dirs=make_dirs,
+            permissions=permissions,
+            mount_locations=self._mount_locations,
+        )
+
+    def list_files(
+        self, path: str | Path, *, pattern: str | None = None, itself: bool = False
+    ) -> list[pebble.FileInfo]:
+        self._check_connection()
+        path = str(path)
+        self._check_absolute_path(path)
+        return _pebble_filesystem.list_files(
+            self._root, path, pattern=pattern, itself=itself, mount_locations=self._mount_locations
+        )
+
+    def make_dir(
+        self,
+        path: str | Path,
+        *,
+        make_parents: bool = False,
+        permissions: int | None = None,
+        user_id: int | None = None,
+        user: str | None = None,
+        group_id: int | None = None,
+        group: str | None = None,
+    ) -> None:
+        self._check_connection()
+        path = str(path)
+        if permissions is not None and not (0 <= permissions <= 0o777):
+            raise pebble.PathError(
+                'generic-file-error', f'permissions not within 0o000 to 0o777: {permissions:#o}'
+            )
+        self._check_absolute_path(path)
+        _pebble_filesystem.make_dir(
+            self._root, path, make_parents=make_parents, permissions=permissions
+        )
+
+    def remove_path(self, path: str | Path, *, recursive: bool = False) -> None:
+        self._check_connection()
+        path = str(path)
+        self._check_absolute_path(path)
+        _pebble_filesystem.remove_path(
+            self._root, path, recursive=recursive, mount_locations=self._mount_locations
+        )
 
     @property
     def _container(self) -> ContainerSpec:
