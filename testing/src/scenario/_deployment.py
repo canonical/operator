@@ -50,6 +50,10 @@ _DEFAULT_CLOUD_SPEC = CloudSpec(type='kubernetes', name='localhost')
 # Juju gives Kubernetes charms a cloud spec from this version on.
 _K8S_CLOUD_SPEC_JUJU_VERSION = '3.6.10'
 
+# Juju runs leader-settings-changed on non-leaders before this version, and
+# not from it on (Juju 4 removed leader settings).
+_NO_LEADER_SETTINGS_JUJU_VERSION = '4.0.0'
+
 # State fields that describe a unit's place in the model. Juju sets these
 # itself, so a state_template may not.
 _JUJU_OWNED_FIELDS = (
@@ -398,8 +402,9 @@ class Juju:
         """Deploy a charm, as ``juju deploy`` would.
 
         :meth:`settle` runs each unit's startup events: ``install``,
-        ``leader-elected`` on the leader and ``leader-settings-changed`` on the
-        other units, ``config-changed``, ``start``, and, in a Kubernetes
+        ``leader-elected`` on the leader and, before Juju 4,
+        ``leader-settings-changed`` on the other units, ``config-changed``,
+        ``start``, and, in a Kubernetes
         model, ``pebble-ready`` for each container. Each unit also gets a
         ``storage-attached`` for each storage instance. As in Juju, these
         come before ``install`` in a machine model, and after ``start`` in a
@@ -435,7 +440,9 @@ class Juju:
             trust: Whether the application has Juju trust, as with
                 ``juju deploy --trust``.
             num_units: How many units to deploy. Unit ``0`` is the leader.
-            juju_version: The Juju agent version to simulate.
+            juju_version: The Juju agent version to simulate. From Juju 4
+                on, there are no leader settings, so the units that aren't
+                the leader get no ``leader-settings-changed``.
 
         Raises:
             JujuError: if an application of this name already exists,
@@ -584,7 +591,12 @@ class Juju:
         for other in app._units.values():
             other._state = dataclasses.replace(other._state, planned_units=len(app._units))
         self._queues[app.name, unit_id] = deque()
-        leadership = 'leader_elected' if unit.is_leader else 'leader_settings_changed'
+        if unit.is_leader:
+            leadership = [_Queued(Event('leader_elected'))]
+        elif _has_leader_settings(app._charm.juju_version):
+            leadership = [_Queued(Event('leader_settings_changed'))]
+        else:
+            leadership = []
         attached = [
             _Queued(Event(f'{storage.name}_storage_attached', _storage=storage))
             for storage in storages
@@ -599,7 +611,7 @@ class Juju:
         startup = [] if is_k8s else attached
         startup += [
             _Queued(Event('install')),
-            _Queued(Event(leadership)),
+            *leadership,
             _Queued(Event('config_changed')),
             _Queued(Event('start')),
         ]
@@ -690,6 +702,11 @@ def _load_charm(
             f'{name!r}, ...}})).'
         ) from None
     return charm, dict(spec.meta), spec.config, spec.actions
+
+
+def _has_leader_settings(juju_version: str) -> bool:
+    """Whether a unit running this Juju version gets ``leader-settings-changed``."""
+    return JujuVersion(juju_version) < _NO_LEADER_SETTINGS_JUJU_VERSION
 
 
 def _default_config(config_schema: Mapping[str, Any] | None) -> dict[str, Any]:

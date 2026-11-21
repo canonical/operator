@@ -229,6 +229,55 @@ def test_deploy_runs_the_startup_sequence(juju: Juju):
     ]
 
 
+@pytest.mark.parametrize('juju_version', ['4.0.0', '4.0.9', '4.1.2'])
+def test_from_juju_4_non_leaders_get_no_leader_settings_changed(juju: Juju, juju_version: str):
+    deploy_mycharm(juju, num_units=3, juju_version=juju_version)
+    trace = juju.settle()
+    assert events(trace, 'myapp/0') == ['install', 'leader_elected', 'config_changed', 'start']
+    for unit in ('myapp/1', 'myapp/2'):
+        assert events(trace, unit) == ['install', 'config_changed', 'start']
+
+
+@pytest.mark.parametrize(
+    ('juju_version', 'leadership'),
+    [('3.6.14', ['leader_settings_changed']), ('4.0.9', [])],
+)
+def test_a_unit_added_later_gets_leader_settings_changed_only_before_juju_4(
+    juju: Juju, juju_version: str, leadership: list[str]
+):
+    app = juju.deploy(CharmSpec(WaitingCharm, meta=EXEC_META), juju_version=juju_version)
+    juju.settle()
+    juju.add_unit(app)
+    trace = juju.settle()
+    assert events(trace, 'execy/1') == [
+        'install',
+        *leadership,
+        'config_changed',
+        'start',
+        'workload_pebble_ready',
+    ]
+
+
+def test_from_juju_4_a_machine_model_keeps_the_rest_of_the_startup_order():
+    meta = {**META, 'storage': {'data': {'type': 'filesystem'}}}
+    with Juju(cloud_spec=CloudSpec(type='lxd', name='localhost')) as j:
+        j.deploy(spec(MyCharm, meta), num_units=2, juju_version='4.0.9')
+        trace = j.settle()
+    assert events(trace, 'myapp/0') == [
+        'data_storage_attached',
+        'install',
+        'leader_elected',
+        'config_changed',
+        'start',
+    ]
+    assert events(trace, 'myapp/1') == [
+        'data_storage_attached',
+        'install',
+        'config_changed',
+        'start',
+    ]
+
+
 @pytest.mark.parametrize(
     ('config', 'expected'), [(None, 'info'), ({'log_level': 'trace'}, 'trace')]
 )
