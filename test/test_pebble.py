@@ -2858,6 +2858,49 @@ bad path\r
             'files': [{'path': '/foo/bar'}],
         }
 
+    @pytest.mark.parametrize(
+        'path,escaped',
+        [
+            ('/foo/b"ar', b'/foo/b\\"ar'),
+            ('/foo/b\\ar', b'/foo/b\\\\ar'),
+            ('/foo/b\\"ar', b'/foo/b\\\\\\"ar'),
+            ('/foo/b\\/ar', b'/foo/b\\\\/ar'),
+            ('/foo/bar\\', b'/foo/bar\\\\'),
+        ],
+    )
+    def test_push_path_escaping(self, client: MockClient, path: str, escaped: bytes):
+        client.responses.append((
+            {'Content-Type': 'application/json'},
+            json.dumps({
+                'result': [{'path': path}],
+                'status': 'OK',
+                'status-code': 200,
+                'type': 'sync',
+            }).encode(),
+        ))
+
+        client.push(path, 'content')
+
+        headers, body = client.requests[0][3:]
+        chunks = list(body)
+        # Pebble reads the filename with Go's mime.ParseMediaType, where a
+        # backslash escapes the next character if it's a tspecial. This is the
+        # assertion that checks that: the email-based parse below unescapes only
+        # \\ and \", so it would round-trip the old escaping too.
+        assert b'; filename="' + escaped + b'"\r\n' in b''.join(chunks)
+        req, filename, content = self._parse_write_multipart(
+            headers['Content-Type'], (chunk for chunk in chunks)
+        )
+        assert filename == path
+        assert content == b'content'
+        assert req == {'action': 'write', 'files': [{'path': path}]}
+
+    @pytest.mark.parametrize('path', ['/foo/b\rar', '/foo/b\nar', '/foo/b\x00ar'])
+    def test_push_path_with_control_character(self, client: MockClient, path: str):
+        with pytest.raises(ValueError, match='CR, LF, or NUL'):
+            client.push(path, 'content')
+        assert client.requests == []
+
     def _parse_write_multipart(self, content_type: str, body: _bytes_generator):
         message = email.message.Message()
         message['Content-Type'] = content_type

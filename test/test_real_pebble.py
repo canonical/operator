@@ -214,8 +214,8 @@ class TestRealPebble:
     ):
         path = tmp_path / name
         content = 'foo\nbar\nbaz-42'
-        client.push(path, content)
-        with client.pull(path) as f:
+        client.push(str(path), content)
+        with client.pull(str(path)) as f:
             assert f.read() == content
 
     def test_push_pull(self, client: pebble.Client):
@@ -226,6 +226,26 @@ class TestRealPebble:
             data = f.read()
             assert data == content
         os.remove(fname)
+
+    @pytest.mark.parametrize(
+        'name',
+        [
+            'back\\slash',  # \s isn't a tspecial, so this worked before the fix too.
+            'back\\;slash',
+            'back\\"slash',
+            'back\\\\slash',
+            'trailing\\',
+        ],
+    )
+    def test_push_pull_awkward_name(
+        self, client: pebble.Client, tmp_path: pathlib.Path, name: str
+    ):
+        path = tmp_path / name
+        content = 'foo\nbar\nbaz-42'
+        client.push(str(path), content)
+        assert path.read_text() == content
+        with client.pull(str(path)) as f:
+            assert f.read() == content
 
     def test_exec_timeout(self, client: pebble.Client):
         process = client.exec(['sleep', '0.2'], timeout=0.1)

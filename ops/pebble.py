@@ -2943,7 +2943,13 @@ class Client:
         Raises:
             PathError: If there was an error writing the file to the path; for example, if the
                 destination path doesn't exist and ``make_dirs`` is not used.
+            ValueError: If the path contains a carriage return, line feed, or null
+                character, which can't be sent to Pebble.
         """
+        # These would end the filename early in the multipart header, and Pebble
+        # would reject the request with an error that doesn't mention the path.
+        if any(c in path for c in '\r\n\x00'):
+            raise ValueError(f'cannot push to a path containing CR, LF, or NUL: {path!r}')
         with tracer.start_as_current_span('pebble push') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
@@ -3000,7 +3006,11 @@ class Client:
         else:
             source_io: _AnyStrFileLikeIO = source  # type: ignore
         boundary = binascii.hexlify(os.urandom(16))
-        path_escaped = path.replace('"', '\\"').encode('utf-8')
+        # Pebble reads this with Go's mime.ParseMediaType, where a backslash
+        # escapes the next character if it's a tspecial. Escape \ and " as Go's
+        # multipart.Writer does. It also percent-encodes CR and LF, which can't
+        # be undone, so push() refuses those instead.
+        path_escaped = path.replace('\\', '\\\\').replace('"', '\\"').encode('utf-8')
         content_type = f'multipart/form-data; boundary="{boundary.decode("utf-8")}"'
 
         def generator() -> Generator[bytes, None, None]:
