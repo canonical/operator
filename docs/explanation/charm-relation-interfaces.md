@@ -3,14 +3,14 @@
 
 See also: {ref}`manage-interfaces`
 
-An interface definition records what a Juju relation interface means. It describes what providers and requirers of the interface are expected to do, and the data they exchange. It is the source of truth for the data and behaviour of both sides of a relation.
+An interface definition records what a Juju relation interface means. It's the source of truth for what providers and requirers of the interface are expected to do, and for the data they exchange.
 
 Juju interfaces are untyped. For Juju to consider two charms compatible, the interface names of the two endpoints only need to be the same string. Two charms could have incompatible implementations of two different relations that happen to share a name. Keeping interface definitions in a single, shared location prevents this, and avoids a sprawl of subtly different interfaces with the same purpose.
 
 Interface definitions are part of {external+charmlibs:doc}`Charmlibs <index>`. To browse the interfaces that already exist, see [Interfaces on Charmhub](https://charmhub.io/interfaces) or the {external+charmlibs:doc}`interface specifications <reference/interfaces>` in the Charmlibs documentation.
 
 ```{note}
-Interface definitions used to live in the `canonical/charm-relation-interfaces` repository, which is now archived. Contribute new interfaces and updates to `charmlibs` instead.
+Interface definitions used to live in the `canonical/charm-relation-interfaces` repository, which is now archived. Contribute new interfaces and updates to Charmlibs instead.
 ```
 
 ## Using interfaces
