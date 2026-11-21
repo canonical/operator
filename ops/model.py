@@ -3595,7 +3595,9 @@ class SecretNotFoundError(ModelError):
     """Raised when the specified secret does not exist."""
 
 
-_ACTION_RESULT_KEY_REGEX = re.compile(r'^[a-z0-9](([a-z0-9-.]+)?[a-z0-9])?$')
+# Juju checks each dot-separated part of an action result key against this,
+# so an empty part (from a doubled, leading or trailing dot) is invalid.
+_ACTION_RESULT_KEY_SEGMENT_REGEX = re.compile(r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?')
 
 
 def _format_action_result_dict(
@@ -3638,10 +3640,13 @@ def _format_action_result_dict(
             # technically a type error, but for consistency with the
             # other exceptions raised on key validation...
             raise ValueError(f'invalid key {key!r}; must be a string')
-        if not _ACTION_RESULT_KEY_REGEX.match(key):
-            raise ValueError(
-                f"key {key!r} is invalid: must be similar to 'key', 'some-key2', or 'some.key'"
-            )
+        for part in key.split('.'):
+            if not _ACTION_RESULT_KEY_SEGMENT_REGEX.fullmatch(part):
+                raise ValueError(
+                    f'key {key!r} is invalid: part {part!r} must start and end with a '
+                    'lowercase letter or digit, and contain only lowercase letters, '
+                    "digits, and hyphens (similar to 'key', 'some-key2', or 'some.key')"
+                )
 
         if parent_key:
             key = f'{parent_key}.{key}'

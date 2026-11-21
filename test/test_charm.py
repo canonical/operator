@@ -741,6 +741,16 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
         {'a': {(1, 2): 'c'}},
         {'a': {None: 'c'}},
         {'aBc': 'd'},
+        # Juju checks each dot-separated part of the key.
+        {'a..b': 'c'},
+        {'a-.c': 'd'},
+        {'x.-y': 'z'},
+        {'a.': 'b'},
+        {'.a': 'b'},
+        {'a': {'b..c': 'd'}},
+        # Python's $ would match before this trailing newline, but Juju's doesn't.
+        {'a\n': 'b'},
+        {'a': {'b\n': 'c'}},
     ],
 )
 def test_invalid_action_results(
@@ -763,6 +773,21 @@ def test_invalid_action_results(
     charm.res = bad_res
     with pytest.raises(ValueError):
         charm.on.foo_bar_action.emit(id='1')
+
+
+def test_invalid_action_result_key_names_part():
+    with pytest.raises(ValueError, match=r"key 'a\.b-\.c' is invalid: part 'b-'"):
+        ops.model._format_action_result_dict({'a.b-.c': 'd'})
+
+
+@pytest.mark.parametrize('key', ['stdout', 'stderr', 'stdout-encoding', 'stderr-encoding'])
+def test_reserved_action_result_keys_left_to_juju(key: str):
+    # Juju rejects the reserved names with an error, which reaches the charm
+    # as a ModelError, so ops doesn't check them itself.
+    assert ops.model._format_action_result_dict({key: 'x', 'a': {key: 'y'}}) == {
+        key: 'x',
+        f'a.{key}': 'y',
+    }
 
 
 @pytest.mark.parametrize(
