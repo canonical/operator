@@ -93,6 +93,7 @@ def test_sub_binding(mycharm: type[ops.CharmBase]):
         mycharm,
         meta={
             'name': 'foo',
+            'subordinate': True,
             'requires': {'bar': {'interface': 'foo', 'scope': 'container'}},
         },
     )
@@ -119,6 +120,7 @@ def test_sub_binding_default_network(mycharm: type[ops.CharmBase]):
         mycharm,
         meta={
             'name': 'foo',
+            'subordinate': True,
             'requires': {'bar': {'interface': 'foo', 'scope': 'container'}},
         },
     )

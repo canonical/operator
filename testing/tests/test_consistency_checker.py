@@ -941,7 +941,11 @@ def test_networks_consistency():
         Event('start'),
         _CharmSpec(
             MyCharm,
-            meta={'name': 'sub', 'requires': {'foo': {'interface': 'bar', 'scope': 'container'}}},
+            meta={
+                'name': 'sub',
+                'subordinate': True,
+                'requires': {'foo': {'interface': 'bar', 'scope': 'container'}},
+            },
         ),
     )
 
