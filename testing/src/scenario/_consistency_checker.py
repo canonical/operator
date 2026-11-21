@@ -170,6 +170,7 @@ def check_event_consistency(
     event: Event,
     charm_spec: _CharmSpec[CharmType],
     state: State,
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the internal consistency of the ``Event`` data structure.
@@ -203,7 +204,7 @@ def check_event_consistency(
         _check_workload_event(charm_spec, event, state, errors, warnings)
 
     if event._is_action_event:
-        _check_action_event(charm_spec, event, state, errors, warnings)
+        _check_action_event(charm_spec, event, state, juju_version, errors, warnings)
 
     if event._is_storage_event:
         _check_storage_event(charm_spec, event, state, errors, warnings)
@@ -277,6 +278,7 @@ def _check_action_event(
     charm_spec: _CharmSpec[CharmType],
     event: Event,
     state: State,
+    juju_version: JujuVersion,
     errors: list[str],
     warnings: list[str],
 ):
@@ -299,7 +301,7 @@ def _check_action_event(
         )
         return
 
-    _check_action_param_types(charm_spec, action, errors, warnings)
+    _check_action_param_types(charm_spec, action, juju_version, errors, warnings)
 
 
 def _check_storage_event(
@@ -338,6 +340,7 @@ def _check_storage_event(
 def _check_action_param_types(
     charm_spec: _CharmSpec[CharmType],
     action: _Action,
+    juju_version: JujuVersion,
     errors: list[str],
     warnings: list[str],
 ):
@@ -376,12 +379,25 @@ def _check_action_param_types(
                 f'Cannot consistency-check.',
             )
 
+    # The default in Juju 4 is False. The default in earlier Juju versions is True.
+    declared_additional_properties = action_spec.get('additionalProperties')
+    if declared_additional_properties is None:
+        additional_properties = juju_version < '4.0.0'
+    else:
+        additional_properties = declared_additional_properties
     for provided_param_name, provided_param_value in action.params.items():
         if provided_param_name not in action_params:
-            errors.append(
-                f'param {provided_param_name} is not a valid parameter for {action.name}: '
-                'missing from action specification',
-            )
+            if not additional_properties:
+                errors.append(
+                    f'param {provided_param_name} is not a valid parameter for {action.name}: '
+                    'missing from action specification',
+                )
+            elif declared_additional_properties is None:
+                warnings.append(
+                    f'param {provided_param_name} is not declared for {action.name}. Juju '
+                    'accepts it only because `additionalProperties` is not set, and Juju 4 '
+                    'will reject it. Set `additionalProperties` in the action specification.',
+                )
             continue
         expected_type = expected_param_type.get(provided_param_name)
         if expected_type is None:
