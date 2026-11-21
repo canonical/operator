@@ -163,6 +163,58 @@ def test_action_continues_after_fail():
     assert ctx.action_results == {'initial': 'result', 'final': 'result'}
 
 
+def test_action_set_stores_a_copy(mycharm: type[CharmBase]):
+    seen: list[dict[str, Any]] = []
+
+    def handle_evt(charm: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        results = {'a': '1'}
+        evt.set_results(results)
+        evt.set_results({'b': '2'})
+        # The second call must not have mutated the charm's own dict.
+        seen.append(dict(results))
+        # A later change to the charm's dict must not leak into the results.
+        results['c'] = '3'
+
+    mycharm._evt_handler = handle_evt  # type: ignore
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    ctx.run(ctx.on.action('foo'), State())
+
+    # The second set_results call did not mutate the charm's dict.
+    assert seen[0] == {'a': '1'}
+    # The recorded results contain the values from both calls, and only those.
+    assert ctx.action_results == {'a': '1', 'b': '2'}
+
+
+def test_action_set_results_shared_dict_survives_context_reuse():
+    """Reusing a Context must not empty a results dict the charm still holds."""
+    # A dict the charm passes to set_results on every run, as a charm that
+    # keeps a module-level results dict would do.
+    shared_results = {'a': '1'}
+
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_action, self._on_foo_action)
+
+        def _on_foo_action(self, event: ActionEvent):
+            event.set_results(shared_results)
+
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    ctx.run(ctx.on.action('foo'), State())
+    assert shared_results == {'a': '1'}
+    assert ctx.action_results == {'a': '1'}
+
+    # Not recommended, but run another action in the same context.
+    ctx.run(ctx.on.action('foo'), State())
+    # Clearing the recorded results at the start of the second run must not
+    # empty the charm's dict, which is still the same object.
+    assert shared_results == {'a': '1'}
+    assert ctx.action_results == {'a': '1'}
+
+
 def test_action_event_has_id(mycharm: type[CharmBase]):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
