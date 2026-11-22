@@ -2832,8 +2832,8 @@ class Client:
     def get_services(self, names: Iterable[str] | None = None) -> list[ServiceInfo]:
         """Get the service status for the configured services.
 
-        If names is specified, only fetch the service status for the services
-        named.
+        If names is specified and non-empty, only fetch the service status for
+        the services named.
         """
         with self._start_span('pebble get_services') as span:
             query = None
@@ -3550,8 +3550,8 @@ class Client:
         Args:
             level: Optional check level to query for (default is to fetch
                 checks with any level).
-            names: Optional list of check names to query for (default is to
-                fetch all checks).
+            names: Optional list of check names to query for. If not specified
+                or empty, fetch all checks.
 
         Returns:
             List of :class:`CheckInfo` objects.
@@ -3668,8 +3668,10 @@ class Client:
                 notices for the current user).
             user_id: Filter for notices for the specified user, including
                 public notices (only works for Pebble admins).
-            types: Filter for notices with any of the specified types.
-            keys: Filter for notices with any of the specified keys.
+            types: Filter for notices with any of the specified types. If
+                empty, do not filter by type.
+            keys: Filter for notices with any of the specified keys. If empty,
+                do not filter by key.
         """
         with self._start_span('pebble get_notices') as span:
             query: dict[str, str | list[str]] = {}
