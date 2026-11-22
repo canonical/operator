@@ -62,19 +62,6 @@ _paths = st.lists(
     max_size=50,
 ).map(lambda chars: '/' + ''.join(chars))
 
-# A known problem these tests found, kept out of the general strategies so
-# that the properties stay green; it has its own xfail test below.
-#
-# - push: _encode_multipart escapes '"' but not '\', and Go's
-#   mime.ParseMediaType (which Pebble uses) treats '\' before a tspecial as an
-#   escape, so '\\' arrives as '\', '\/' as '/', and a trailing '\' makes the
-#   header unparsable.
-
-
-def _push_safe(path: str) -> bool:
-    # The closing quote follows the path, so a trailing backslash escapes it.
-    return not any(a == '\\' and b in _TSPECIALS for a, b in itertools.pairwise(path + '"'))
-
 
 def _go_escape(value: str) -> str:
     """Escape a parameter value the way Go's multipart.Writer does."""
@@ -265,7 +252,7 @@ def _encode_push(
 @example(metadata={}, path='/a"b', content=b'x', chunk_size=8)
 @given(
     metadata=st.dictionaries(st.text(), _json_values, max_size=4),
-    path=_paths.filter(_push_safe),
+    path=_paths,
     content=st.binary(max_size=2000),
     chunk_size=st.integers(min_value=1, max_value=64),
 )
@@ -306,11 +293,6 @@ def test_pull_path_non_ascii_or_trailing_whitespace(path: str):
         parser.remove_files()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="_encode_multipart doesn't escape '\\'; fixed by #2901",
-)
 @pytest.mark.parametrize('path', ['/srv/a\\\\b', '/srv/a\\/b', '/srv/a\\'])
 def test_push_path_with_backslash_before_tspecial(path: str):
     _, filename = _encode_push({}, path, b'data')
