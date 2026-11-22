@@ -4,6 +4,9 @@ name: ops Property Tests
 # gives that branch's pushes and pull requests the derandomised run.
 # GitHub only schedules workflows from the default branch, so the nightly run
 # is property-tests-nightly.yaml on main, which checks this branch out.
+# Both workflows merge main first, so the tests run against the code they
+# describe. A fix that lands on main then shows up here as an XPASS, without
+# a manual merge.
 on:
   push:
     branches:
@@ -26,7 +29,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      # A conflict fails the run, which says the branch needs merging by hand.
+      - name: Merge main
+        run: |
+          git fetch origin main
+          git merge --no-commit --no-ff FETCH_HEAD || {
+            echo "::error title=property-tests needs merging::main doesn't merge cleanly into property-tests; merge it by hand"
+            exit 1
+          }
+        env:
+          # git wants an identity even for a merge it doesn't commit.
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - run: uv tool install tox --with tox-uv
       - run: uv python install ${{ matrix.python-version }}

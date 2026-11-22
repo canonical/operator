@@ -62,43 +62,6 @@ _paths = st.lists(
     max_size=50,
 ).map(lambda chars: '/' + ''.join(chars))
 
-# Known problems these tests found, kept out of the general strategies so
-# that the properties stay green; each has its own xfail test below.
-#
-# - pull: _FilesParser reads the filename with the stdlib email parser, which
-#   decodes header bytes as ASCII (non-ASCII bytes become surrogate escapes)
-#   and strips trailing whitespace. Either way the name doesn't match the
-#   requested path, and Client.pull raises ProtocolError('path not expected').
-# - push: _encode_multipart escapes '"' but not '\', and Go's
-#   mime.ParseMediaType (which Pebble uses) treats '\' before a tspecial as an
-#   escape, so '\\' arrives as '\', '\/' as '/', and a trailing '\' makes the
-#   header unparsable.
-
-
-def _pull_safe(path: str) -> bool:
-    return path.isascii() and path == path.rstrip(' \t')
-
-
-# Pull paths are drawn from ASCII directly: filtering _paths with _pull_safe
-# would throw away most draws. Only paths with trailing whitespace are
-# filtered out.
-_pull_paths = (
-    st
-    .lists(
-        st.characters(min_codepoint=0x20, max_codepoint=0x7E)
-        | st.sampled_from(_TSPECIALS + ' \t'),
-        min_size=1,
-        max_size=50,
-    )
-    .map(lambda chars: '/' + ''.join(chars))
-    .filter(_pull_safe)
-)
-
-
-def _push_safe(path: str) -> bool:
-    # The closing quote follows the path, so a trailing backslash escapes it.
-    return not any(a == '\\' and b in _TSPECIALS for a, b in itertools.pairwise(path + '"'))
-
 
 def _go_escape(value: str) -> str:
     """Escape a parameter value the way Go's multipart.Writer does."""
@@ -167,7 +130,7 @@ def _pull_bodies(draw: st.DrawFn) -> tuple[str, bytes, str, bytes, dict[str, Any
     # The delimiter must not appear in the content (RFC 2046), and Pebble
     # picks a random boundary to make sure it doesn't.
     content = draw(st.binary(max_size=2000).filter(lambda c: delimiter not in c))
-    path = draw(_pull_paths)
+    path = draw(_paths)
     response = {
         'type': 'sync',
         'status-code': 200,
@@ -289,7 +252,7 @@ def _encode_push(
 @example(metadata={}, path='/a"b', content=b'x', chunk_size=8)
 @given(
     metadata=st.dictionaries(st.text(), _json_values, max_size=4),
-    path=_paths.filter(_push_safe),
+    path=_paths,
     content=st.binary(max_size=2000),
     chunk_size=st.integers(min_value=1, max_value=64),
 )
@@ -311,11 +274,6 @@ def test_push_encoding_round_trips(
 # ── what the properties found ───────────────────────────────────────────────
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason='the email parser mangles the filename; fixed by #2871',
-)
 @pytest.mark.parametrize('path', ['/srv/café', '/srv/file ', '/srv/file\t'])
 def test_pull_path_non_ascii_or_trailing_whitespace(path: str):
     boundary = 'b0undary'
@@ -335,11 +293,6 @@ def test_pull_path_non_ascii_or_trailing_whitespace(path: str):
         parser.remove_files()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="_encode_multipart doesn't escape '\\'; fixed by #2901",
-)
 @pytest.mark.parametrize('path', ['/srv/a\\\\b', '/srv/a\\/b', '/srv/a\\'])
 def test_push_path_with_backslash_before_tspecial(path: str):
     _, filename = _encode_push({}, path, b'data')
