@@ -67,8 +67,7 @@ runpy.run_module('scenario._isolated_worker', run_name='__main__', alter_sys=Tru
 
 def _worker_environ() -> dict[str, str]:
     environ = dict(os.environ)
-    # The charm's output is only kept if it's written before the worker is
-    # killed, and a block-buffered sys.stdout never is.
+    # Run unbuffered so that a charm's output is written before the worker is killed.
     environ['PYTHONUNBUFFERED'] = '1'
     # In a source checkout, the worker can only import scenario from here.
     # Installed, this is the test environment's site-packages, which would
