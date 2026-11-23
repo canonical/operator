@@ -364,6 +364,49 @@ relation = testing.SubordinateRelation(
 relation.remote_unit_name  # 'zookeeper/42'
 ```
 
+#### Unit addresses in the databags
+
+When a unit joins a relation, Juju writes the unit's addresses to its databag:
+`ingress-address` and `egress-subnets`, and on Juju 3 also `private-address`.
+In a unit test, these keys aren't in the databags of the input or output
+state. When the charm reads a unit databag, the testing framework adds any of
+these keys that the databag doesn't have:
+
+- This unit's addresses come from the `Network` for the relation's endpoint in
+  `State.networks`, or from the default `Network`. The databag and
+  `network-get` give the same address.
+- A remote unit's address is `203.0.113.<unit ID>`.
+- A peer unit's address is `198.51.100.<unit ID>`.
+- The unit ID wraps at 256, and a unit has the same address in every relation.
+- The remote unit in a `SubordinateRelation` has the same addresses as this
+  unit, because the principal unit is on the same machine.
+
+To give a unit a specific address, set the key in that unit's databag. A value
+in the state always wins. For example:
+
+```python
+relation = testing.Relation(
+    endpoint='db',
+    remote_units_data={0: {'ingress-address': '10.0.0.7'}},
+)
+```
+
+To change this unit's address, add a `Network` for the endpoint to
+`State.networks` instead.
+
+On Juju 4, Juju ignores the charm's changes to `ingress-address` and
+`egress-subnets` in its own unit databag. When the `Context` has a `juju_version` of
+4 or later, the testing framework does the same. The charm sees its
+own value for the rest of the event, but the change isn't in the output state.
+
+The testing framework differs from Juju 3 in a few ways:
+
+- Juju restores the keys after a `config-changed` event. The testing framework
+  keeps any value that the charm wrote, and puts back any key that the charm
+  deleted on the next run.
+- After the event, Juju's databag has the keys, but the output state only has
+  the keys that the test or the charm put there.
+
 (manage-relations-integration-tests)=
 ### Write integration tests
 
