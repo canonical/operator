@@ -764,9 +764,10 @@ def check_containers_consistency(
                     f'container {container.name!r} has a check {check.name!r} with a '
                     f"different 'startup' ({check.startup}) than the plan ({plan_check.startup}).",
                 )
-            # Scenario and Pebble allow None, collapsing to 3.
+            # Scenario and Pebble allow None, collapsing to 3. Pebble also treats a
+            # threshold of 0 in the plan as unset.
             check_threshold = 3 if check.threshold is None else check.threshold
-            plan_threshold = 3 if plan_check.threshold is None else plan_check.threshold
+            plan_threshold = plan_check.threshold or 3
             if check_threshold != plan_threshold:
                 errors.append(
                     f'container {container.name!r} has a check {check.name!r} with a '

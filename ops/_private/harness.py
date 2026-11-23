@@ -3245,9 +3245,8 @@ class _TestingPebbleClient:
                 continue
             info = self._check_infos.get(name)
             if info is None:
-                threshold = (
-                    self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
-                )
+                # Pebble treats a threshold of 0 as unset and uses the default.
+                threshold = check.threshold or self._DEFAULT_CHECK_THRESHOLD
                 info = pebble.CheckInfo(
                     name=name,
                     level=check.level,
@@ -3375,9 +3374,7 @@ class _TestingPebbleClient:
             if not info:
                 continue
             info.level = check.level
-            info.threshold = (
-                self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
-            )
+            info.threshold = check.threshold or self._DEFAULT_CHECK_THRESHOLD
             info.startup = check.startup
 
     def add_layer(
@@ -3480,9 +3477,8 @@ class _TestingPebbleClient:
                     if check.startup == pebble.CheckStartup.DISABLED
                     else pebble.CheckStatus.UP
                 )
-                threshold = (
-                    self._DEFAULT_CHECK_THRESHOLD if check.threshold is None else check.threshold
-                )
+                # Pebble treats a threshold of 0 as unset and uses the default.
+                threshold = check.threshold or self._DEFAULT_CHECK_THRESHOLD
                 info = pebble.CheckInfo(
                     name,
                     level=check.level,

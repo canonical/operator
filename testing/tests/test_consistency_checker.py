@@ -286,6 +286,23 @@ def test_checkinfo_matches_layer_with_defaults():
     )
 
 
+@pytest.mark.parametrize('threshold,consistent', [(3, True), (0, False)])
+def test_checkinfo_matches_layer_with_zero_threshold(threshold: int, consistent: bool):
+    # Pebble treats a threshold of 0 in the plan as unset, so it reports the
+    # default of 3 for this check, never 0.
+    layer = ops.pebble.Layer({
+        'checks': {'chk1': {'override': 'replace', 'threshold': 0, 'exec': {'command': 'echo'}}}
+    })
+    check = CheckInfo('chk1', startup=ops.pebble.CheckStartup.ENABLED, threshold=threshold)
+    container = Container('foo', check_infos={check}, layers={'base': layer})
+    asserter = assert_consistent if consistent else assert_inconsistent
+    asserter(
+        State(containers={container}),
+        Event('foo-pebble-ready', _container=container),
+        _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
+    )
+
+
 @pytest.mark.parametrize('suffix', sorted(_RELATION_EVENTS_SUFFIX))
 def test_evt_bad_relation_name(suffix: str):
     assert_inconsistent(

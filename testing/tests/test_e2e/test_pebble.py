@@ -791,6 +791,31 @@ def test_pebble_replan_checks():
     assert info_out.status == ops.pebble.CheckStatus.UP
 
 
+class ZeroThresholdCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['foo'].pebble_ready, self._on_pebble_ready)
+
+    def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
+        layer = ops.pebble.Layer({
+            'checks': {
+                'chk1': {'override': 'replace', 'threshold': 0, 'exec': {'command': 'true'}}
+            }
+        })
+        event.workload.add_layer('base', layer, combine=True)
+        event.workload.replan()
+
+
+def test_check_threshold_of_zero_defaults_to_three():
+    # Pebble treats a check threshold of 0 as unset, and reports the default of 3.
+    ctx = Context(ZeroThresholdCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
+    container = Container('foo', can_connect=True)
+    state_out = ctx.run(ctx.on.pebble_ready(container), State(containers={container}))
+    assert state_out.get_container('foo').get_check_info('chk1').threshold == 3
+    # The output state, with the threshold Pebble reports, is consistent.
+    ctx.run(ctx.on.update_status(), state_out)
+
+
 class CombineLayerCharm(ops.CharmBase):
     layer_name: str
     layer_dict: LayerDict
