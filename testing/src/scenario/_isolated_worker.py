@@ -5,9 +5,10 @@
 
 ``python -m scenario._isolated_worker`` reads messages from stdin (see
 ``_worker_protocol``) and writes a response to stdout for each one. The first
-message describes the charm. Each later one is an event and a ``State`` to
-run it on, and gets ``{"state": ...}`` or ``{"error": <traceback>}`` back. The
-charm is imported on the first event.
+message describes the charm. The worker imports it and responds with ``{}``,
+or with ``{"error": <traceback>}`` and exits. Each later message is an event
+and a ``State`` to run it on, and gets ``{"state": ...}`` or
+``{"error": <traceback>}`` back.
 """
 
 from __future__ import annotations
@@ -49,11 +50,12 @@ def load_charm_type(charm_source: pathlib.Path) -> type[ops.CharmBase]:
     return charm_types[0]
 
 
-def run(setup: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
+def run(
+    charm_type: type[ops.CharmBase], setup: dict[str, Any], request: dict[str, Any]
+) -> dict[str, Any]:
     """Run one request's event, and return the response."""
     ctx = Context(
-        # Imported on the first call; later calls find it in sys.modules.
-        load_charm_type(pathlib.Path(setup['charm_source'])),
+        charm_type,
         meta=setup['meta'],
         config=setup['config'],
         actions=setup['actions'],
@@ -82,9 +84,15 @@ def main() -> int:
         return 0
     # Ahead of the environment's own packages, so these win for the charm.
     sys.path[:0] = [entry for entry in setup['extra_sys_path'] if entry not in sys.path]
+    try:
+        charm_type = load_charm_type(pathlib.Path(setup['charm_source']))
+    except (Exception, SystemExit):
+        write_message({'error': traceback.format_exc()}, to=responses)
+        return 1
+    write_message({}, to=responses)
     while (request := read_message(requests)) is not None:
         try:
-            response = run(setup, request)
+            response = run(charm_type, setup, request)
         except (Exception, SystemExit):
             # SystemExit too, so a charm calling sys.exit doesn't end the worker.
             response = {'error': traceback.format_exc()}

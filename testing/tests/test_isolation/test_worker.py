@@ -115,12 +115,23 @@ def test_the_worker_gets_the_application_settings(workers: list[Worker]):
 
 
 def test_a_charm_that_raises_leaves_the_worker_running(workers: list[Worker]):
-    worker = Worker(CHARMS / 'alpha')  # Without confdep.
+    worker = Worker(CHARMS / 'hardexit')
     workers.append(worker)
     for _ in range(2):
-        with pytest.raises(IsolationError, match="No module named 'confdep'") as caught:
-            worker.run(on.install(), State())
+        with pytest.raises(IsolationError, match='update-status failed') as caught:
+            worker.run(on.update_status(), State())
         assert 'crashed' not in str(caught.value)
+    assert worker.run(on.install(), State()).unit_status == ActiveStatus('installed')
+
+
+def test_a_charm_that_cant_be_loaded_stops_the_worker(workers: list[Worker]):
+    worker = Worker(CHARMS / 'alpha')  # Without confdep.
+    workers.append(worker)
+    with pytest.raises(IsolationError, match="couldn't be loaded") as caught:
+        worker.run(on.install(), State())
+    assert "No module named 'confdep'" in str(caught.value)
+    with pytest.raises(IsolationError, match="isn't restarted after it crashes"):
+        worker.run(on.install(), State())
 
 
 def test_a_charm_that_calls_sys_exit_leaves_the_worker_running(workers: list[Worker]):

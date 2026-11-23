@@ -7,9 +7,9 @@ The main test process never imports the charm: it reads the metadata from disk,
 and events and ``State`` cross to the worker as JSON. Each application has its
 own worker, which starts on the first event and is kept for later ones. A
 charm that raises gives an :class:`IsolationError` with its traceback, and the
-worker carries on. A worker that dies or times out also raises
-:class:`IsolationError`, but isn't started again, so every later event on it
-raises too.
+worker carries on. A charm that can't be loaded, and a worker that dies or
+times out, also raise :class:`IsolationError`, but the worker isn't started
+again, so every later event on it raises too.
 """
 
 from __future__ import annotations
@@ -30,9 +30,9 @@ from ._worker_protocol import read_message, write_message
 from .context import _DEFAULT_JUJU_VERSION
 from .state import State, _CharmSpec, _Event
 
-# Seconds one event may run before the worker is killed.
-# A guard against a hang, not a performance check: the first event also
-# imports the charm, which can be slow for a large charm on a busy CI runner.
+# Seconds that loading the charm, or one event, may take before the worker is
+# killed. A guard against a hang, not a performance check: importing a large
+# charm can be slow on a busy CI runner.
 _DEFAULT_TIMEOUT = 60.0
 
 
@@ -87,7 +87,8 @@ class Worker:
         app_name: The application name; the charm's name if not given.
         juju_version: The Juju version the charm sees.
         app_trusted: Whether the application is trusted.
-        timeout: Seconds one event may run before the worker is killed.
+        timeout: Seconds that loading the charm, or one event, may take
+            before the worker is killed.
             ``None`` waits for as long as it takes.
     """
 
@@ -130,8 +131,8 @@ class Worker:
         """Run ``event`` on ``state`` as unit ``unit_id``, and return the output ``State``.
 
         Raises:
-            IsolationError: if the charm raised, or the worker crashed or
-                timed out, now or earlier.
+            IsolationError: if the charm raised or couldn't be loaded, or the
+                worker crashed or timed out, now or earlier.
         """
         if self._crashed:
             raise IsolationError(
@@ -143,24 +144,18 @@ class Worker:
             'event': _state_json.encode_event(event),
             'state': _state_json.encode_state(state),
         }
-        starting = self._proc is None
-        if starting:
+        if self._proc is None:
             self._start()
-        proc = self._proc
-        assert proc is not None and proc.stdin is not None and proc.stdout is not None
-        try:
-            if starting:
-                write_message(self._setup, to=proc.stdin)
-            write_message(request, to=proc.stdin)
-            response = self._read_response(proc.stdout)
-        except TimeoutError:
-            raise self._fail(
-                f'An event took more than {self._timeout} seconds, and the worker was killed.'
-            ) from None
-        except (OSError, ValueError):
-            response = None
-        if response is None:
-            raise self._fail('The worker crashed without responding.')
+            loaded = self._send(self._setup, doing='Loading the charm')
+            if 'error' in loaded:
+                # The worker exits after sending the error.
+                self._crashed = True
+                self.close()
+                raise IsolationError(
+                    f"The charm for {self.app_name!r} couldn't be loaded in its worker:\n"
+                    f'{loaded["error"]}'
+                )
+        response = self._send(request, doing='An event')
         if 'error' in response:
             raise IsolationError(f'The charm failed in its worker:\n{response["error"]}')
         return _state_json.decode_state(response['state'])
@@ -182,6 +177,22 @@ class Worker:
             proc.kill()
             proc.wait()
         self._finish(proc)
+
+    def _send(self, message: dict[str, Any], *, doing: str) -> dict[str, Any]:
+        proc = self._proc
+        assert proc is not None and proc.stdin is not None and proc.stdout is not None
+        try:
+            write_message(message, to=proc.stdin)
+            response = self._read_response(proc.stdout)
+        except TimeoutError:
+            raise self._fail(
+                f'{doing} took more than {self._timeout} seconds, and the worker was killed.'
+            ) from None
+        except (OSError, ValueError):
+            response = None
+        if response is None:
+            raise self._fail('The worker crashed without responding.')
+        return response
 
     def _start(self) -> None:
         self._proc = proc = subprocess.Popen(
