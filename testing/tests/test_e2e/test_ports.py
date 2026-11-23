@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from typing import Literal
+
+import ops
 import pytest
 from ops import CharmBase, Framework, StartEvent, StopEvent
 
 from scenario import Context, State
-from scenario.state import Port, StateValidationError, TCPPort, UDPPort
+from scenario.state import ICMPPort, Port, StateValidationError, TCPPort, UDPPort
 
 
 class MyCharm(CharmBase):
@@ -53,3 +56,55 @@ def test_port_port(klass):
         klass(port=0)
     with pytest.raises(StateValidationError):
         klass(port=65536)
+
+
+def test_state_normalises_ops_ports():
+    state = State(opened_ports=[ops.Port('tcp', 80), ops.Port('udp', 53), ops.Port('icmp', None)])
+    assert state.opened_ports == {TCPPort(80), UDPPort(53), ICMPPort()}
+    assert {type(port) for port in state.opened_ports} == {TCPPort, UDPPort, ICMPPort}
+
+
+def test_state_rejects_ops_icmp_port_with_port_number():
+    with pytest.raises(StateValidationError, match='cannot be set'):
+        State(opened_ports=[ops.Port('icmp', 80)])
+
+
+def test_state_rejects_ops_port_with_unknown_protocol():
+    with pytest.raises(StateValidationError, match='unknown port protocol'):
+        State(opened_ports=[ops.Port('sctp', 80)])  # type: ignore
+
+
+@pytest.mark.parametrize('protocol', ['tcp', 'udp'])
+def test_state_rejects_ops_port_without_port_number(protocol: Literal['tcp', 'udp']):
+    with pytest.raises(StateValidationError, match=f'`port` is required for {protocol} ports'):
+        State(opened_ports=[ops.Port(protocol, None)])
+
+
+def test_port_equality_with_ops_port():
+    assert TCPPort(80) == ops.Port('tcp', 80)
+    assert UDPPort(53) == ops.Port('udp', 53)
+    assert ICMPPort() == ops.Port('icmp', None)
+    assert TCPPort(80) != UDPPort(80)
+    assert TCPPort(80) != ops.Port('tcp', 81)
+    assert TCPPort(80) in {TCPPort(80)}
+
+
+@pytest.mark.parametrize(
+    'port,ops_port',
+    [
+        (TCPPort(80), ops.Port('tcp', 80)),
+        (UDPPort(53), ops.Port('udp', 53)),
+        (ICMPPort(), ops.Port('icmp', None)),
+    ],
+)
+def test_port_in_sets_with_ops_port(port: Port, ops_port: ops.Port):
+    assert hash(port) == hash(ops_port)
+    assert port in {ops_port}
+    assert ops_port in {port}
+    assert {port} == {ops_port}
+
+
+def test_state_opened_ports_compare_with_ops_ports():
+    state = State(opened_ports=[ops.Port('tcp', 80), ops.Port('udp', 53)])
+    assert state.opened_ports == {ops.Port('tcp', 80), ops.Port('udp', 53)}
+    assert state.opened_ports != {ops.Port('tcp', 80), ops.Port('udp', 54)}
