@@ -148,6 +148,17 @@ def test_a_worker_that_died_between_events_is_reported(workers: list[Worker]):
         worker.run(on.install(), State())
 
 
+def test_a_worker_that_exits_before_its_setup_is_reported(workers: list[Worker]):
+    # `true` exits without reading its input, and a setup message larger than
+    # the pipe buffer makes sure the write fails rather than racing the exit.
+    worker = Worker(CHARMS / 'report', python='true', extra_sys_path=['x' * 100_000])
+    workers.append(worker)
+    with pytest.raises(IsolationError, match='crashed without responding'):
+        worker.run(on.install(), State())
+    with pytest.raises(IsolationError, match='not restarted'):
+        worker.run(on.install(), State())
+
+
 @pytest.mark.parametrize(
     ('source', 'found'),
     [

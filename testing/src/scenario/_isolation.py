@@ -148,11 +148,14 @@ class Worker:
             'event': _state_json.encode_event(event),
             'state': _state_json.encode_state(state),
         }
-        if self._proc is None:
+        starting = self._proc is None
+        if starting:
             self._start()
         proc = self._proc
         assert proc is not None and proc.stdin is not None and proc.stdout is not None
         try:
+            if starting:
+                write_message(proc.stdin, self._setup)
             write_message(proc.stdin, request)
             response = self._read_response(proc.stdout)
         except TimeoutError:
@@ -193,7 +196,6 @@ class Worker:
             stderr=subprocess.PIPE,
             env=self._environ,
         )
-        assert proc.stdin is not None
         self._stderr.clear()
         # Read stderr as it comes, so a full pipe can't block the worker, and
         # so there's something to report if it crashes.
@@ -201,7 +203,6 @@ class Worker:
             target=self._read_stderr, args=(proc.stderr,), daemon=True
         )
         self._stderr_reader.start()
-        write_message(proc.stdin, self._setup)
 
     def _read_stderr(self, stream: IO[bytes]) -> None:
         try:
