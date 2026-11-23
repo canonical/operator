@@ -80,9 +80,7 @@ def main() -> int:
     if setup is None:
         return 0
     # Ahead of the environment's own packages, so these win for the charm.
-    for entry in reversed(setup['extra_sys_path']):
-        if entry not in sys.path:
-            sys.path.insert(0, entry)
+    sys.path[:0] = [entry for entry in setup['extra_sys_path'] if entry not in sys.path]
     while (request := read_message(requests)) is not None:
         try:
             response = run(setup, request)
