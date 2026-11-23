@@ -3,7 +3,7 @@
 
 """Run a charm's events in a separate worker process.
 
-The test process never imports the charm: it reads the metadata from disk,
+The main test process never imports the charm: it reads the metadata from disk,
 and events and ``State`` cross to the worker as JSON. The worker starts on the
 first event and is kept for later ones. A worker that dies or times out raises
 :class:`IsolationError`, and isn't started again.
