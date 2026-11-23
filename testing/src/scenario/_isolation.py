@@ -4,9 +4,10 @@
 """Run a charm's events in a separate worker process.
 
 The main test process never imports the charm: it reads the metadata from disk,
-and events and ``State`` cross to the worker as JSON. The worker starts on the
-first event and is kept for later ones. A worker that dies or times out raises
-:class:`IsolationError`, and isn't started again.
+and events and ``State`` cross to the worker as JSON. Each application has its
+own worker, which starts on the first event and is kept for later ones. A
+worker that dies or times out raises :class:`IsolationError`, and isn't started
+again.
 """
 
 from __future__ import annotations
@@ -67,7 +68,11 @@ def _worker_environ() -> dict[str, str]:
 
 
 class Worker:
-    """A worker process that runs one charm's events, for any of its units.
+    """A worker process that runs events for one application's units.
+
+    The application's name and trust are fixed when the worker is created, and
+    each event names the unit it runs as, so one worker serves every unit. Two
+    applications of the same charm need a worker each.
 
     Args:
         charm_source: The charm's directory, with ``src/charm.py``.
