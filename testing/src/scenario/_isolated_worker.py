@@ -63,8 +63,9 @@ def run(setup: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
         app_trusted=setup['app_trusted'],
     )
     event = _state_json.decode_event(request['event'])
-    state = _state_json.decode_state(request['state'])
-    return {'state': _state_json.encode_state(ctx.run(event, state))}
+    state_in = _state_json.decode_state(request['state'])
+    state_out = ctx.run(event, state_in)
+    return {'state': _state_json.encode_state(state_out)}
 
 
 def main() -> int:
