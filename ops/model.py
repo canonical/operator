@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import contextlib
-import contextvars
 import copy
 import dataclasses
 import datetime
@@ -37,7 +36,7 @@ import typing
 import warnings
 import weakref
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator, Iterable, Mapping, MutableMapping
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, MutableMapping
 from pathlib import Path, PurePath
 from typing import (
     Any,
@@ -69,7 +68,7 @@ if typing.TYPE_CHECKING:
 _ = JujuVersion
 
 # a k8s spec is a mapping from names/"types" to json/yaml spec objects
-K8sSpec = Mapping[str, Any]
+K8sSpec: TypeAlias = Mapping[str, Any]
 
 _StorageDictType: TypeAlias = 'dict[str, list[Storage] | None]'
 _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
@@ -99,7 +98,7 @@ _NetworkDict = TypedDict(
     },
 )
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
@@ -220,6 +219,16 @@ class Model:
     def juju_version(self) -> JujuVersion:
         """The version of Juju that is running the model."""
         return self._backend._juju_context.version
+
+    @property
+    def proxy_config(self) -> ProxyConfig:
+        """The model's proxy configuration as found in the Juju model config."""
+        context = self._backend._juju_context
+        return ProxyConfig(
+            http=context.http_proxy,
+            https=context.https_proxy,
+            no=context.no_proxy,
+        )
 
     def get_unit(self, unit_name: str) -> Unit:
         """Get a unit by name.
@@ -345,7 +354,7 @@ class _ModelCache:
     @typing.overload
     def get(self, entity_type: type[Application], name: str) -> Application: ...
 
-    def get(self, entity_type: UnitOrApplicationType, name: str):
+    def get(self, entity_type: UnitOrApplicationType, name: str) -> Unit | Application:
         """Fetch the cached entity of type `entity_type` with name `name`."""
         key = (entity_type, name)
         entity = self._weakrefs.get(key)
@@ -382,7 +391,7 @@ class Application:
         self._status = None
         self._collected_statuses: list[StatusBase] = []
 
-    def _invalidate(self):
+    def _invalidate(self) -> None:
         self._status = None
 
     @property
@@ -430,7 +439,7 @@ class Application:
         return self._status
 
     @status.setter
-    def status(self, value: StatusBase):
+    def status(self, value: StatusBase) -> None:
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(
                 f'invalid value provided for application {self} status: {value}'
@@ -582,7 +591,7 @@ class Unit:
             containers: _ContainerMeta_Raw = meta.containers
             self._containers = ContainerMapping(iter(containers), backend)
 
-    def _invalidate(self):
+    def _invalidate(self) -> None:
         self._status = None
 
     @property
@@ -618,7 +627,7 @@ class Unit:
         return self._status
 
     @status.setter
-    def status(self, value: StatusBase):
+    def status(self, value: StatusBase) -> None:
         if not isinstance(value, StatusBase):
             raise InvalidStatusError(f'invalid value provided for unit {self} status: {value}')
 
@@ -879,16 +888,16 @@ class _GenericLazyMapping(Mapping[str, _LazyValueType], ABC):
             data = self._lazy_data = self._load()
         return data
 
-    def _invalidate(self):
+    def _invalidate(self) -> None:
         self._lazy_data = None
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: str):
         return key in self._data
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self._data)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._data)
 
     def __getitem__(self, key: str) -> _LazyValueType:
@@ -935,7 +944,7 @@ class RelationMapping(Mapping[str, list['Relation']]):
     def __len__(self):
         return len(self._data)
 
-    def __iter__(self) -> Iterable[str]:
+    def __iter__(self) -> Iterator[str]:
         return iter(self._data)
 
     def __getitem__(self, relation_name: str) -> list[Relation]:
@@ -958,7 +967,7 @@ class RelationMapping(Mapping[str, list['Relation']]):
                 relation_list.append(relation)
         return relation_list
 
-    def _invalidate(self, relation_name: str):
+    def _invalidate(self, relation_name: str) -> None:
         """Used to wipe the cache of a given relation_name.
 
         Not meant to be used by Charm authors. The content of relation data is
@@ -967,7 +976,7 @@ class RelationMapping(Mapping[str, list['Relation']]):
         """
         self._data[relation_name] = None
 
-    def _get_unique(self, relation_name: str, relation_id: int | None = None):
+    def _get_unique(self, relation_name: str, relation_id: int | None = None) -> Relation | None:
         if relation_id is not None:
             if not isinstance(relation_id, int):
                 raise ModelError(
@@ -1226,6 +1235,27 @@ class SecretRotate(enum.Enum):
 class SecretInfo:
     """Secret information (metadata)."""
 
+    id: str
+    """Locator ID (URI) for the secret. See :attr:`Secret.id`."""
+
+    label: str | None
+    """Label used to reference the secret locally. See :attr:`Secret.label`."""
+
+    revision: int
+    """The secret's latest revision."""
+
+    expires: datetime.datetime | None
+    """Time at which the secret expires, or ``None`` if it never expires."""
+
+    rotation: SecretRotate | None
+    """The secret's rotation policy, or ``None`` if not set."""
+
+    rotates: datetime.datetime | None
+    """Time at which the secret is next due to be rotated, or ``None`` if not set."""
+
+    description: str | None
+    """The secret's description, or ``None`` if not set."""
+
     def __init__(
         self,
         id: str,
@@ -1337,7 +1367,7 @@ class Secret:
         return id
 
     @classmethod
-    def _validate_content(cls, content: dict[str, str] | None):
+    def _validate_content(cls, content: dict[str, str] | None) -> None:
         """Ensure the given secret content is valid, or raise ValueError."""
         if not isinstance(content, dict):
             raise TypeError(f'Secret content must be a dict, not {type(content).__name__}')
@@ -1505,7 +1535,7 @@ class Secret:
             self._id = self.get_info().id
         return self._id
 
-    def set_content(self, content: dict[str, str]):
+    def set_content(self, content: dict[str, str]) -> None:
         """Update the content of this secret.
 
         This will create a new secret revision, and notify all units tracking
@@ -1536,7 +1566,7 @@ class Secret:
         description: str | None = None,
         expire: datetime.datetime | datetime.timedelta | None = None,
         rotate: SecretRotate | None = None,
-    ):
+    ) -> None:
         """Update this secret's information (metadata).
 
         This will not create a new secret revision (that applies only to
@@ -1565,7 +1595,7 @@ class Secret:
             rotate=rotate,
         )
 
-    def grant(self, relation: Relation, *, unit: Unit | None = None):
+    def grant(self, relation: Relation, *, unit: Unit | None = None) -> None:
         """Grant read access to this secret.
 
         If the application or unit has already been granted access to this
@@ -1580,7 +1610,7 @@ class Secret:
             self._ensure_id(), relation.id, unit=unit.name if unit is not None else None
         )
 
-    def revoke(self, relation: Relation, *, unit: Unit | None = None):
+    def revoke(self, relation: Relation, *, unit: Unit | None = None) -> None:
         """Revoke read access to this secret.
 
         If the application or unit does not have access to this secret, do
@@ -1595,7 +1625,7 @@ class Secret:
             self._ensure_id(), relation.id, unit=unit.name if unit is not None else None
         )
 
-    def remove_revision(self, revision: int):
+    def remove_revision(self, revision: int) -> None:
         """Remove the given secret revision.
 
         This is normally only called when handling
@@ -1690,7 +1720,7 @@ class Relation:
     ):
         self.name = relation_name
         self.id = relation_id
-        self.units: set[Unit] = set()
+        self.units = set()
         self.active = active
         self._backend = backend
         self._cache = cache
@@ -1831,7 +1861,7 @@ class Relation:
         dst: Unit | Application,
         *,
         encoder: Callable[[Any], str] | None = None,
-    ):
+    ) -> None:
         """Save the data from the provided object to the Juju relation data.
 
         For example::
@@ -1933,6 +1963,9 @@ class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
     :attr:`Relation.data`
     """
 
+    relation: Relation
+    """The relation that this data belongs to."""
+
     def __init__(
         self,
         relation: Relation,
@@ -1963,7 +1996,7 @@ class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
     def __len__(self):
         return len(self._data)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Unit | Application]:
         return iter(self._data)
 
     def __getitem__(self, key: Unit | Application) -> RelationDataContent:
@@ -1977,6 +2010,9 @@ class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
 # mutable or not is controlled by the flag.
 class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     """Data content of a unit or application in a relation."""
+
+    relation: Relation
+    """The relation that this data belongs to."""
 
     def __init__(self, relation: Relation, entity: Unit | Application, backend: _ModelBackend):
         self.relation = relation
@@ -1993,6 +2029,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _load(self) -> _RelationDataContent_Raw:
         """Load the data from the current entity / relation."""
+        # Validate every uncached read here, so that all read paths raise
+        # RelationDataAccessError rather than a bare ModelError from Juju. Reads
+        # served from the cache are validated in _validate_cached_read.
+        self._validate_read_if_active()
         try:
             return self._backend.relation_get(
                 self.relation.id,
@@ -2004,8 +2044,21 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # Dead relations tell no tales (and have no data).
             return {}
 
-    def _validate_read(self):
-        """Return if the data content can be read."""
+    def _validate_read_if_active(self) -> None:
+        """Validate a read, except on a relation that is already gone.
+
+        Dead relations tell no tales: reading a broken relation's databag gives
+        `{}` rather than raising, and that has to hold whether or not this unit
+        could have read the databag while the relation was alive. Without this,
+        validating before the read turns the empty dict `_load` returns for a
+        `RelationNotFoundError` into an access error -- and for a follower's own
+        app databag, into one that talks about a remote application.
+        """
+        if self.relation.active:
+            self._validate_read()
+
+    def _validate_read(self) -> None:
+        """Raise if the data content cannot be read."""
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
             return
@@ -2022,23 +2075,17 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # leaders have no read restrictions
             return
 
-        # type guard; we should not be accessing relation data
-        # if the remote app does not exist.
         app = self.relation.app
-        if app is None:
-            raise RelationDataAccessError(
-                f'Remote application instance cannot be retrieved for {self.relation}.'
-            )
 
         # is this a peer relation?
-        if app.name == self._entity.name:
+        if app is not None and app.name == self._entity.name:
             # peer relation data is always publicly readable
             return
 
-        # if we're here it means: this is not a peer relation,
-        # this is an app databag, and we don't have leadership.
-
-        # is this a LOCAL app databag?
+        # Check for the local app databag before the remote-app type guard below,
+        # so that a follower reading its own app databag is told that, rather than
+        # told about a remote application. The two overlap on a broken relation,
+        # where `relation.app` can be None (https://bugs.launchpad.net/juju/+bug/1960934).
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
@@ -2046,7 +2093,15 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 f'application databag'
             )
 
-        return True
+        # type guard; we should not be accessing relation data
+        # if the remote app does not exist.
+        if app is None:
+            raise RelationDataAccessError(
+                f'Remote application instance cannot be retrieved for {self.relation}.'
+            )
+
+        # If we're here it means this is a remote app databag (readable by any remote unit).
+        return
 
     def _validate_write(self, data: Mapping[str, str]) -> None:
         """Validate writing key:value pairs to this databag.
@@ -2096,7 +2151,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                     f'not the same unit.'
                 )
 
-    def __setitem__(self, key: str, value: str):
+    def __setitem__(self, key: str, value: str) -> None:
         self.update({key: value})
 
     def _commit(self, data: Mapping[str, str]) -> None:
@@ -2120,9 +2175,37 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             else:
                 self._data[key] = value
 
+    def _validate_cached_read(self) -> None:
+        """Validate a read of data that may already be cached.
+
+        When the data hasn't been loaded yet, ``_load`` validates the read, so
+        validating here as well would mean a redundant leadership check.
+        """
+        if self._lazy_data is not None:
+            self._validate_read_if_active()
+
     def __getitem__(self, key: str) -> str:
-        self._validate_read()
+        self._validate_cached_read()
         return super().__getitem__(key)
+
+    # `_GenericLazyMapping` serves these three from `_data`, which only calls
+    # `_load` while the cache is empty. Without them, a databag that loaded
+    # while the unit was leader stays readable through `in`, `len()` and
+    # iteration after leadership is lost, while `__getitem__` raises: the same
+    # read/no-read split this class exists to remove, moved to the warm path.
+    # The extra check is a comparison against `_ModelBackend.is_leader`'s
+    # 30-second lease cache, not another hook-tool call.
+    def __contains__(self, key: str) -> bool:
+        self._validate_cached_read()
+        return super().__contains__(key)
+
+    def __iter__(self) -> Iterator[str]:
+        self._validate_cached_read()
+        return super().__iter__()
+
+    def __len__(self) -> int:
+        self._validate_cached_read()
+        return super().__len__()
 
     def update(
         self, data: Mapping[str, str] | Iterable[tuple[str, str]] = (), /, **kwargs: str
@@ -2137,28 +2220,34 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 self[k] = v
         """
         data = dict(data, **kwargs)
+        # Validate writes before checking what's changed, so a permission error names the operation
+        # the user was attempting, rather than the read that change detection happens to require.
+        # This also validates malformed keys and values that would otherwise be a no-op (for
+        # example, `del bag[1]`).
+        self._validate_write(data)
         changes = {
             key: val
             for key, val in data.items()
             if (key not in self and val != '') or (key in self and val != self[key])
         }
-        self._validate_write(changes)  # always check permissions
         if not changes:  # return early if there are no changes required
             return
         self._commit(changes)
         self._update_cache(changes)
 
-    def __delitem__(self, key: str):
+    def __delitem__(self, key: str) -> None:
         # Match the behavior of Juju, which is that setting the value to an empty
         # string will remove the key entirely from the relation data.
         self.__setitem__(key, '')
 
     def __repr__(self):
         try:
-            self._validate_read()
+            # `super().__repr__()` reads `_data`, which validates the read when
+            # it loads; this covers the case where it is already cached.
+            self._validate_cached_read()
+            return super().__repr__()
         except RelationDataAccessError:
             return '<n/a>'
-        return super().__repr__()
 
 
 class ConfigData(_GenericLazyMapping['bool | int | float | str']):
@@ -2184,8 +2273,11 @@ class StatusBase:
 
     _statuses: ClassVar[dict[_StatusName, type[StatusBase]]] = {}
 
-    # Subclasses must provide this attribute
-    name: _StatusName
+    name: ClassVar[_StatusName]
+    """The name of the status, for example "active" or "blocked"."""
+
+    message: str
+    """The status message."""
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
@@ -2204,7 +2296,7 @@ class StatusBase:
         return f'{self.__class__.__name__}({self.message!r})'
 
     @classmethod
-    def from_name(cls, name: str, message: str):
+    def from_name(cls, name: str, message: str) -> StatusBase:
         """Create a status instance from a name and message.
 
         If ``name`` is "unknown", ``message`` is ignored, because unknown status
@@ -2225,7 +2317,7 @@ class StatusBase:
             return cls._statuses[typing.cast('_StatusName', name)](message)
 
     @classmethod
-    def register(cls, child: type[StatusBase]):
+    def register(cls, child: type[StatusBase]) -> type[StatusBase]:
         """.. deprecated:: 2.17.0 Deprecated - this was for internal use only."""
         warnings.warn(
             'StatusBase.register is for internal use only', DeprecationWarning, stacklevel=2
@@ -2386,7 +2478,7 @@ class Pod:
     def __init__(self, backend: _ModelBackend):
         self._backend = backend
 
-    def set_spec(self, spec: K8sSpec, k8s_resources: K8sSpec | None = None):
+    def set_spec(self, spec: K8sSpec, k8s_resources: K8sSpec | None = None) -> None:
         """Set the specification for pods that Juju should start in kubernetes.
 
         See ``juju help-tool pod-spec-set`` for details of what should be passed.
@@ -2413,7 +2505,7 @@ class StorageMapping(Mapping[str, list['Storage']]):
     def __len__(self):
         return len(self._storage_map)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._storage_map)
 
     def __getitem__(self, storage_name: str) -> list[Storage]:
@@ -2428,7 +2520,7 @@ class StorageMapping(Mapping[str, list['Storage']]):
                 storage_list.append(storage)
         return storage_list
 
-    def request(self, storage_name: str, count: int = 1):
+    def request(self, storage_name: str, count: int = 1) -> None:
         """Requests new storage instances of a given name.
 
         Uses storage-add hook command to request additional storage. Juju will notify the unit
@@ -2443,7 +2535,7 @@ class StorageMapping(Mapping[str, list['Storage']]):
             )
         self._backend.storage_add(storage_name, count)
 
-    def _invalidate(self, storage_name: str):
+    def _invalidate(self, storage_name: str) -> None:
         """Remove an entry from the storage map.
 
         Not meant to be used by charm authors -- this exists mainly for testing purposes.
@@ -2510,8 +2602,9 @@ class MultiPushPullError(Exception):
     errors: list[tuple[str, Exception]]
     """The list of errors.
 
-    Each error is represented by a tuple of (<source_path>, <exception>),
-    where source_path is the path being pushed to or pulled from.
+    Each error is represented by a tuple of (<path>, <exception>). The path is
+    the file that failed to copy, or the source path given to the method if
+    listing it failed.
     """
 
     def __init__(self, message: str, errors: list[tuple[str, Exception]]):
@@ -2601,14 +2694,14 @@ class Container:
         """Replan all services: restart changed services and start startup-enabled services."""
         self._pebble.replan_services()
 
-    def start(self, *service_names: str):
+    def start(self, *service_names: str) -> None:
         """Start given service(s) by name."""
         if not service_names:
             raise TypeError('start expected at least 1 argument, got 0')
 
         self._pebble.start_services(service_names)
 
-    def restart(self, *service_names: str):
+    def restart(self, *service_names: str) -> None:
         """Restart the given service(s) by name.
 
         Listed running services will be stopped and restarted, and listed stopped
@@ -2630,7 +2723,7 @@ class Container:
                 self._pebble.stop_services(stop)
             self._pebble.start_services(service_names)
 
-    def stop(self, *service_names: str):
+    def stop(self, *service_names: str) -> None:
         """Stop given service(s) by name."""
         if not service_names:
             raise TypeError('stop expected at least 1 argument, got 0')
@@ -2643,7 +2736,7 @@ class Container:
         layer: str | pebble.LayerDict | pebble.Layer,
         *,
         combine: bool = False,
-    ):
+    ) -> None:
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         Args:
@@ -2797,7 +2890,7 @@ class Container:
         user: str | None = None,
         group_id: int | None = None,
         group: str | None = None,
-    ):
+    ) -> None:
         """Write content to a given file path on the remote system.
 
         Note that if another process has the file open on the remote system,
@@ -2858,13 +2951,15 @@ class Container:
         self,
         source_path: str | Path | Iterable[str | Path],
         dest_dir: str | PurePath,
-    ):
+    ) -> None:
         """Recursively push a local path or files to the remote system.
 
-        Only regular files and directories are copied; symbolic links, device files, etc. are
-        skipped.  Pushing is attempted to completion even if errors occur during the process.  All
-        errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single :class:`MultiPushPullError` is raised containing details for each error.
+        Regular files, directories, and symbolic links to files are copied. Symbolic links to
+        directories found within a directory, dangling links, device files, etc. are skipped.
+        A dangling link named in ``source_path`` is an error.  Pushing is attempted to completion
+        even if errors occur during the process.  All errors are collected incrementally. After
+        copying has completed, if any errors occurred, a single :class:`MultiPushPullError` is
+        raised containing details for each error.
 
         Assuming the following files exist locally:
 
@@ -2913,31 +3008,52 @@ class Container:
         dest_dir = Path(dest_dir)
 
         def local_list(source_path: Path) -> list[pebble.FileInfo]:
-            paths = source_path.iterdir() if source_path.is_dir() else [source_path]
-            files = [self._build_fileinfo(f) for f in paths]
-            return files
+            if source_path.is_dir():
+                # is_file() follows links, so this is only false for a link to a directory or a
+                # dangling link, which are skipped.
+                return [
+                    self._build_fileinfo(f, follow_symlinks=f.is_file())
+                    for f in source_path.iterdir()
+                ]
+            # Only a path the caller named gets here, so always follow it if it's a link.
+            return [self._build_fileinfo(source_path, follow_symlinks=True)]
 
         errors: list[tuple[str, Exception]] = []
         for source_path in source_paths:
+            skipped_links = 0
             try:
                 for info in Container._list_recursive(local_list, source_path):
-                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
-                    if info.type is pebble.FileType.DIRECTORY:
-                        self.make_dir(dstpath, make_parents=True)
+                    if info.type is pebble.FileType.SYMLINK:
+                        logger.debug('skipped symlink in Container.push_path: %s', info.path)
+                        skipped_links += 1
                         continue
-                    with open(info.path, 'rb') as src:
-                        self.push(
-                            dstpath,
-                            src,
-                            make_dirs=True,
-                            permissions=info.permissions,
-                            user_id=info.user_id,
-                            user=info.user,
-                            group_id=info.group_id,
-                            group=info.group,
-                        )
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    # Carry on with the rest of the tree if one file fails.
+                    try:
+                        if info.type is pebble.FileType.DIRECTORY:
+                            self.make_dir(dstpath, make_parents=True)
+                            continue
+                        with open(info.path, 'rb') as src:
+                            self.push(
+                                dstpath,
+                                src,
+                                make_dirs=True,
+                                permissions=info.permissions,
+                                user_id=info.user_id,
+                                user=info.user,
+                                group_id=info.group_id,
+                                group=info.group,
+                            )
+                    except (OSError, pebble.Error) as err:
+                        errors.append((info.path, err))
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
+            if skipped_links:
+                logger.info(
+                    'Container.push_path skipped %d symbolic link(s) under %s',
+                    skipped_links,
+                    source_path,
+                )
         if errors:
             raise MultiPushPullError('failed to push one or more files', errors)
 
@@ -2945,13 +3061,14 @@ class Container:
         self,
         source_path: str | PurePath | Iterable[str | PurePath],
         dest_dir: str | Path,
-    ):
+    ) -> None:
         """Recursively pull a remote path or files to the local system.
 
-        Only regular files and directories are copied; symbolic links, device files, etc. are
-        skipped.  Pulling is attempted to completion even if errors occur during the process.  All
-        errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single :class:`MultiPushPullError` is raised containing details for each error.
+        Regular files and directories are copied, and symbolic links are followed. Device files,
+        etc. are skipped.  Pulling is attempted to completion even if errors occur during the
+        process.  All errors are collected incrementally. After copying has completed, if any
+        errors occurred, a single :class:`MultiPushPullError` is raised containing details for each
+        error.
 
         Assuming the following files exist remotely:
 
@@ -3005,23 +3122,27 @@ class Container:
             try:
                 for info in Container._list_recursive(self.list_files, source_path):
                     dstpath = self._build_destpath(info.path, source_path, dest_dir)
-                    if info.type is pebble.FileType.DIRECTORY:
-                        dstpath.mkdir(parents=True, exist_ok=True)
-                        continue
-                    dstpath.parent.mkdir(parents=True, exist_ok=True)
-                    with self.pull(info.path, encoding=None) as src:
-                        with dstpath.open(mode='wb') as dst:
-                            shutil.copyfileobj(src, dst)
+                    # Carry on with the rest of the tree if one file fails.
+                    try:
+                        if info.type is pebble.FileType.DIRECTORY:
+                            dstpath.mkdir(parents=True, exist_ok=True)
+                            continue
+                        dstpath.parent.mkdir(parents=True, exist_ok=True)
+                        with self.pull(info.path, encoding=None) as src:
+                            with dstpath.open(mode='wb') as dst:
+                                shutil.copyfileobj(src, dst)
+                    except (OSError, pebble.Error) as err:
+                        errors.append((info.path, err))
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: str | Path) -> pebble.FileInfo:
+    def _build_fileinfo(path: str | Path, *, follow_symlinks: bool = False) -> pebble.FileInfo:
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
-        if path.is_symlink():
+        if path.is_symlink() and not follow_symlinks:
             ftype = pebble.FileType.SYMLINK
         elif path.is_dir():
             ftype = pebble.FileType.DIRECTORY
@@ -3033,7 +3154,7 @@ class Container:
         import grp
         import pwd
 
-        info = path.lstat()
+        info = path.stat() if follow_symlinks else path.lstat()
         try:
             pw_name = pwd.getpwuid(info.st_uid).pw_name
         except KeyError:
@@ -3140,7 +3261,7 @@ class Container:
         user: str | None = None,
         group_id: int | None = None,
         group: str | None = None,
-    ):
+    ) -> None:
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -3168,7 +3289,7 @@ class Container:
             group=group,
         )
 
-    def remove_path(self, path: str | PurePath, *, recursive: bool = False):
+    def remove_path(self, path: str | PurePath, *, recursive: bool = False) -> None:
         """Remove a file or directory on the remote system.
 
         Args:
@@ -3278,7 +3399,7 @@ class Container:
             combine_stderr=combine_stderr,
         )
 
-    def send_signal(self, sig: int | str, *service_names: str):
+    def send_signal(self, sig: int | str, *service_names: str) -> None:
         """Send the given signal to one or more services.
 
         Args:
@@ -3349,10 +3470,10 @@ class ContainerMapping(Mapping[str, Container]):
     def __init__(self, names: Iterable[str], backend: _ModelBackend):
         self._containers = {name: Container(name, backend) for name in names}
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> Container:
         return self._containers[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._containers)
 
     def __len__(self):
@@ -3372,10 +3493,10 @@ class ServiceInfoMapping(Mapping[str, pebble.ServiceInfo]):
     def __init__(self, services: Iterable[pebble.ServiceInfo]):
         self._services = {s.name: s for s in services}
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> pebble.ServiceInfo:
         return self._services[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._services)
 
     def __len__(self):
@@ -3395,10 +3516,10 @@ class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
     def __init__(self, checks: Iterable[pebble.CheckInfo]):
         self._checks = {c.name: c for c in checks}
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> pebble.CheckInfo:
         return self._checks[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._checks)
 
     def __len__(self):
@@ -3409,13 +3530,28 @@ class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
 
 
 class ModelError(Exception):
-    """Base class for exceptions raised when interacting with the Model."""
+    """Base class for exceptions raised when interacting with the Model.
 
-    pass
+    On Python 3.11 and above, when the error is caused by a failed hook command,
+    the exception has a note that names the hook command, its arguments, the Juju
+    hook that was running, and the event being handled, so these details appear in
+    the traceback. The note only includes arguments that are safe to log: for
+    example, relation IDs and secret labels, but not relation data or secret
+    content.
+    """
 
 
 class TooManyRelatedAppsError(ModelError):
     """Raised by :meth:`Model.get_relation` if there is more than one integrated application."""
+
+    relation_name: str
+    """The name of the relation endpoint (for example, 'db')."""
+
+    num_related: int
+    """The number of applications integrated on the relation endpoint."""
+
+    max_supported: int
+    """The maximum number of integrated applications supported."""
 
     def __init__(self, relation_name: str, num_related: int, max_supported: int):
         super().__init__(
@@ -3523,6 +3659,18 @@ def _format_action_result_dict(
     return output_
 
 
+def _raise_if_command_missing(error: hookcmds.Error) -> None:
+    """Raise the original :class:`FileNotFoundError` if the hook command doesn't exist.
+
+    ``hookcmds`` reports a missing hook command (such as a secret command on
+    Juju 2.9, or any hook command outside Juju) as a :class:`hookcmds.Error`.
+    The model backend has always raised :class:`FileNotFoundError` in that case,
+    so it unwraps the original error to keep that behaviour.
+    """
+    if isinstance(error.__cause__, FileNotFoundError):
+        raise error.__cause__ from None
+
+
 class _ModelBackend:
     """Represents the connection between the Model representation and talking to Juju.
 
@@ -3555,46 +3703,155 @@ class _ModelBackend:
 
         self._is_leader: bool | None = None
         self._leader_check_time: float | None = None
+        self._peer_endpoints: frozenset[str] = frozenset()
         self._hook_is_running = ''
-        self._is_recursive = contextvars.ContextVar('_is_recursive', default=False)
+        self._event_is_deferred = False
 
     @contextlib.contextmanager
-    def _prevent_recursion(self):
-        token = self._is_recursive.set(True)
-        try:
-            yield
-        finally:
-            self._is_recursive.reset(token)
+    def _wrap_hookcmd(self, cmd: str, **trace: Any) -> Generator[None]:
+        """Run a hook command with tracing and ops error handling.
 
-    @contextlib.contextmanager
-    def _wrap_hookcmd(self, cmd: str, *args: Any, **kwargs: Any):
-        if self._is_recursive.get():
-            # Either `juju-log` hook command failed or there's a bug in ops.
-            return
-        # Logs are collected via log integration, omit the subprocess calls that push
-        # the same content to juju from telemetry.
-        mgr = self._prevent_recursion() if cmd == 'juju-log' else tracer.start_as_current_span(cmd)
+        The ``trace`` keyword arguments are recorded on the span, and the span
+        is exported to the charm's tracing backend. Never pass a value that may
+        hold sensitive data, such as secret content, relation data, or action
+        results. If the hook command fails, these arguments are also included in
+        a note on the :class:`ModelError`, which typically ends up in the charm's
+        logs.
+        """
         try:
-            with mgr as span:
-                if span is not None:
+            with tracer.start_as_current_span(cmd) as span:
+                if span.is_recording():
                     span.set_attribute('call', 'subprocess.run')
-                    if args:
-                        span.set_attribute('args', args)
-                    if kwargs:
-                        span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
+                    if trace:
+                        span.set_attribute('kwargs', [f'{k}={v}' for k, v in trace.items()])
                 yield
         except hookcmds.Error as e:
-            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
-            if (
-                cmd.startswith(('relation-', 'network-'))
-                and 'relation not found' in e.stderr.lower()
-            ):
-                raise RelationNotFoundError() from e
-            elif cmd.startswith('secret-') and 'not found' in e.stderr.lower():
-                raise SecretNotFoundError() from e
-            raise ModelError(e.stderr) from e
+            _raise_if_command_missing(e)
+            stderr_lower = e.stderr.lower()
+            if self._relation_is_gone(cmd, stderr_lower, trace):
+                # A gone relation isn't an authorisation failure, so it isn't
+                # a security event.
+                error = RelationNotFoundError()
+            else:
+                self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
+                if cmd.startswith('secret-') and 'not found' in stderr_lower:
+                    error = SecretNotFoundError()
+                else:
+                    error = ModelError(e.stderr)
+            self._add_hook_command_note(error, cmd, trace)
+            raise error from e
 
-    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
+    def _current_hook(self) -> str | None:
+        dispatch_path = self._juju_context.dispatch_path
+        if not dispatch_path:
+            return self._juju_context.hook_name or None
+        kind, _, name = dispatch_path.rpartition('/')
+        return None if kind == 'actions' else name
+
+    def _add_hook_command_note(self, error: ModelError, cmd: str, args: Mapping[str, Any]) -> None:
+        """Add a note to the error naming the hook command, its arguments, and the event.
+
+        The note typically ends up in the charm's logs, so never pass an
+        argument that may hold sensitive data, such as secret content,
+        relation data, or action results. Callers that go through
+        :meth:`_wrap_hookcmd` pass its ``trace`` arguments, which are already
+        restricted in the same way.
+        """
+        if sys.version_info < (3, 11):
+            return
+        note = f'Hook command {cmd!r}'
+        formatted = ', '.join(f'{k}={v!r}' for k, v in args.items() if v is not None)
+        if formatted:
+            note += f' ({formatted})'
+        note += ' failed'
+        hook = self._current_hook()
+        action = self._juju_context.action_name
+        event = self._hook_is_running or None
+        dispatched_event = None
+        if hook is not None:
+            note += f' during the {hook!r} hook'
+            dispatched_event = hook.replace('-', '_')
+        elif action is not None:
+            note += f' during the {action!r} action'
+            dispatched_event = f'{action.replace("-", "_")}_action'
+        # The framework marks charm construction with the pseudo-event name
+        # '__init__', which is not an event that charms can observe.
+        if event == '__init__':
+            note += ' while initialising the charm'
+        elif self._event_is_deferred:
+            note += f' while handling the deferred {event!r} event'
+        # Leave out the event when it's the one the hook or action dispatched,
+        # rather than saying "during the 'config-changed' hook while handling
+        # the 'config_changed' event".
+        elif event not in (None, dispatched_event):
+            note += f' while handling the {event!r} event'
+        error.add_note(f'{note}.')
+
+    def _relation_is_gone(self, cmd: str, stderr: str, trace: Mapping[str, object]) -> bool:
+        """Whether this hook command's failure means the relation is gone.
+
+        Juju reports a missing relation in one of two ways, depending on where
+        it's missing from. If the unit agent no longer has the relation in its
+        hook context, the hook command rejects the relation ID itself, with
+        "relation not found". If the agent still has the relation but the
+        controller doesn't (for example, on the consuming side of a cross-model
+        relation after ``juju remove-saas --force``), the command reaches the
+        controller, which often answers "permission denied" so that the reply
+        doesn't say whether the relation ever existed. Which commands get which
+        wording varies by Juju version: on Juju 3.6 reading a remote databag
+        says "permission denied" and ``network-get`` says "not found", and on
+        Juju 4.0 it's the other way around. A charm can't do anything with the
+        relation in either case, so ops treats both wordings the same way.
+
+        On a relation that still exists, Juju refuses only a follower reading its
+        own (non-peer) application databag, or writing it. In those two cases ops
+        can't tell a gone relation from a real authorisation failure, so it keeps
+        the original error and reports a security event: swallowing a real
+        authorisation failure is the thing this function must not do.
+
+        ops's own access checks stop most such calls before they reach Juju, but
+        they don't run outside the charm's ``__init__`` and event handlers. This
+        function checks leadership with :meth:`is_leader`, which only uses a
+        cached value within the lease period that Juju guarantees.
+
+        Args:
+            cmd: The hook command that failed.
+            stderr: The command's standard error, lowercased.
+            trace: The arguments the call site passed to :meth:`_wrap_hookcmd`.
+                This relies on ``relation-get`` passing ``app``, ``unit`` and
+                ``endpoint``, and ``relation-set`` passing ``app``.
+        """
+        if cmd not in (
+            'relation-ids',
+            'relation-list',
+            'relation-get',
+            'relation-set',
+            'relation-model-get',
+            'network-get',
+        ):
+            return False
+        # Juju words this as "relation not found" for most hook commands and
+        # "relation 42 not found" for `network-get`.
+        if re.search(r'relation (\d+ )?not found', stderr):
+            return True
+        if 'permission denied' not in stderr:
+            return False
+        # "permission denied" means the relation is gone, except in the two
+        # cases where a follower touches its own application databag.
+        # 1. Reading it, unless it's a peer relation's, which every unit can
+        #    read. The remote application databag and unit databags are
+        #    readable by any unit, so this is the only read Juju can refuse.
+        if cmd == 'relation-get' and trace.get('app') and trace.get('unit') == self.app_name:
+            return trace.get('endpoint') in self._peer_endpoints or self.is_leader()
+        # 2. Writing it. A unit can only write its own application databag, so
+        #    there is no `unit` argument to compare against.
+        if cmd == 'relation-set' and trace.get('app'):
+            return self.is_leader()
+        # Any other "permission denied" means the relation is gone, including
+        # from `network-get`, which 4.0 words that way.
+        return True
+
+    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str) -> None:
         authz_messages = (
             'access denied',
             'permission denied',
@@ -3604,7 +3861,15 @@ class _ModelBackend:
         if not any(message in stderr.lower() for message in authz_messages):
             return
         base_cmd = os.path.basename(cmd)
-        leadership = ' (as leader)' if self.is_leader() else ''
+        # Use the cached leadership status rather than querying it, so that
+        # reporting a failure never runs another hook command.
+        is_leader = self._cached_leadership()
+        if is_leader is None:
+            leadership = ' (leadership unknown)'
+        elif is_leader:
+            leadership = ' (as leader)'
+        else:
+            leadership = ''
         description = (
             f'Hook command {base_cmd!r}{leadership} failed with code {returncode}: '
             f'{stderr.strip()!r}. '
@@ -3695,12 +3960,11 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
+        # `data` is intentionally excluded from tracing. It should not contain sensitive data,
+        # but sometimes does, particularly when the charm needs to work on an older Juju
+        # without secrets support.
         with self._wrap_hookcmd(
-            'relation-set',
-            relation_id=relation_id,
-            endpoint=relation_name,
-            data=data,
-            app=is_app,
+            'relation-set', relation_id=relation_id, endpoint=relation_name, app=is_app
         ):
             hookcmds.relation_set(data, relation_id, endpoint=relation_name, app=is_app)
 
@@ -3723,15 +3987,21 @@ class _ModelBackend:
         The value is cached for the duration of a lease which is 30s in Juju.
         """
         now = time.monotonic()
-        if self._leader_check_time is not None and self._is_leader is not None:
-            time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
-            if time_since_check <= self.LEASE_RENEWAL_PERIOD:
-                return self._is_leader
-        # Current time MUST be saved before running is-leader to ensure the cache
-        # is only used inside the window that is-leader itself asserts.
-        self._leader_check_time = now
+        is_leader = self._cached_leadership()
+        if is_leader is not None:
+            return is_leader
         with self._wrap_hookcmd('is-leader'):
             self._is_leader = hookcmds.is_leader()
+        self._leader_check_time = now  # Only store refreshed lease on success.
+        return self._is_leader
+
+    def _cached_leadership(self) -> bool | None:
+        """Return the cached leadership status, or None if unknown or the lease has expired."""
+        if self._leader_check_time is None or self._is_leader is None:
+            return None
+        time_since_check = datetime.timedelta(seconds=time.monotonic() - self._leader_check_time)
+        if time_since_check > self.LEASE_RENEWAL_PERIOD:
+            return None
         return self._is_leader
 
     def resource_get(self, resource_name: str) -> str:
@@ -3740,7 +4010,7 @@ class _ModelBackend:
 
     def pod_spec_set(
         self, spec: Mapping[str, Any], k8s_resources: Mapping[str, Any] | None = None
-    ):
+    ) -> None:
         tmpdir = Path(tempfile.mkdtemp('-pod-spec-set'))
         try:
             spec_path = tmpdir / 'spec.yaml'
@@ -3752,8 +4022,10 @@ class _ModelBackend:
                 with k8s_res_path.open('wt', encoding='utf8') as f:
                     yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            with self._wrap_hookcmd('pod-spec-set', spec=spec, k8s_resources=k8s_resources):
-                hookcmds._utils.run('pod-spec-set', *args)
+            with self._wrap_hookcmd('pod-spec-set'):
+                hookcmds._utils.run(
+                    'pod-spec-set', *args, redacted_cmd=['pod-spec-set', '--', '<redacted>']
+                )
         finally:
             shutil.rmtree(str(tmpdir))
 
@@ -3824,12 +4096,14 @@ class _ModelBackend:
         # The hookcmds action_set method will handle flattening nested structures, but does
         # not do validation, so we handle both here.
         flat_results = _format_action_result_dict(results)
-        # We do not trace the arguments here, as they may contain sensitive data.
-        with self._wrap_hookcmd('action-set', '...'):
+        # `results` is intentionally excluded from tracing, as it may contain sensitive data.
+        with self._wrap_hookcmd('action-set'):
             hookcmds.action_set(flat_results)
 
     def action_log(self, message: str) -> None:
-        with self._wrap_hookcmd('action-log', message=message):
+        # The message should not contain sensitive information, but it might, so we don't
+        # include it in the trace. It seems unlikely that it's useful in a trace anyway.
+        with self._wrap_hookcmd('action-log'):
             hookcmds.action_log(message)
 
     def action_fail(self, message: str = '') -> None:
@@ -3871,8 +4145,14 @@ class _ModelBackend:
                     level=level,  # type: ignore[arg-type]
                 )
             except hookcmds.Error as e:  # ruff: ignore[try-except-in-loop]
+                _raise_if_command_missing(e)
                 self._check_for_security_event('juju-log', e.returncode, e.stderr)
-                raise ModelError(e.stderr) from e
+                error = ModelError(e.stderr)
+                # Leave the message out of the note for the same reasons it
+                # isn't traced: it's arbitrary charm content that may be long
+                # or sensitive.
+                self._add_hook_command_note(error, 'juju-log', {'level': level})
+                raise error from e
 
     def network_get(self, binding_name: str, relation_id: int | None = None) -> _NetworkDict:
         """Return network info provided by network-get for a given binding.
@@ -3902,23 +4182,23 @@ class _ModelBackend:
     def add_metrics(
         self, metrics: Mapping[str, int | float], labels: Mapping[str, str] | None = None
     ) -> None:
-        cmd: list[str] = ['add-metric']
+        args: list[str] = []
         if labels:
             label_args: list[str] = []
             for k, v in labels.items():
                 _ModelBackendValidator.validate_metric_label(k)
                 _ModelBackendValidator.validate_label_value(k, v)
                 label_args.append(f'{k}={v}')
-            cmd.extend(['--labels', ','.join(label_args)])
+            args.extend(['--labels', ','.join(label_args)])
 
         metric_args: list[str] = []
         for k, v in metrics.items():
             _ModelBackendValidator.validate_metric_key(k)
             metric_value = _ModelBackendValidator.format_metric_value(v)
             metric_args.append(f'{k}={metric_value}')
-        cmd.extend(metric_args)
-        with self._wrap_hookcmd(*cmd):
-            hookcmds._utils.run(*cmd)
+        args.extend(metric_args)
+        with self._wrap_hookcmd('add-metric', args=args):
+            hookcmds._utils.run('add-metric', *args)
 
     def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
@@ -3949,7 +4229,7 @@ class _ModelBackend:
         data: Mapping[str, str],
         *,
         relation_name: str | None = None,
-    ):
+    ) -> None:
         self.relation_set(
             relation_id=relation_id,
             data=data,
@@ -3987,12 +4267,14 @@ class _ModelBackend:
             raise TypeError('either `id` or `label` must be provided')
         return SecretInfo(
             raw.id,
-            label=raw.label,
+            # hookcmds gives '' for a missing label or description, but SecretInfo has
+            # always used None.
+            label=raw.label or None,
             revision=raw.revision,
             expires=raw.expiry,  # Note the different names.
             rotation=SecretRotate(raw.rotation) if raw.rotation else None,
             rotates=raw.rotates,
-            description=raw.description,
+            description=raw.description or None,
             model_uuid=self.model_uuid,
         )
 
@@ -4005,7 +4287,7 @@ class _ModelBackend:
         description: str | None = None,
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
-    ):
+    ) -> None:
         # The content is None or has already been validated with Secret._validate_content
         if self._juju_context.version < '3.6':
             # Older Juju series don't coalesce multiple secret updates within a hook.
@@ -4020,11 +4302,11 @@ class _ModelBackend:
                 expire = expire or info.expires
                 rotate = rotate or info.rotation
                 # The label fix is needed for Juju < 3.5
-                label = label or info.label
+                label = label or info.label or None
+        # `content` is intentionally excluded from tracing, as it contains the secret data.
         with self._wrap_hookcmd(
             'secret-set',
             id=id,
-            content=content,
             label=label,
             description=description,
             expire=expire,
@@ -4050,9 +4332,9 @@ class _ModelBackend:
         owner: str | None = None,
     ) -> str:
         # The content has already been validated with Secret._validate_content
+        # `content` is intentionally excluded from tracing, as it contains the secret data.
         with self._wrap_hookcmd(
             'secret-add',
-            content=content,
             label=label,
             description=description,
             expire=expire,
@@ -4068,23 +4350,23 @@ class _ModelBackend:
                 owner=owner,  # type: ignore  # lenient for backwards compatibility
             )
 
-    def secret_grant(self, id: str, relation_id: int, *, unit: str | None = None):
+    def secret_grant(self, id: str, relation_id: int, *, unit: str | None = None) -> None:
         with self._wrap_hookcmd('secret-grant', id=id, relation_id=relation_id, unit=unit):
             hookcmds.secret_grant(id, relation_id=relation_id, unit=unit)
 
-    def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None):
+    def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None) -> None:
         with self._wrap_hookcmd('secret-revoke', id=id, relation_id=relation_id, unit=unit):
             hookcmds.secret_revoke(id, relation_id=relation_id, unit=unit)
 
-    def secret_remove(self, id: str, *, revision: int | None = None):
+    def secret_remove(self, id: str, *, revision: int | None = None) -> None:
         with self._wrap_hookcmd('secret-remove', id=id, revision=revision):
             hookcmds.secret_remove(id, revision=revision)
 
-    def open_port(self, protocol: str, port: int | None = None):
+    def open_port(self, protocol: str, port: int | None = None) -> None:
         with self._wrap_hookcmd('open-port', protocol=protocol, port=port):
             hookcmds.open_port(protocol, port)
 
-    def close_port(self, protocol: str, port: int | None = None):
+    def close_port(self, protocol: str, port: int | None = None) -> None:
         with self._wrap_hookcmd('close-port', protocol=protocol, port=port):
             hookcmds.close_port(protocol, port)
 
@@ -4102,7 +4384,7 @@ class _ModelBackend:
             ports.add(port)
         return ports
 
-    def reboot(self, now: bool = False):
+    def reboot(self, now: bool = False) -> None:
         _log_security_event(
             _SecurityEventLevel.WARN,
             _SecurityEvent.SYS_RESTART,
@@ -4110,13 +4392,17 @@ class _ModelBackend:
             description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
         )
         with tracer.start_as_current_span('juju-reboot'):
-            if now:
-                hookcmds.juju_reboot(now=True)
-                # Juju will kill the Charm process, and in testing no code after
-                # this point would execute. However, we want to guarantee that for
-                # Charmers, so we force that to be the case.
-                sys.exit()
-            hookcmds.juju_reboot()
+            try:
+                if now:
+                    hookcmds.juju_reboot(now=True)
+                    # Juju will kill the Charm process, and in testing no code after
+                    # this point would execute. However, we want to guarantee that for
+                    # Charmers, so we force that to be the case.
+                    sys.exit()
+                hookcmds.juju_reboot()
+            except hookcmds.Error as e:
+                _raise_if_command_missing(e)
+                raise
 
     def credential_get(self) -> CloudSpec:
         """Access cloud credentials by running the credential-get hook command.
@@ -4134,14 +4420,14 @@ class _ModelBackendValidator:
     METRIC_KEY_REGEX = re.compile(r'^[a-zA-Z](?:[a-zA-Z0-9-_]*[a-zA-Z0-9])?$')
 
     @classmethod
-    def validate_metric_key(cls, key: str):
+    def validate_metric_key(cls, key: str) -> None:
         if cls.METRIC_KEY_REGEX.match(key) is None:
             raise ModelError(
                 f'invalid metric key {key!r}: must match {cls.METRIC_KEY_REGEX.pattern}'
             )
 
     @classmethod
-    def validate_metric_label(cls, label_name: str):
+    def validate_metric_label(cls, label_name: str) -> None:
         if cls.METRIC_KEY_REGEX.match(label_name) is None:
             raise ModelError(
                 f'invalid metric label name {label_name!r}: '
@@ -4149,7 +4435,7 @@ class _ModelBackendValidator:
             )
 
     @classmethod
-    def format_metric_value(cls, value: int | float):
+    def format_metric_value(cls, value: int | float) -> str:
         if not isinstance(value, (int, float)):
             raise ModelError(
                 f'invalid metric value {value!r} provided: must be a positive finite float'
@@ -4162,7 +4448,7 @@ class _ModelBackendValidator:
         return str(value)
 
     @classmethod
-    def validate_label_value(cls, label: str, value: str):
+    def validate_label_value(cls, label: str, value: str) -> None:
         # Label values cannot be empty, contain commas or equal signs as those are
         # used by add-metric as separators.
         if not value:
@@ -4207,12 +4493,12 @@ class LazyNotice:
         type_repr = self.type if isinstance(self.type, pebble.NoticeType) else repr(self.type)
         return f'LazyNotice(id={self.id!r}, type={type_repr}, key={self.key!r})'
 
-    def __getattr__(self, item: str):
+    def __getattr__(self, item: str) -> Any:
         # Note: not called for defined attributes (id, type, key)
         self._ensure_loaded()
         return getattr(self._notice, item)
 
-    def _ensure_loaded(self):
+    def _ensure_loaded(self) -> None:
         if self._notice is not None:
             return
         self._notice = self._container.get_notice(self.id)
@@ -4245,12 +4531,12 @@ class LazyCheckInfo:
     def __repr__(self):
         return f'LazyCheckInfo(name={self.name!r})'
 
-    def __getattr__(self, item: str):
+    def __getattr__(self, item: str) -> Any:
         # Note: not called for defined attribute `name`.
         self._ensure_loaded()
         return getattr(self._info, item)
 
-    def _ensure_loaded(self):
+    def _ensure_loaded(self) -> None:
         if self._info is not None:
             return
         self._info = self._container.get_check(self.name)
@@ -4361,3 +4647,51 @@ class CloudSpec:
             skip_tls_verify=o.skip_tls_verify,
             is_controller_cloud=o.is_controller_cloud,
         )
+
+
+class ProxyConfig:
+    """Proxy settings from the model's ``juju-*-proxy`` config.
+
+    The ``http`` and ``https`` attributes are ``None`` if the corresponding model config
+    is not available (either its env var is unset, or its value is empty). ``no`` is
+    an empty tuple in that case.
+    """
+
+    def __init__(
+        self,
+        *,
+        http: str | None = None,
+        https: str | None = None,
+        no: tuple[str, ...] = (),
+    ):
+        self._http = http
+        self._https = https
+        self._no = no
+
+    @property
+    def http(self) -> str | None:
+        """The HTTP proxy, from the ``juju-http-proxy`` model config."""
+        return self._http
+
+    @property
+    def https(self) -> str | None:
+        """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
+        return self._https
+
+    @property
+    def no(self) -> tuple[str, ...]:
+        """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config.
+
+        This is the comma-separated model config split into its entries, and is an
+        empty tuple if the model config is not available. Entries can contain '*',
+        and a '*' entry excludes all destinations.
+        """
+        return self._no
+
+    def __repr__(self):
+        return f'ProxyConfig(http={self._http!r}, https={self._https!r}, no={self._no!r})'
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ProxyConfig):
+            return False
+        return (self._http, self._https, self._no) == (other._http, other._https, other._no)

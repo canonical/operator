@@ -135,13 +135,17 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
             if self.unit.is_leader():
                 assert local_app_data['k'] == 'local val'  # test read
                 local_app_data['k'] = 'new val'  # test write
+                assert len(local_app_data.items()) == 1
+                assert 'k' in local_app_data
             else:
                 with pytest.raises(ops.RelationDataAccessError):
                     local_app_data['k']
-            # these probably fail at real runtime with a ModelError
-            # but pass here because the validation methods are only hooked up to get/set
-            assert len(local_app_data.items()) == 1
-            assert 'k' in local_app_data
+                # Reads that don't go via __getitem__ are validated as well, so that
+                # they raise here rather than a ModelError at real runtime.
+                with pytest.raises(ops.RelationDataAccessError):
+                    len(local_app_data.items())
+                with pytest.raises(ops.RelationDataAccessError):
+                    _ = 'k' in local_app_data
 
     ctx = Context(
         ValidateCharm,
@@ -822,6 +826,21 @@ def test_trigger_sub_relation():
         meta=meta,
         post_event=post_event,
     )
+
+
+def test_subordinate_relation_large_remote_unit_id():
+    # Small ints are interned, so an identity comparison only fails above 256.
+    meta = {'name': 'local', 'requires': {'foo': {'interface': 'foo', 'scope': 'container'}}}
+    relation = SubordinateRelation('foo', remote_unit_id=1000, remote_unit_data={'k': 'v'})
+
+    def post_event(charm: ops.CharmBase):
+        rel = charm.model.get_relation('foo')
+        assert rel is not None
+        (unit,) = rel.units
+        assert unit.name == 'remote/1000'
+        assert rel.data[unit]['k'] == 'v'
+
+    trigger(State(relations={relation}), 'update_status', Charm, meta=meta, post_event=post_event)
 
 
 def test_cannot_instantiate_relationbase():

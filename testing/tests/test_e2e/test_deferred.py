@@ -8,7 +8,7 @@ from collections.abc import Mapping
 
 import pytest
 from scenario import Context
-from scenario.state import Container, Relation, State, _Event
+from scenario.state import Container, Event, Relation, State
 
 import ops
 
@@ -56,7 +56,7 @@ def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]):
     mycharm.defer_next = 2  # type: ignore
 
     out = trigger(
-        State(deferred=[_Event('update_status').deferred(handler=mycharm._on_event)]),  # type: ignore
+        State(deferred=[Event('update_status').deferred(handler=mycharm._on_event)]),  # type: ignore
         'start',
         mycharm,
         meta=mycharm.META,  # type: ignore
@@ -82,7 +82,7 @@ def test_deferred_relation_event(mycharm: type[ops.CharmBase]):
         State(
             relations={rel},
             deferred=[
-                _Event('foo_relation_changed', relation=rel).deferred(
+                Event('foo_relation_changed', _relation=rel).deferred(
                     handler=mycharm._on_event,  # type: ignore
                 )
             ],
@@ -145,7 +145,7 @@ def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
         State(
             containers={ctr},
             deferred=[
-                _Event('foo_pebble_ready', container=ctr).deferred(handler=mycharm._on_event)  # type: ignore
+                Event('foo_pebble_ready', _container=ctr).deferred(handler=mycharm._on_event)  # type: ignore
             ],
         ),
         'start',
@@ -275,7 +275,7 @@ class CustomEvents(ops.ObjectEvents):
 
 
 class MyConsumer(ops.Object):
-    on = CustomEvents()  # type: ignore
+    on = CustomEvents()
 
     def __init__(self, charm: ops.CharmBase):
         super().__init__(charm, 'my-consumer')
@@ -311,3 +311,30 @@ def test_defer_custom_event(mycharm: type[ops.CharmBase]):
         == {'arg0': 'foo', 'arg1': 28}
     )
     assert not state_2.deferred
+
+
+def _plain_function(event: ops.EventBase):
+    pass
+
+
+def test_deferred_handler_must_be_a_method():
+    with pytest.raises(ValueError, match='must be a method'):
+        Event('start').deferred(handler=_plain_function)
+
+
+def test_deferred_handler_must_not_be_a_nested_function():
+    def nested(event: ops.EventBase):
+        pass
+
+    with pytest.raises(ValueError, match='must be a method'):
+        Event('start').deferred(handler=nested)
+
+
+def test_deferred_handler_can_be_a_method_of_a_nested_class():
+    class NestedCharm(ops.CharmBase):
+        def _on_start(self, event: ops.EventBase):
+            pass
+
+    deferred = Event('start').deferred(handler=NestedCharm._on_start)
+    assert deferred.handle_path == 'NestedCharm/on/start[1]'
+    assert deferred.observer == '_on_start'

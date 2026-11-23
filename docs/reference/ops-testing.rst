@@ -101,6 +101,7 @@ This API for testing was previously called 'Scenario'.
    :special-members: __call__
 .. autoclass:: ops.testing.DeferredEvent
 .. autoclass:: ops.testing.ErrorStatus
+.. autoclass:: ops.testing.Event()
 .. autoclass:: ops.testing.Exec
 .. autoclass:: ops.testing.ICMPPort
 .. autoclass:: ops.testing.JujuLogLine
@@ -112,6 +113,7 @@ This API for testing was previously called 'Scenario'.
 .. autoclass:: ops.testing.Notice
 .. autoclass:: ops.testing.PeerRelation
 .. autoclass:: ops.testing.Port
+.. autoclass:: ops.testing.ProxyConfig
 .. autoclass:: ops.testing.Relation
 .. autoclass:: ops.testing.RelationBase
 .. autoclass:: ops.testing.Resource

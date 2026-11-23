@@ -57,7 +57,7 @@ If your virtual machine gets into an undesirable state, use {external+multipass:
 With your virtual machine stopped, make your project directory available inside your virtual machine, then start your virtual machine:
 
 ```text
-multipass mount --type native /path/to/my-charm juju-sandbox:~/my-charm
+multipass mount --type native /path/to/my-charm juju-sandbox:my-charm
 multipass shell juju-sandbox
 ```
 
@@ -122,7 +122,7 @@ import pytest
 
 @pytest.fixture(scope='session')
 def charm():
-    """Return the path of the charm under test."""
+    """Return the absolute path of the charm under test."""
     charm = os.environ.get('CHARM_PATH')
     if not charm:
         charm_dir = (

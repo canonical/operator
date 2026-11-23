@@ -12,7 +12,7 @@ permissions: {}
 
 jobs:
   build-wheels:
-    uses: ./.github/workflows/_build-wheels.yaml
+    uses: $/.github/workflows/_build-wheels.yaml
 
   o11y-charm-tests:
     runs-on: ubuntu-latest
@@ -23,21 +23,21 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: 876ead46978a030c82f7481f9158832a1df85ce3  # rev241 2026-08-21T14:21:22Z
+            commit: a448fef5e050bbf77817976d6ca8dc56d6154b2c  # rev245 2026-09-15T16:02:16Z
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: 5ddc8619405a52d268263c5bedfefa328e5f33aa  # rev320 2026-08-19T16:04:44Z
+            commit: 30c6f9b761882c3625d55bc7ad1059decafc4105  # 2026-09-24T21:41:03Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: d09d11161b66e6a623d59d972070ce564aab3112  # 2026-08-21T12:53:20Z
+            commit: 2ac8767c0fadc9dd34eb53174bd17c3415daeb98  # rev201 2026-09-14T20:08:32Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Download operator wheels
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: ${{ needs.build-wheels.outputs.artifact-name }}
           path: operator-wheels

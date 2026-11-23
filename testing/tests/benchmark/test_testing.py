@@ -25,6 +25,8 @@ import pytest
 import ops
 from ops import testing
 
+pytest.importorskip('pytest_benchmark')  # Provides the 'benchmark' fixture.
+
 
 @pytest.fixture
 def benchmark_charm():

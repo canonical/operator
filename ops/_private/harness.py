@@ -2400,6 +2400,7 @@ class _TestingModelBackend:
         self._pebble_clients_can_connect: dict[_TestingPebbleClient, bool] = {}
         self._planned_units: int | None = None
         self._hook_is_running = ''
+        self._event_is_deferred = False
         self._secrets: list[_Secret] = []
         self._opened_ports: set[model.Port] = set()
         self._networks: dict[tuple[str | None, int | None], _NetworkDict] = {}
@@ -4063,7 +4064,10 @@ class _TestingPebbleClient:
         # For example: if user_id filter is set and it doesn't match, return False.
         if user_id is not None and not (notice.user_id is None or user_id == notice.user_id):
             return False
-        if types is not None and notice.type not in types:
+        notice_type = (
+            notice.type.value if isinstance(notice.type, pebble.NoticeType) else notice.type
+        )
+        if types is not None and notice_type not in types:
             return False
         if keys is not None and notice.key not in keys:
             return False

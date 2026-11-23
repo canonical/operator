@@ -1,3 +1,116 @@
+# 3.10.0 - 20 November 2026
+
+## Breaking Changes
+
+* Fix: `ops.hookcmds` returns all the data that the hook commands output ([#2805](https://github.com/canonical/operator/pull/2805))
+
+## Features
+
+* Make the testing event class public as `ops.testing.Event` ([#2760](https://github.com/canonical/operator/pull/2760))
+* Model juju-*-proxy model configs from Juju ([#2832](https://github.com/canonical/operator/pull/2832))
+* Add a typed JSON encoding of `ops.testing.State` for worker processes ([#2828](https://github.com/canonical/operator/pull/2828))
+
+## Fixes
+
+* Avoid exponential backtracking in the `ops.testing` storage name check ([#2800](https://github.com/canonical/operator/pull/2800))
+* `ops.testing.Container` fallback type checking; ty and pyrefly in ci by @Vivek1106-04 ([#2804](https://github.com/canonical/operator/pull/2804))
+* Send the correct OTLP span kind from ops-tracing by @Vivek1106-04 ([#2824](https://github.com/canonical/operator/pull/2824))
+* Preserve zero user and group IDs in Pebble services by @ItsM0rty ([#2847](https://github.com/canonical/operator/pull/2847))
+* Accept tagged Juju versions and type lists in the `ops.testing` consistency checker ([#2857](https://github.com/canonical/operator/pull/2857))
+* Preserve zero user and group IDs when merging Pebble exec checks by @nancy6547 ([#2867](https://github.com/canonical/operator/pull/2867))
+* Handle an OSError connecting exec websockets like a websocket error ([#2877](https://github.com/canonical/operator/pull/2877))
+* Close the socket when connecting an exec websocket fails ([#2876](https://github.com/canonical/operator/pull/2876))
+* Wrap errors reading the Pebble response in `ConnectionError` ([#2875](https://github.com/canonical/operator/pull/2875))
+* Encode bytes, mapping attributes and dropped counts per OTLP/JSON by @Vivek1106-04 ([#2827](https://github.com/canonical/operator/pull/2827))
+* Skip symlinks in push_path, and keep going after a failed file ([#2851](https://github.com/canonical/operator/pull/2851))
+* Use `CheckLevel.UNSET` for an unset level in `testing.CheckInfo` ([#2878](https://github.com/canonical/operator/pull/2878))
+* Decode exec output incrementally, replacing undecodable bytes ([#2870](https://github.com/canonical/operator/pull/2870))
+* Keep the check level when a merged layer does not set one ([#2872](https://github.com/canonical/operator/pull/2872))
+* Keep non-ASCII characters and whitespace in pulled paths ([#2871](https://github.com/canonical/operator/pull/2871))
+* Accept `ops.Port` in `testing.State`, compare ports by value, and report duplicate entities ([#2855](https://github.com/canonical/operator/pull/2855))
+* Filter Pebble notices by type in `ops.testing` by @Indian-boult ([#2917](https://github.com/canonical/operator/pull/2917))
+
+## Documentation
+
+* Use the pydantic v2 validator in the typed config how-to ([#2802](https://github.com/canonical/operator/pull/2802))
+* Upgrade K8s tutorial to api-demo-server 3.0.0 ([#2833](https://github.com/canonical/operator/pull/2833))
+* Fix the Jubilant module name in the opened ports example ([#2844](https://github.com/canonical/operator/pull/2844))
+* Make the Pebble check and stored state examples run ([#2777](https://github.com/canonical/operator/pull/2777))
+* Remove the Scenario 6 to 7 upgrade guide ([#2836](https://github.com/canonical/operator/pull/2836))
+* Add a how-to set up production integrations guide ([#2835](https://github.com/canonical/operator/pull/2835))
+* Say that `pebble.CheckInfo.level` is `UNSET` when there is no level ([#2879](https://github.com/canonical/operator/pull/2879))
+* Minor consistency fixes in Kubernetes tutorial ([#2893](https://github.com/canonical/operator/pull/2893))
+* Update advice about `uv.lock`; update example charm dependencies and locking strategy ([#2889](https://github.com/canonical/operator/pull/2889))
+* Set `filterwarnings` to `error` in example charms; other minor changes to match Charmcraft ([#2890](https://github.com/canonical/operator/pull/2890))
+* Prevent file handle leaks in Kubernetes tutorial charms ([#2907](https://github.com/canonical/operator/pull/2907))
+* Reconstruct tutorial charms and prevent linter errors ([#2904](https://github.com/canonical/operator/pull/2904))
+
+## Tests
+
+* Drop unused `MODEL_SETTINGS` from tox environments and example charms by @sundeep8967 ([#2702](https://github.com/canonical/operator/pull/2702))
+* Declare ops-scenario and ops-tracing test dependencies ([#2891](https://github.com/canonical/operator/pull/2891))
+
+## CI
+
+* Update the charm-tech-code pins and use the new release tool options ([#2808](https://github.com/canonical/operator/pull/2808))
+* Use the self-repository syntax for in-repo actions and workflows ([#2799](https://github.com/canonical/operator/pull/2799))
+* Improve the release workflows after the 2.23.6 release ([#2812](https://github.com/canonical/operator/pull/2812))
+* Fix open code scanning alerts ([#2840](https://github.com/canonical/operator/pull/2840))
+* Run the property-tests branch's property tests nightly ([#2897](https://github.com/canonical/operator/pull/2897))
+
+# 3.9.0 - 08 October 2026
+
+## Features
+
+* Add an exception note when `ModelError` is raised ([#2786](https://github.com/canonical/operator/pull/2786))
+
+## Fixes
+
+* Make `_CharmSpec` covariant in its charm type ([#2715](https://github.com/canonical/operator/pull/2715))
+* Say which tracing destination rejected the data ([#2714](https://github.com/canonical/operator/pull/2714))
+* Detect Pydantic dataclasses from before 2.11 when mapping aliases ([#2768](https://github.com/canonical/operator/pull/2768))
+* Enforce relation databag read permissions on all access paths ([#2738](https://github.com/canonical/operator/pull/2738))
+* Use cached leadership in security logging, renew lease on success by @cristiangirlea ([#2778](https://github.com/canonical/operator/pull/2778))
+* A gone relation raises `RelationNotFoundError`, not "permission denied" ([#2748](https://github.com/canonical/operator/pull/2748))
+* Treat an `_Abort(0)` from the charm's `__init__` as success in ops.testing ([#2780](https://github.com/canonical/operator/pull/2780))
+* Record trace data in every ops.testing run with opentelemetry-sdk 1.45 ([#2787](https://github.com/canonical/operator/pull/2787))
+* Let charms and libraries set `on` without a type: ignore ([#2775](https://github.com/canonical/operator/pull/2775))
+
+## Documentation
+
+* Surface the tool versions page ([#2712](https://github.com/canonical/operator/pull/2712))
+* Update Concierge links and intersphinx URLs in doc source ([#2725](https://github.com/canonical/operator/pull/2725))
+* Add retry loop to version check in K8s tutorial charm ([#2689](https://github.com/canonical/operator/pull/2689))
+* Merge HACKING.md into CONTRIBUTING.md, fewer files in root ([#2734](https://github.com/canonical/operator/pull/2734))
+* Add a how-to guide for securing a charm ([#2721](https://github.com/canonical/operator/pull/2721))
+* Condense and trim CONTRIBUTING.md ([#2754](https://github.com/canonical/operator/pull/2754))
+* Fix the self-review command in the discoverability how-to ([#2764](https://github.com/canonical/operator/pull/2764))
+* Mount the project directory to a target relative to the home directory ([#2765](https://github.com/canonical/operator/pull/2765))
+* Pull tutorial code snippets from examples/ ([#2544](https://github.com/canonical/operator/pull/2544))
+
+## Tests
+
+* Add conformance tests for the tracing and certificate_transfer interfaces ([#2711](https://github.com/canonical/operator/pull/2711))
+* Make pyright check whole trees rather than a list of directories ([#2779](https://github.com/canonical/operator/pull/2779))
+
+## Refactoring
+
+* Drop typing.cast where narrowing can do the work ([#2723](https://github.com/canonical/operator/pull/2723))
+* Only import pdb when a debugger is actually requested ([#2740](https://github.com/canonical/operator/pull/2740))
+
+## CI
+
+* Enrich scheduled-failure issues with an LLM triage pass ([#2663](https://github.com/canonical/operator/pull/2663), [#2781](https://github.com/canonical/operator/pull/2781))
+* Stop tox writing a .venv redirect file in the examples ([#2769](https://github.com/canonical/operator/pull/2769))
+* Move the release process from release.py to workflows ([#2772](https://github.com/canonical/operator/pull/2772))
+
+# 3.8.3 - 30 September 2026
+
+## **Security** Fixes
+
+* Stop recording secret content, relation data, pod specs, and action results and log messages in trace data (GHSA-4356-5g33-3qrp)
+* Stop including action results and action log messages in hook command errors
+
 # 3.8.2 - 31 August 2026
 
 ## Fixes

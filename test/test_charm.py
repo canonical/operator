@@ -59,7 +59,7 @@ def test_basic(request: pytest.FixtureRequest):
 
     framework = create_framework(request)
 
-    events: list[str] = list(MyCharm.on.events())  # type: ignore
+    events: list[str] = list(MyCharm.on.events())
     assert 'install' in events
     assert 'custom' in events
 
@@ -718,7 +718,7 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     framework = create_framework(request, meta=meta)
     charm = MyCharm(framework)
 
-    events: list[str] = list(MyCharm.on.events())  # type: ignore
+    events: list[str] = list(MyCharm.on.events())
     assert 'foo_bar_action' in events
     assert 'start_action' in events
 

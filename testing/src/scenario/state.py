@@ -26,6 +26,7 @@ from typing import (
     NoReturn,
     TypeVar,
     cast,
+    final,
     overload,
 )
 from uuid import uuid4
@@ -36,6 +37,7 @@ import ops
 from ops import CharmBase, CharmEvents, SecretRotate, StatusBase, pebble
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
+from ops import ProxyConfig as ProxyConfig_Ops
 
 from . import _charmcraft_extensions
 from .errors import MetadataNotFoundError, StateValidationError
@@ -55,7 +57,7 @@ if TYPE_CHECKING:  # pragma: no cover
     # defaults; these have no metadata equivalent and pass straight through.
     class _StateKwargsRest(TypedDict, total=False):
         networks: Iterable[Network]
-        opened_ports: Iterable[Port]
+        opened_ports: Iterable[Port | ops.Port]
         leader: bool
         model: Model
         secrets: Iterable[Secret]
@@ -277,6 +279,33 @@ class CloudSpec:  # ruff: ignore[undocumented-public-class]
         )
 
 
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class ProxyConfig:
+    """Proxy settings from the model's ``juju-*-proxy`` config.
+
+    The default values of each attribute follow Juju's default values for ``juju-*-proxy`` config.
+    """
+
+    http: str = ''
+    """The HTTP proxy, from the ``juju-http-proxy`` model config."""
+
+    https: str = ''
+    """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
+
+    no: tuple[str, ...] = ('127.0.0.1', 'localhost', '::1')
+    """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config.
+
+    Scenario joins the entries with commas to set ``JUJU_CHARM_NO_PROXY``.
+    """
+
+    def _to_ops(self) -> ProxyConfig_Ops:
+        return ProxyConfig_Ops(
+            http=self.http or None,
+            https=self.https or None,
+            no=tuple(entry.strip() for entry in self.no if entry.strip()),
+        )
+
+
 def _generate_secret_id():
     # This doesn't account for collisions, but the odds are so low that it
     # should not be possible in any realistic test run.
@@ -467,7 +496,11 @@ _NAME_RULES: dict[str, tuple[re.Pattern[str], str]] = {
         'underscores, starting with a letter',
     ),
     'storage': (
-        re.compile(r'^[a-z][a-z0-9]*(?:-[a-z0-9]*[a-z][a-z0-9]*)*$'),
+        # Each hyphen-separated part after the first is "digits, then a letter,
+        # then anything": equivalent to "contains a letter", but without the
+        # ambiguity that makes the obvious [a-z0-9]*[a-z][a-z0-9]* backtrack
+        # exponentially (on 'a-' + 'aa-' * 26 + '!', for example).
+        re.compile(r'^[a-z][a-z0-9]*(?:-[0-9]*[a-z][a-z0-9]*)*$'),
         'lowercase alphanumeric characters separated by single hyphens, '
         'starting with a letter, with each hyphen-separated part '
         'containing at least one letter',
@@ -582,11 +615,14 @@ class Network:
     def __init__(
         self,
         binding_name: str,
-        bind_addresses: Iterable[BindAddress] = (BindAddress([Address('192.0.2.0')]),),
+        bind_addresses: Iterable[BindAddress] | None = None,
         *,
         ingress_addresses: Iterable[str] = ('192.0.2.0',),
         egress_subnets: Iterable[str] = ('192.0.2.0/24',),
     ):
+        if bind_addresses is None:
+            # A fresh default each time: BindAddress.addresses is a list.
+            bind_addresses = (BindAddress([Address('192.0.2.0')]),)
         object.__setattr__(self, 'binding_name', binding_name)
         object.__setattr__(self, 'bind_addresses', list(bind_addresses))
         object.__setattr__(
@@ -901,7 +937,7 @@ class SubordinateRelation(RelationBase):
 
     def _get_databag_for_remote(self, unit_id: int) -> RawDataBagContents:
         """Return the databag for some remote unit ID."""
-        if unit_id is not self.remote_unit_id:
+        if unit_id != self.remote_unit_id:
             raise ValueError(
                 f'invalid unit id ({unit_id}): subordinate relation only has one '
                 f'remote and that has id {self.remote_unit_id}',
@@ -1022,6 +1058,29 @@ class Model:
 
     The spec will be accessible in the charm via the
     :meth:`self.model.get_cloud_spec() <ops.Model.get_cloud_spec>` method.
+    """
+
+    proxy_config: ProxyConfig | None = None
+    """Proxy configs from the model's ``juju-*-proxy`` config.
+
+    Scenario sets the matching ``JUJU_CHARM_*_PROXY`` environment variables
+    from these values.
+
+    If this is ``None``, Scenario doesn't set any of the environment variables.
+
+    For example::
+
+        proxy_config = ProxyConfig(
+            http='http://proxy.example.com:3128',
+            https='http://proxy.example.com:3128',
+            no=('127.0.0.1', 'localhost', '::1'),
+        )
+        state_in = State(
+            model=Model(proxy_config=proxy_config)
+        )
+
+    The configs are available to the charm as
+    :attr:`self.model.proxy_config <ops.Model.proxy_config>` attribute.
     """
 
 
@@ -1221,8 +1280,12 @@ class CheckInfo:
     name: str
     """Name of the check."""
 
-    level: pebble.CheckLevel | None
-    """Level of the check."""
+    level: pebble.CheckLevel
+    """Level of the check.
+
+    This is :attr:`ops.pebble.CheckLevel.UNSET` if the check has no level. Passing
+    ``None`` to the constructor is the same as not passing a level.
+    """
 
     startup: pebble.CheckStartup
     """Startup mode of the check."""
@@ -1273,8 +1336,7 @@ class CheckInfo:
         change_id: pebble.ChangeID | None = None,
     ):
         object.__setattr__(self, 'name', name)
-        if level is not None:
-            level = pebble.CheckLevel(level)
+        level = pebble.CheckLevel.UNSET if level is None else pebble.CheckLevel(level)
         object.__setattr__(self, 'level', level)
         object.__setattr__(self, 'startup', startup)
         object.__setattr__(self, 'status', status)
@@ -1774,16 +1836,22 @@ class Port:
                 'Port cannot be instantiated directly; please use TCPPort, UDPPort, or ICMPPort',
             )
 
+    # The subclasses use eq=False so that they inherit this, rather than the
+    # dataclass-generated __eq__, which would compare the class as well.
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Port, ops.Port)):
             return (self.protocol, self.port) == (other.protocol, other.port)
         return False
 
+    # This matches the hash of an equal ops.Port, whose fields are the other way around.
+    def __hash__(self) -> int:
+        return hash((self.protocol, self.port))
+
     def _to_ops(self) -> ops.Port:
         return ops.Port(port=self.port, protocol=self.protocol)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=False)
 class TCPPort(Port):
     """Represents a TCP port on the charm host."""
 
@@ -1803,7 +1871,7 @@ class TCPPort(Port):
             )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=False)
 class UDPPort(Port):
     """Represents a UDP port on the charm host."""
 
@@ -1823,7 +1891,7 @@ class UDPPort(Port):
             )
 
 
-@dataclasses.dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True, eq=False)
 class ICMPPort(Port):
     """Represents an ICMP port on the charm host."""
 
@@ -1844,6 +1912,17 @@ _port_cls_by_protocol = {
     'udp': UDPPort,
     'icmp': ICMPPort,
 }
+
+
+def _port_from_ops(port: ops.Port) -> Port:
+    """Convert an :class:`ops.Port` to the matching Scenario port class."""
+    if port.protocol == 'icmp':
+        return ICMPPort(port=port.port)
+    if port.protocol not in _port_cls_by_protocol:
+        raise StateValidationError(f'unknown port protocol {port.protocol!r}')
+    if port.port is None:
+        raise StateValidationError(f'`port` is required for {port.protocol} ports')
+    return _port_cls_by_protocol[port.protocol](port.port)
 
 
 _next_storage_index_counter = 0  # storage indices start at 0
@@ -1940,7 +2019,11 @@ class State:
 
     # we don't use sets to make json serialization easier
     opened_ports: frozenset[Port]
-    """Ports opened by Juju on this charm."""
+    """Ports opened by Juju on this charm.
+
+    :class:`ops.Port` values passed to the constructor are converted to the
+    matching :class:`TCPPort`, :class:`UDPPort` or :class:`ICMPPort`.
+    """
     leader: bool
     """Whether this charm has leadership."""
     model: Model
@@ -1982,7 +2065,7 @@ class State:
         networks: Iterable[Network] = (),
         containers: Iterable[Container] = (),
         storages: Iterable[Storage] = (),
-        opened_ports: Iterable[Port] = (),
+        opened_ports: Iterable[Port | ops.Port] = (),
         leader: bool = False,
         model: Model | None = None,
         secrets: Iterable[Secret] = (),
@@ -2014,8 +2097,7 @@ class State:
 
         # Normalise ops.Port to scenario Port.
         normalised_ports = frozenset(
-            Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
-            for port in opened_ports
+            _port_from_ops(port) if isinstance(port, ops.Port) else port for port in opened_ports
         )
         object.__setattr__(self, 'opened_ports', normalised_ports)
 
@@ -2140,12 +2222,12 @@ class State:
         Args:
             relation: A relation ID, or a relation object from a previous state.
                 If a relation object is passed, its ID is used to find the relation, and the
-                type, endpoint and interface of the found relation are validated against it.
+                type and endpoint of the found relation are validated against it.
 
         Raises:
             KeyError: If no relation matching the id is found.
             ValueError: If a relation object is passed but the found relation
-                has a mismatched type, endpoint, or interface.
+                has a mismatched type or endpoint.
         """
         rel_id = relation.id if isinstance(relation, RelationBase) else relation
         for state_relation in self.relations:
@@ -2458,8 +2540,9 @@ class _CharmSpec(Generic[_CharmTypeCo]):
 class DeferredEvent:
     """An event that has been deferred to run prior to the next Juju event.
 
-    Tests should not instantiate this class directly: use the `deferred` method
-    of the event instead. For example:
+    Tests should not instantiate this class directly: use the
+    :meth:`Event.deferred` method of the event instead. For
+    example::
 
         ctx = Context(MyCharm)
         deferred_start = ctx.on.start().deferred(handler=MyCharm._on_start)
@@ -2475,7 +2558,7 @@ class DeferredEvent:
 
     # It would be nicer if people could do something like:
     #   `isinstance(state.deferred[0], ops.StartEvent)`
-    # than comparing with the string names, but there's only one `_Event`
+    # than comparing with the string names, but there's only one `Event`
     # class in Scenario, and it also needs to be created from the context,
     # which is not available here. For the ops classes, it's complex to create
     # them because they need a Handle.
@@ -2563,67 +2646,57 @@ class _EventPath(str):
         return '', _EventType.CUSTOM
 
 
+@final
 @dataclasses.dataclass(frozen=True)
-class _Event:  # type: ignore
-    """A Juju, ops, or custom event that can be run against a charm."""
+class Event:
+    """An event to run against a charm.
 
-    path: str
-    """The name of the event.
+    Get an event by calling the appropriate method of :attr:`Context.on`, and
+    pass it to :meth:`Context.run`. For example::
 
-    For example: ``start``, ``config_changed``, ``my_relation_joined``, or
-    ``custom.MyConsumer.lib_changed``.
+        ctx = Context(MyCharm)
+        ctx.run(ctx.on.start(), State())
 
-    This is converted to an _EventPath object on instantiation.
+    Tests should not instantiate this class directly: the methods of
+    :class:`CharmEvents` make sure that the event is consistent with the
+    component that it is about (the relation, container, secret, and so on).
+    The constructor is not part of the public API, and its arguments may
+    change in any release.
     """
 
-    storage: Storage | None = None
-    """If this is a storage event, the storage it refers to."""
-    relation: RelationBase | None = None
-    """If this is a relation event, the relation it refers to."""
-    relation_remote_unit_id: int | None = None
-    relation_departed_unit_id: int | None = None
+    # The name of the event, for example ``start``, ``config_changed``,
+    # ``my_relation_joined``, or ``{custom}.MyConsumer.lib_changed``.
+    _raw_path: str
 
-    secret: Secret | None = None
-    """If this is a secret event, the secret it refers to."""
+    # The entity that the event is about, if any.
+    _storage: Storage | None = None
+    _relation: RelationBase | None = None
+    _relation_remote_unit_id: int | None = None
+    _relation_departed_unit_id: int | None = None
+    _secret: Secret | None = None
+    # For secret-remove and secret-expired, the revision that the event is about.
+    _secret_revision: int | None = None
+    _container: Container | None = None
+    _notice: Notice | None = None
+    _check_info: CheckInfo | None = None
+    _action: _Action | None = None
 
-    # if this is a secret-removed or secret-expired event, the secret revision it refers to
-    secret_revision: int | None = None
+    # For custom events, the bound event and the arguments to emit it with. The
+    # charm object *must* have an attribute that is an instance of the same
+    # emitter type.
+    _custom_event: ops.BoundEvent | None = None
+    _custom_event_args: Iterable[Any] = dataclasses.field(default_factory=tuple)
+    _custom_event_kwargs: Mapping[str, Any] = dataclasses.field(default_factory=dict[str, Any])
 
-    container: Container | None = None
-    """If this is a workload (container) event, the container it refers to."""
-
-    notice: Notice | None = None
-    """If this is a Pebble notice event, the notice it refers to."""
-
-    check_info: CheckInfo | None = None
-    """If this is a Pebble check event, the check info it provides."""
-
-    action: _Action | None = None
-    """If this is an action event, the :class:`Action` it refers to."""
-
-    custom_event: ops.BoundEvent | None = None
-    """If this is a custom event, the bound event it refers to.
-
-    The charm object *must* have an attribute that is an instance of the same
-    emitter type.
-    """
-
-    custom_event_args: Iterable[Any] = dataclasses.field(default_factory=tuple)
-    """If this is a custom event, the arguments to pass to the event."""
-
-    custom_event_kwargs: Mapping[str, Any] = dataclasses.field(default_factory=dict[str, Any])
-    """If this is a custom event, the keyword arguments to pass to the event."""
-
-    _owner_path: list[str] = dataclasses.field(default_factory=list[str])
-
-    # The event name as Juju provides it. Set in __post_init__ via
-    # object.__setattr__ (frozen dataclass), so it's excluded from init.
+    # These are derived from _raw_path in __post_init__ via object.__setattr__
+    # (frozen dataclass), so they're excluded from init.
+    _path: _EventPath = dataclasses.field(init=False, repr=False)
+    # The event name as Juju provides it.
     _juju_name: str = dataclasses.field(init=False)
 
     def __post_init__(self):
-        path = _EventPath(self.path)
-        # bypass frozen dataclass
-        object.__setattr__(self, 'path', path)
+        path = _EventPath(self._raw_path)
+        object.__setattr__(self, '_path', path)
         # This is the hook name as Juju provides it: the entity name
         # (container/relation/storage) carries verbatim from the path; only
         # the event-type suffix is hyphenated. (Not meaningful for action or
@@ -2635,28 +2708,25 @@ class _Event:  # type: ignore
         )
 
     @property
-    def _path(self) -> _EventPath:
-        # we converted it in __post_init__, but the type checker doesn't know about that
-        return cast('_EventPath', self.path)
-
-    @property
     def name(self) -> str:
-        """Full event name, in Python-attribute form (as ops names the event).
+        """The event name.
 
-        Consists of a 'prefix' and a 'suffix'. The suffix denotes the type of the event, the
-        prefix the name of the entity the event is about. Hyphens in the entity name are
-        translated to underscores, so an event for relation endpoint "foo-bar" has the name:
+        For Juju events, this is the Juju hook name with hyphens replaced by
+        underscores. The name consists of a prefix, naming the entity the event
+        is about, and a suffix, denoting the type of event. For example, a
+        change on relation endpoint ``foo-bar`` runs the Juju hook
+        ``foo-bar-relation-changed``, and the event name is
+        ``foo_bar_relation_changed``. Events that are not about an entity, such
+        as ``update_status``, have no prefix.
 
-        "foo_bar_relation_changed":
-         - "foo_bar"=prefix (name of a relation, hyphens translated to underscores),
-         - "_relation_changed"=suffix (relation event)
-
-        The verbatim endpoint name is preserved in ``self._path.juju_prefix``.
+        For custom events, this is the event's attribute name on its emitter,
+        without the emitter or library name. For example, an event observed
+        as ``self.consumer.on.lib_changed`` has the name ``lib_changed``.
         """
         return self._path.python_name
 
     @property
-    def owner_path(self) -> list[str]:
+    def _owner_path(self) -> list[str]:
         """Path to the ObjectEvents instance owning this event.
 
         If this event is defined on the toplevel charm class, it should be ['on'].
@@ -2691,7 +2761,7 @@ class _Event:  # type: ignore
     @property
     def _is_custom_event(self) -> bool:
         """Whether the event name indicates that this is a custom event."""
-        return self.custom_event is not None
+        return self._custom_event is not None
 
     # this method is private because _CharmSpec is not quite user-facing; also,
     # the user should know.
@@ -2745,6 +2815,11 @@ class _Event:  # type: ignore
                 state_out = ctx.run(ctx.on.start(), state_in)
                 assert len(state_out.deferred) == 2
                 assert state_out.deferred[1].name == 'start'
+
+        Args:
+            handler: the method of the charm class that would have handled the
+                event, for example ``MyCharm._on_start``.
+            event_id: the position of the event in the simulated notice queue.
         """
         handler_repr = repr(handler)
         handler_re = re.compile(r'<function (.*) at .*>')
@@ -2753,7 +2828,13 @@ class _Event:  # type: ignore
             raise ValueError(
                 f'cannot construct DeferredEvent from {handler}; please create one manually.',
             )
-        owner_name, handler_name = match.groups()[0].split('.')[-2:]
+        qualname_parts = match.groups()[0].split('.')
+        if len(qualname_parts) < 2 or qualname_parts[-2] == '<locals>':
+            raise ValueError(
+                f'cannot construct DeferredEvent from {handler}: the handler must be a method '
+                'of an ops.Object subclass, such as MyCharm._on_start.',
+            )
+        owner_name, handler_name = qualname_parts[-2:]
         handle_path = f'{owner_name}/on/{self.name}[{event_id}]'
 
         # Many events have no snapshot data: install, start, stop, remove, config-changed,
@@ -2766,27 +2847,27 @@ class _Event:  # type: ignore
         #  relation event but not *be* one.
         if self._is_workload_event:
             # Enforced by the consistency checker, but for type checkers:
-            assert self.container is not None
-            snapshot_data['container_name'] = self.container.name
-            if self.notice:
-                if hasattr(self.notice.type, 'value'):
-                    notice_type = cast('pebble.NoticeType', self.notice.type).value
+            assert self._container is not None
+            snapshot_data['container_name'] = self._container.name
+            if self._notice:
+                if hasattr(self._notice.type, 'value'):
+                    notice_type = cast('pebble.NoticeType', self._notice.type).value
                 else:
-                    notice_type = str(self.notice.type)
+                    notice_type = str(self._notice.type)
                 snapshot_data.update(
                     {
-                        'notice_id': self.notice.id,
-                        'notice_key': self.notice.key,
+                        'notice_id': self._notice.id,
+                        'notice_key': self._notice.key,
                         'notice_type': notice_type,
                     },
                 )
-            elif self.check_info:
-                snapshot_data['check_name'] = self.check_info.name
+            elif self._check_info:
+                snapshot_data['check_name'] = self._check_info.name
 
         elif self._is_relation_event:
             # Enforced by the consistency checker, but for type checkers:
-            assert self.relation is not None
-            relation = self.relation
+            assert self._relation is not None
+            relation = self._relation
             if isinstance(relation, PeerRelation):
                 # FIXME: relation.unit for peers should point to <this unit>, but we
                 #  don't have access to the local app name in this context.
@@ -2804,34 +2885,34 @@ class _Event:  # type: ignore
                 },
             )
             if not self.name.endswith(('_created', '_broken')):
-                snapshot_data['unit_name'] = f'{remote_app}/{self.relation_remote_unit_id}'
+                snapshot_data['unit_name'] = f'{remote_app}/{self._relation_remote_unit_id}'
             if self.name.endswith('_departed'):
-                snapshot_data['departing_unit'] = f'{remote_app}/{self.relation_departed_unit_id}'
+                snapshot_data['departing_unit'] = f'{remote_app}/{self._relation_departed_unit_id}'
 
         elif self._is_storage_event:
             # Enforced by the consistency checker, but for type checkers:
-            assert self.storage is not None
+            assert self._storage is not None
             snapshot_data.update(
                 {
-                    'storage_name': self.storage.name,
-                    'storage_index': self.storage.index,
-                    # "storage_location": str(self.storage.get_filesystem(self._context)),
+                    'storage_name': self._storage.name,
+                    'storage_index': self._storage.index,
+                    # "storage_location": str(self._storage.get_filesystem(self._context)),
                 },
             )
 
         elif self._is_secret_event:
             # Enforced by the consistency checker, but for type checkers:
-            assert self.secret is not None
+            assert self._secret is not None
             snapshot_data.update(
-                {'secret_id': self.secret.id, 'secret_label': self.secret.label},
+                {'secret_id': self._secret.id, 'secret_label': self._secret.label},
             )
             if self.name.endswith(('_remove', '_expired')):
-                snapshot_data['secret_revision'] = self.secret_revision
+                snapshot_data['secret_revision'] = self._secret_revision
 
         elif self._is_action_event:
             # Enforced by the consistency checker, but for type checkers:
-            assert self.action is not None
-            snapshot_data['id'] = self.action.id
+            assert self._action is not None
+            snapshot_data['id'] = self._action.id
 
         return DeferredEvent(
             handle_path,
@@ -2840,6 +2921,9 @@ class _Event:  # type: ignore
             snapshot_data=snapshot_data,
         )
 
+
+# Some charms' tests import this class as ``_Event``.
+_Event = Event
 
 _next_action_id_counter = 1
 

@@ -53,7 +53,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
 def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the workload version has been set."""
-    expected_version = "2.1.0"  # Hardcoded for simplicity.
+    expected_version = "3.0.0"  # Hardcoded for simplicity.
     juju.wait(lambda status: status.apps[APP_NAME].version == expected_version)
 
 
@@ -111,6 +111,9 @@ def _get_loki_logs(loki_api_url: str) -> list[str] | None:
             time.sleep(1)
         try:
             response = urllib.request.urlopen(loki_api_url)
+        except urllib.error.HTTPError as error:
+            error.close()  # Prevent a file handle leak.
+            continue
         except urllib.error.URLError:
             continue
         response_decoded = json.loads(response.read())

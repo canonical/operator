@@ -42,7 +42,15 @@ Charmcraft created several files, including:
 - `src/charm.py` - The Python file that will contain the logic of your charm.
 - `src/fastapi_demo.py` - A helper module that will contain functions for interacting with your workload application.
 
-These files currently contain placeholder code and configuration.
+These files currently contain placeholder code and configuration. It's possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
+
+Charmcraft didn't create a lock file. Create one now:
+
+```text
+uv lock
+```
+
+This creates a file called `uv.lock`, which specifies the exact dependency versions that will be installed when you test and build your charm. When you commit your charm to source control, include `uv.lock`.
 
 ## Write your charm
 
@@ -50,33 +58,20 @@ These files currently contain placeholder code and configuration.
 
 Open `~/k8s-tutorial/charmcraft.yaml` in your usual text editor or IDE, then change the values of `title`, `summary`, and `description` to:
 
-```yaml
-title: Web Server Demo
-summary: A demo charm that operates a small Python FastAPI server.
-description: |
-  This charm demonstrates how to write a Kubernetes charm with Ops.
+```{literalinclude} ../../../examples/k8s-1-minimal/charmcraft.yaml
+:language: yaml
+:start-at: 'title: Web Server Demo'
+:end-at: how to write a Kubernetes charm with Ops.
 ```
 
 Next, describe the workload container and its OCI image.
 
 In `charmcraft.yaml`, replace the `containers` and `resources` blocks with:
 
-```yaml
-containers:
-  demo-server:
-    resource: demo-server-image
-
-resources:
-  # An OCI image resource for the container listed above.
-  demo-server-image:
-    type: oci-image
-    description: OCI image from GitHub Container registry
-    # The upstream-source field is ignored by Charmcraft and Juju, but it can be
-    # useful to developers in identifying the source of the OCI image.  It is also
-    # used by the 'canonical/charming-actions' GitHub action for automated releases.
-    # The test_deploy function in tests/integration/test_charm.py reads upstream-source
-    # to determine which OCI image to use when running the charm's integration tests.
-    upstream-source: ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
+```{literalinclude} ../../../examples/k8s-1-minimal/charmcraft.yaml
+:language: yaml
+:start-at: 'containers:'
+:end-at: 'upstream-source: ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0'
 ```
 
 ### Write a helper module
@@ -89,23 +84,9 @@ To make things easier for Juju users, your charm should expose the workload vers
 
 Replace the content of `src/fastapi_demo.py` with:
 
-```python
-import json
-import logging
-import urllib.request
-
-logger = logging.getLogger(__name__)
-
-
-def get_version(port: int) -> str:
-    """Get the version of fastapi_demo that is running.
-
-    Args:
-        port: The port where fastapi_demo web server is listening.
-    """
-    response = urllib.request.urlopen(f"http://localhost:{port}/version")
-    data = json.loads(response.read())
-    return data["version"]
+```{literalinclude} ../../../examples/k8s-1-minimal/src/fastapi_demo.py
+:language: python
+:start-at: '"""Functions for interacting with the workload.'
 ```
 
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
@@ -133,8 +114,6 @@ Replace the contents of `src/charm.py` with:
 
 import ops
 
-import fastapi_demo
-
 
 class FastAPIDemoCharm(ops.CharmBase):
     """Charm the service."""
@@ -148,6 +127,8 @@ if __name__ == "__main__":  # pragma: nocover
 ```
 
 As you can see, a charm is a pure Python class that inherits from the [`CharmBase`](ops.CharmBase) class of Ops and which we pass to [](ops.main). We'll refer to `FastAPIDemoCharm` as the "charm class".
+
+Before continuing, run `tox -e lint`. You'll see errors about unknown imports, which occur because `tests/unit/test_charm.py` depends on the version of `src/charm.py` you just replaced. Delete `tests/unit/test_charm.py` for now; we'll recreate `test_charm.py` later in the tutorial.
 
 ### Add logger functionality
 
@@ -164,8 +145,10 @@ logger = logging.getLogger(__name__)
 
 In the `__init__` function of your charm class, we'll tell Ops which method of your charm class to run for each event. Let's start with when the Juju controller tells us that the workload container's Pebble is up and running.
 
-```python
-framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
+```{literalinclude} ../../../examples/k8s-1-minimal/src/charm.py
+:language: python
+:start-at: framework.observe(self.on["demo-server"]
+:end-at: framework.observe(self.on["demo-server"]
 ```
 
 
@@ -209,8 +192,6 @@ services:
     summary: FastAPI demo server
     command: /bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000
     startup: enabled
-    environment:
-      DEMO_SERVER_LOGFILE: /tmp/demo_server.log
     ...
 ```
 
@@ -222,24 +203,17 @@ The workload version is available after the workload starts, which happens after
 
 In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready` function after the `container.replan()` line:
 
-```python
-# Set the workload version of this charm.
-# The workload may not be ready immediately after replan(), so try get_version() in a loop.
-for attempt in range(3):  # In general, allow more attempts for a complex workload.
-    if attempt:
-        time.sleep(2**attempt)  # If not first attempt, retry with exponential back-off.
-    try:
-        version = fastapi_demo.get_version(port=8000)
-        break
-    except urllib.error.URLError:
-        continue
-else:
-    logger.error("The workload was not available within the expected time")
-    raise RuntimeError("workload is not available")
-self.unit.set_workload_version(version)
+```{literalinclude} ../../../examples/k8s-1-minimal/src/charm.py
+:language: python
+:start-at: "# Set the workload version of this charm."
+:end-at: self.unit.set_workload_version(version)
 ```
 
-Then, still in `src/charm.py`, add `import time` and `import urllib.error` in the imports at the top of the file.
+Then, still in `src/charm.py`, add the following lines at the top of the file:
+
+- `import time`
+- `import urllib.error`
+- `import fastapi_demo`
 
 We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju.
 
@@ -276,7 +250,7 @@ Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` 
 
 ```text
 juju deploy ./fastapi-demo_amd64.charm --resource \
-     demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
+     demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0
 ```
 
 
@@ -300,7 +274,7 @@ Model    Controller     Cloud/Region  Version  SLA          Timestamp
 testing  concierge-k8s  k8s           3.6.13   unsupported  13:38:19+01:00
 
 App           Version  Status  Scale  Charm         Channel  Rev  Address         Exposed  Message
-fastapi-demo  2.1.0    active      1  fastapi-demo             0  10.152.183.215  no
+fastapi-demo  3.0.0    active      1  fastapi-demo             0  10.152.183.215  no
 
 Unit             Workload  Agent  Address      Ports  Message
 fastapi-demo/0*  active    idle   10.1.157.73
@@ -317,7 +291,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"2.1.0"}
+{"version":"3.0.0"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!
@@ -369,68 +343,11 @@ In this section we'll write a test to check that the `fastapi` service is starte
 
 ### Write a test
 
-Replace the contents of `tests/unit/test_charm.py` with:
+Create a file `tests/unit/test_charm.py` containing:
 
-```python
-import ops
-import pytest
-from ops import testing
-
-from charm import FastAPIDemoCharm
-
-# The default Pebble layer in the application image.
-# Defined in https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml
-ROCK_LAYER = ops.pebble.Layer(
-    {
-        "services": {
-            "fastapi": {
-                "override": "replace",
-                "summary": "FastAPI demo server",
-                "command": "/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000",
-                "startup": "enabled",
-                "environment": {"DEMO_SERVER_LOGFILE": "/tmp/demo_server.log"},
-                "on-success": "shutdown",
-                "on-failure": "shutdown",
-            }
-        },
-    }
-)
-
-
-def mock_get_version(port: int):
-    """Get a mock version string without executing the workload code."""
-    return "0.0.1"
-
-
-@pytest.fixture
-def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
-
-
-def test_pebble_layer(mock_version):
-    ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(
-        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
-    )
-    state_in = testing.State(
-        containers={container},
-        leader=True,
-    )
-    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-    # Expected plan after Pebble ready (our charm doesn't add any layers).
-    expected_plan = ops.pebble.Plan(ROCK_LAYER.to_dict())
-
-    # Check that we have the plan we expected:
-    assert state_out.get_container(container.name).plan == expected_plan
-    # Check the unit is active:
-    assert state_out.unit_status == testing.ActiveStatus()
-    # Check the service was started:
-    assert (
-        state_out.get_container(container.name).service_statuses["fastapi"]
-        == ops.pebble.ServiceStatus.ACTIVE
-    )
-    # Check the workload version is set:
-    assert state_out.workload_version == "0.0.1"
+```{literalinclude} ../../../examples/k8s-1-minimal/tests/unit/test_charm.py
+:language: python
+:start-at: import ops
 ```
 
 This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
@@ -451,23 +368,15 @@ The result should be similar to the following output:
 
 ```text
 ...
-============================================ test session starts =============================================
-platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python3
-cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/fastapi-demo
-configfile: pyproject.toml
-collected 1 item
 
-tests/unit/test_charm.py::test_pebble_layer PASSED
-
-============================================= 1 passed in 0.54s ==============================================
+============================= 1 passed in 0.54s ==============================
 unit: commands[1]> coverage report
 Name                  Stmts   Miss Branch BrPart  Cover   Missing
 -----------------------------------------------------------------
-src/charm.py             20      0      0      0   100%
+src/charm.py             25      5      4      2    76%   34, 38-42
 src/fastapi_demo.py       8      3      0      0    62%   35-37
 -----------------------------------------------------------------
-TOTAL                    28      3      0      0    89%
+TOTAL                    33      8      4      2    73%
   unit: OK (1.91=setup[0.09]+cmd[1.54,0.28] seconds)
   congratulations :) (1.93 seconds)
 ```
@@ -490,34 +399,9 @@ Let's write some integration tests as [smoke tests](https://en.wikipedia.org/wik
 
 Replace the contents of `tests/integration/test_charm.py` with:
 
-```python
-import logging
-import pathlib
-
-import jubilant
-import pytest
-import yaml
-
-logger = logging.getLogger(__name__)
-
-METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
-APP_NAME = METADATA["name"]
-
-
-@pytest.mark.juju_setup
-def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Deploy the charm under test."""
-    resources = {
-        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
-    }
-    juju.deploy(charm, app=APP_NAME, resources=resources)
-    juju.wait(jubilant.all_active)
-
-
-def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
-    """Verify that the workload version has been set."""
-    expected_version = "2.1.0"  # Hardcoded for simplicity.
-    juju.wait(lambda status: status.apps[APP_NAME].version == expected_version)
+```{literalinclude} ../../../examples/k8s-1-minimal/tests/integration/test_charm.py
+:language: python
+:start-at: import logging
 ```
 
 These tests depend on two fixtures:
