@@ -12,10 +12,11 @@ from collections.abc import Iterator
 
 import pytest
 from scenario import ActiveStatus, State
-from scenario._isolation import Worker, load_charm_spec
+from scenario._isolation import Worker
 from scenario._isolation_errors import IsolationError
 from scenario.context import CharmEvents
 from scenario.errors import MetadataNotFoundError
+from scenario.state import _CharmSpec
 
 HERE = pathlib.Path(__file__).parent
 CHARMS = HERE / 'charms'
@@ -272,7 +273,7 @@ def test_close_stops_the_worker_and_a_later_event_starts_another():
 
 
 def test_metadata_is_read_from_a_unified_charmcraft_yaml():
-    meta, config, actions = load_charm_spec(CHARMS / 'report')
+    meta, config, actions = _CharmSpec._load_metadata_or_legacy(CHARMS / 'report')
     assert meta['name'] == 'report'
     assert 'config' not in meta
     assert config == {'options': {'name': {'type': 'string', 'default': 'default'}}}
@@ -280,12 +281,12 @@ def test_metadata_is_read_from_a_unified_charmcraft_yaml():
 
 
 def test_metadata_is_read_from_metadata_yaml():
-    meta, config, actions = load_charm_spec(CHARMS / 'alpha')
+    meta, config, actions = _CharmSpec._load_metadata_or_legacy(CHARMS / 'alpha')
     assert meta['name'] == 'alpha'
     assert config is None
     assert actions is None
 
 
 def test_a_charm_without_metadata_is_rejected(tmp_path: pathlib.Path):
-    with pytest.raises(MetadataNotFoundError, match='No charm metadata'):
+    with pytest.raises(MetadataNotFoundError, match='invalid charm root'):
         Worker(tmp_path)

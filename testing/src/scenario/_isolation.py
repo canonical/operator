@@ -25,32 +25,12 @@ from . import _state_json
 from ._isolation_errors import IsolationError
 from ._worker_protocol import read_message, write_message
 from .context import _DEFAULT_JUJU_VERSION
-from .errors import MetadataNotFoundError
 from .state import State, _CharmSpec, _Event
 
 # Seconds one event may run before the worker is killed.
 # A guard against a hang, not a performance check: the first event also
 # imports the charm, which can be slow for a large charm on a busy CI runner.
 _DEFAULT_TIMEOUT = 60.0
-
-
-def load_charm_spec(
-    charm_root: pathlib.Path,
-) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any] | None]:
-    """Read a charm's metadata, config and actions without importing it.
-
-    Raises:
-        MetadataNotFoundError: if there's neither a ``charmcraft.yaml`` nor a
-            ``metadata.yaml`` with metadata in it.
-    """
-    meta, config, actions = _CharmSpec._load_metadata(charm_root)
-    if not meta:
-        meta, config, actions = _CharmSpec._load_metadata_legacy(charm_root)
-    if not meta:
-        raise MetadataNotFoundError(
-            f'No charm metadata in {charm_root} (looked for charmcraft.yaml and metadata.yaml).'
-        )
-    return meta, config, actions
 
 
 # Python puts the current directory first on sys.path when running -c, and
@@ -115,7 +95,7 @@ class Worker:
         app_trusted: bool = False,
         timeout: float | None = _DEFAULT_TIMEOUT,
     ):
-        meta, config, actions = load_charm_spec(charm_source)
+        meta, config, actions = _CharmSpec._load_metadata_or_legacy(charm_source)
         self.app_name: str = app_name or meta['name']
         self._setup = {
             'charm_source': str(charm_source),
