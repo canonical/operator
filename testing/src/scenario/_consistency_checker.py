@@ -28,7 +28,8 @@ from collections.abc import Callable, Hashable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
-from ops import JujuVersion, pebble
+from ops import ActionMeta, JujuVersion, pebble
+from ops.charm import _config_value_has_type
 
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
@@ -359,7 +360,10 @@ def _check_action_param_types(
     }
     expected_param_type: dict[str, Any] = {}
     action_spec = cast('dict[str, Any]', actions[action.name] or {})
-    action_params = cast('dict[str, dict[str, Any]]', action_spec.get('params', {}))
+    # The test's Juju version decides the additionalProperties default, not
+    # the JUJU_VERSION environment variable of the test runner.
+    action_meta = ActionMeta(action.name, action_spec, _juju_version=juju_version)
+    action_params = cast('dict[str, dict[str, Any]]', action_meta.parameters)
     for par_name, par_spec in action_params.items():
         value = par_spec.get('type')
         if not value:
@@ -379,20 +383,14 @@ def _check_action_param_types(
                 f'Cannot consistency-check.',
             )
 
-    # The default in Juju 4 is False. The default in earlier Juju versions is True.
-    declared_additional_properties = action_spec.get('additionalProperties')
-    if declared_additional_properties is None:
-        additional_properties = juju_version < '4.0.0'
-    else:
-        additional_properties = declared_additional_properties
     for provided_param_name, provided_param_value in action.params.items():
         if provided_param_name not in action_params:
-            if not additional_properties:
+            if not action_meta.additional_properties:
                 errors.append(
                     f'param {provided_param_name} is not a valid parameter for {action.name}: '
                     'missing from action specification',
                 )
-            elif declared_additional_properties is None:
+            elif 'additionalProperties' not in action_spec:
                 warnings.append(
                     f'param {provided_param_name} is not declared for {action.name}. Juju '
                     'accepts it only because `additionalProperties` is not set, and Juju 4 '
@@ -409,7 +407,11 @@ def _check_action_param_types(
                     f'type={declared_type}',
                 )
             continue
-        if not isinstance(provided_param_value, expected_type):
+        # bool is a subclass of int, but JSON Schema's integer and number
+        # don't accept a boolean.
+        if not isinstance(provided_param_value, expected_type) or (
+            isinstance(provided_param_value, bool) and bool not in expected_type
+        ):
             expected = ' or '.join(t.__name__ for t in expected_type)
             errors.append(
                 f'param {provided_param_name} is of type {type(provided_param_value)}: '
@@ -474,38 +476,26 @@ def check_config_consistency(
             )
             continue
 
-        converters = {
-            'string': str,
-            'int': int,
-            'float': float,
-            'boolean': bool,
-        }
-        if juju_version >= '3.4':
-            converters['secret'] = str
-
-        validators = {
-            'secret': _is_secret_identifier,
-        }
-
         expected_type_name = meta_config[key].get('type', None)
         if not expected_type_name:
             errors.append(f"config.yaml invalid; option {key!r} has no 'type'.")
             continue
-        validator = validators.get(expected_type_name)
 
-        expected_type = converters.get(expected_type_name)
-        if not expected_type:
+        known_types = {'string', 'int', 'float', 'boolean'}
+        if juju_version >= '3.4':
+            known_types.add('secret')
+        if expected_type_name not in known_types:
             errors.append(
                 f"config invalid for option {key!r}: 'type' {expected_type_name} unknown",
             )
 
-        elif not isinstance(value, expected_type):
+        elif not _config_value_has_type(value, expected_type_name):
             errors.append(
-                f'config invalid; option {key!r} should be of type {expected_type} '
+                f'config invalid; option {key!r} should be of type {expected_type_name} '
                 f'but is of type {type(value)}.',
             )
 
-        elif validator and not validator(value):
+        elif expected_type_name == 'secret' and not _is_secret_identifier(value):
             errors.append(
                 f'config invalid: option {key!r} value {value!r} is not valid.',
             )

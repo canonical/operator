@@ -1221,6 +1221,28 @@ class TestHarness:
         # can cast to bool!
         harness.update_config(key_values={'a': False})
 
+    def test_update_config_numeric_types_match_juju(self, request: pytest.FixtureRequest):
+        # Juju's int doesn't accept a bool, and its float accepts an int.
+        harness = ops.testing.Harness(
+            RecordingCharm,
+            config="""
+            options:
+                i:
+                    type: int
+                f:
+                    type: float
+            """,
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.begin()
+        with pytest.raises(RuntimeError):
+            harness.update_config(key_values={'i': True})
+        with pytest.raises(RuntimeError):
+            harness.update_config(key_values={'f': True})
+        harness.update_config(key_values={'i': 3, 'f': 2})
+        assert harness.charm.config['i'] == 3
+        assert harness.charm.config['f'] == 2
+
     def test_bad_config_option_type(self):
         # Harness.__init__ allocates a tempdir before config validation, so
         # when validation raises the half-built backend becomes unreachable

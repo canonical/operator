@@ -2300,7 +2300,7 @@ class _TestingConfig(dict[str, str | int | float | bool]):
                 'of [{}], not {}.'.format(', '.join(self._supported_types), declared_type)
             )
 
-        if type(value) is not self._supported_types[declared_type]:
+        if not charm._config_value_has_type(value, declared_type):
             raise RuntimeError(
                 f'Config option {key} is supposed to be of type '
                 f'{declared_type}, not `{type(value).__name__}`.'

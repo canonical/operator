@@ -665,6 +665,44 @@ def test_actions_additional_properties(
     assert action.additional_properties == additional_properties
 
 
+@pytest.mark.parametrize('juju_version,additional_properties', [('3.6', True), ('4.0', False)])
+def test_actions_additional_properties_given_juju_version(
+    monkeypatch: pytest.MonkeyPatch, juju_version: str, additional_properties: bool
+):
+    # ops.testing passes the version the test runs under, which wins over
+    # the environment's.
+    monkeypatch.setenv('JUJU_VERSION', '4.0' if additional_properties else '3.6')
+    action = ops.ActionMeta('foo', {}, _juju_version=ops.JujuVersion(juju_version))
+    assert action.additional_properties == additional_properties
+
+
+@pytest.mark.parametrize(
+    'type_name,value,expected',
+    [
+        ('string', 'x', True),
+        ('string', 1, False),
+        ('secret', 'secret:co28kefmp25c77utl3n0', True),
+        ('secret', 1, False),
+        ('boolean', False, True),
+        ('boolean', 0, False),
+        ('int', 1, True),
+        ('int', True, False),
+        ('int', 1.0, False),
+        ('float', 1.5, True),
+        ('float', 1, True),
+        ('float', True, False),
+        ('float', '1.5', False),
+    ],
+)
+def test_config_value_has_type(type_name: str, value: object, expected: bool):
+    assert ops.charm._config_value_has_type(value, type_name) is expected
+
+
+def test_config_value_has_type_unknown_type():
+    with pytest.raises(ValueError):
+        ops.charm._config_value_has_type(1, 'integer')
+
+
 def _setup_test_action(fake_script: FakeScript):
     fake_script.write('action-get', """echo '{"foo-name": "name", "silent": true}'""")
     fake_script.write('action-set', '')
