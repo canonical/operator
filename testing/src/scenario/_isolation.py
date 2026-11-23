@@ -69,12 +69,17 @@ def _worker_environ() -> dict[str, str]:
     environ = dict(os.environ)
     # Run unbuffered so that a charm's output is written before the worker is killed.
     environ['PYTHONUNBUFFERED'] = '1'
-    # In a source checkout, the worker can only import scenario from here.
-    # Installed, this is the test environment's site-packages, which would
-    # undo the isolation, so the worker has to have its own ops-scenario.
+    # The worker is a new process, so it can import this scenario only if the
+    # directory that holds the package is on its sys.path.
     scenario_parent = pathlib.Path(__file__).resolve().parent.parent
     if scenario_parent.name in {'site-packages', 'dist-packages'}:
+        # Installed. The test's own interpreter already has this directory on
+        # its path. Another interpreter needs its own ops-scenario, because
+        # adding this directory would bring in the test environment's other
+        # packages too, which would undo the isolation.
         return environ
+    # A source checkout or an editable install. This directory holds only
+    # scenario, so adding it gives any interpreter this scenario and nothing else.
     existing = environ.get('PYTHONPATH')
     parts = [str(scenario_parent), *([existing] if existing else [])]
     environ['PYTHONPATH'] = os.pathsep.join(parts)
