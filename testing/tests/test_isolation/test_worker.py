@@ -168,6 +168,21 @@ def test_a_worker_that_exits_before_its_setup_is_reported(workers: list[Worker])
         worker.run(on.install(), State())
 
 
+@pytest.mark.parametrize('timeout', [None, 60])
+def test_a_malformed_response_is_reported(
+    tmp_path: pathlib.Path, workers: list[Worker], timeout: float | None
+):
+    # Stands in for the Python interpreter: it ignores its arguments, sends a
+    # frame that isn't JSON, and keeps reading so that writes to it succeed.
+    fake_python = tmp_path / 'python'
+    fake_python.write_text("#!/bin/sh\nprintf '\\000\\000\\000\\002{x'\ncat >/dev/null\n")
+    fake_python.chmod(0o755)
+    worker = Worker(CHARMS / 'report', python=str(fake_python), timeout=timeout)
+    workers.append(worker)
+    with pytest.raises(IsolationError, match='crashed without responding'):
+        worker.run(on.install(), State())
+
+
 @pytest.mark.parametrize(
     ('source', 'found'),
     [

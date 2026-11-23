@@ -162,7 +162,7 @@ class Worker:
             raise self._fail(
                 f'An event took more than {self._timeout} seconds, and the worker was killed.'
             ) from None
-        except OSError:
+        except (OSError, ValueError):
             response = None
         if response is None:
             raise self._fail('The worker crashed without responding.')
