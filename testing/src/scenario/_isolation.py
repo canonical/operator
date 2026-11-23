@@ -89,6 +89,9 @@ class Worker:
             ``None`` waits for as long as it takes.
     """
 
+    app_name: str
+    """The name of the application whose events this worker runs."""
+
     def __init__(
         self,
         charm_source: pathlib.Path,
@@ -101,7 +104,7 @@ class Worker:
         timeout: float | None = _DEFAULT_TIMEOUT,
     ):
         meta, config, actions = _CharmSpec._load_metadata_or_legacy(charm_source)
-        self.app_name: str = app_name or meta['name']
+        self.app_name = app_name or meta['name']
         self._setup = {
             'charm_source': str(charm_source),
             'extra_sys_path': list(extra_sys_path),
