@@ -16,11 +16,11 @@ from typing import IO, Any
 _HEADER = struct.Struct('>I')
 
 
-def write_message(stream: IO[bytes], message: dict[str, Any]) -> None:
-    """Write one message to ``stream`` and flush it."""
+def write_message(message: dict[str, Any], *, to: IO[bytes]) -> None:
+    """Write ``message`` to the stream ``to`` and flush it."""
     data = json.dumps(message).encode()
-    stream.write(_HEADER.pack(len(data)) + data)
-    stream.flush()
+    to.write(_HEADER.pack(len(data)) + data)
+    to.flush()
 
 
 def read_message(stream: IO[bytes]) -> dict[str, Any] | None:

@@ -89,7 +89,7 @@ def main() -> int:
         except (Exception, SystemExit):
             # SystemExit too, so a charm calling sys.exit doesn't end the worker.
             response = {'error': traceback.format_exc()}
-        write_message(responses, response)
+        write_message(response, to=responses)
     return 0
 
 

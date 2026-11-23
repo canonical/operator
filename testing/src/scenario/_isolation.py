@@ -150,8 +150,8 @@ class Worker:
         assert proc is not None and proc.stdin is not None and proc.stdout is not None
         try:
             if starting:
-                write_message(proc.stdin, self._setup)
-            write_message(proc.stdin, request)
+                write_message(self._setup, to=proc.stdin)
+            write_message(request, to=proc.stdin)
             response = self._read_response(proc.stdout)
         except TimeoutError:
             raise self._fail(
