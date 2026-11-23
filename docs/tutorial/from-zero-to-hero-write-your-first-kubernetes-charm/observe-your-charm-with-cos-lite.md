@@ -43,7 +43,7 @@ Next, run the following command to download the libraries:
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
-You might see a warning that Charmcraft cannot get a keyring. You can ignore the warning.
+You'll see a warning about Charmhub-hosted charm libraries. You can ignore the warning.
 
 After Charmcraft has downloaded the libraries, your project's `lib` directory contains:
 

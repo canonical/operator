@@ -1096,7 +1096,8 @@ class TestService:
         assert s.summary == 'New summary'
         assert s.description == 'The lazy quick brown'
         assert s.startup == 'disabled'
-        assert s.override == 'replace'
+        # Like Pebble, merging keeps the existing override.
+        assert s.override == 'merge'
         assert s.command == 'echo new'
         assert s.after == ['a1', 'a2', 'a3']
         assert s.before == ['b1', 'b2', 'b3']
@@ -1221,6 +1222,21 @@ class TestCheck:
         check = pebble.Check('chk-http', d)
         assert check.level == 'foobar!'  # remains a string
 
+    def test_merge_keeps_level(self):
+        base = pebble.Check(
+            'chk', {'override': 'replace', 'level': 'alive', 'http': {'url': 'http://a/'}}
+        )
+        override = pebble.Check('chk', {'override': 'merge', 'period': '5s'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.ALIVE
+        assert base.period == '5s'
+        # Like Pebble, merging keeps the existing override.
+        assert base.override == 'replace'
+
+        override = pebble.Check('chk', {'override': 'merge', 'level': 'ready'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.READY
+
     def test_equality(self):
         d: pebble.CheckDict = {
             'override': 'replace',
@@ -1265,6 +1281,14 @@ class TestCheck:
 
 
 class TestLogTarget:
+    def test_merge_keeps_override(self):
+        base = pebble.LogTarget(
+            'tgt', {'override': 'replace', 'type': 'loki', 'location': 'http://a/'}
+        )
+        base._merge(pebble.LogTarget('tgt', {'override': 'merge', 'services': ['svc']}))
+        assert base.override == 'replace'
+        assert base.services == ['svc']
+
     def _assert_empty(self, target: pebble.LogTarget, name: str):
         assert target.name == name
         assert target.override == ''
@@ -2502,7 +2526,7 @@ Content-Disposition: form-data; name="response"\r
 --01234567890123456789012345678901\r
 Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
 \r
-127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\xff\xfe\x00\x80\r
 --01234567890123456789012345678901\r
 Content-Disposition: form-data; name="response"\r
 \r
@@ -2518,7 +2542,7 @@ Content-Disposition: form-data; name="response"\r
 
         with client.pull('/etc/hosts', encoding=None) as infile:
             content = infile.read()
-        assert content == b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar'
+        assert content == b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\xff\xfe\x00\x80'
 
         assert client.requests == [
             (
@@ -2564,6 +2588,57 @@ Content-Disposition: form-data; name="response"\r
                 None,
             ),
         ]
+
+    def test_pull_non_ascii_path(self, client: MockClient):
+        client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/tmp/cr\xc3\xa8me.txt"\r
+\r
+contents\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/tmp/cr\xc3\xa8me.txt"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
+""",
+        ))
+        with client.pull('/tmp/crème.txt') as infile:  # ruff: ignore[hardcoded-temp-file]
+            assert infile.read() == 'contents'
+
+    @pytest.mark.parametrize('path', ['/srv/file ', '/srv/file\t', ' /srv/file', '/srv/ file '])
+    def test_pull_path_with_surrounding_whitespace(self, client: MockClient, path: str):
+        client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="%s"\r
+\r
+contents\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+%s\r
+--01234567890123456789012345678901--\r
+"""
+            % (
+                path.encode(),
+                json.dumps({
+                    'result': [{'path': path}],
+                    'status': 'OK',
+                    'status-code': 200,
+                    'type': 'sync',
+                }).encode(),
+            ),
+        ))
+        with client.pull(path) as infile:
+            assert infile.read() == 'contents'
 
     def test_pull_protocol_errors(self, client: MockClient):
         client.responses.append(({'Content-Type': 'c/t'}, b''))
@@ -2809,6 +2884,49 @@ bad path\r
             'action': 'write',
             'files': [{'path': '/foo/bar'}],
         }
+
+    @pytest.mark.parametrize(
+        'path,escaped',
+        [
+            ('/foo/b"ar', b'/foo/b\\"ar'),
+            ('/foo/b\\ar', b'/foo/b\\\\ar'),
+            ('/foo/b\\"ar', b'/foo/b\\\\\\"ar'),
+            ('/foo/b\\/ar', b'/foo/b\\\\/ar'),
+            ('/foo/bar\\', b'/foo/bar\\\\'),
+        ],
+    )
+    def test_push_path_escaping(self, client: MockClient, path: str, escaped: bytes):
+        client.responses.append((
+            {'Content-Type': 'application/json'},
+            json.dumps({
+                'result': [{'path': path}],
+                'status': 'OK',
+                'status-code': 200,
+                'type': 'sync',
+            }).encode(),
+        ))
+
+        client.push(path, 'content')
+
+        headers, body = client.requests[0][3:]
+        chunks = list(body)
+        # Pebble reads the filename with Go's mime.ParseMediaType, where a
+        # backslash escapes the next character if it's a tspecial. This is the
+        # assertion that checks that: the email-based parse below unescapes only
+        # \\ and \", so it would round-trip the old escaping too.
+        assert b'; filename="' + escaped + b'"\r\n' in b''.join(chunks)
+        req, filename, content = self._parse_write_multipart(
+            headers['Content-Type'], (chunk for chunk in chunks)
+        )
+        assert filename == path
+        assert content == b'content'
+        assert req == {'action': 'write', 'files': [{'path': path}]}
+
+    @pytest.mark.parametrize('path', ['/foo/b\rar', '/foo/b\nar', '/foo/b\x00ar'])
+    def test_push_path_with_control_character(self, client: MockClient, path: str):
+        with pytest.raises(ValueError, match='CR, LF, or NUL'):
+            client.push(path, 'content')
+        assert client.requests == []
 
     def _parse_write_multipart(self, content_type: str, body: _bytes_generator):
         message = email.message.Message()
@@ -3955,6 +4073,176 @@ class TestExec:
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
+
+    def test_wait_output_multibyte_split_across_messages(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        # U+1F600 is four bytes in UTF-8; split it between two messages.
+        stdio.receives.append(b'cr\xc3')
+        stdio.receives.append(b'\xa8me \xf0\x9f')
+        stdio.receives.append(b'\x98\x80\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        out, err = process.wait_output()
+        assert out == 'crème 😀\n'
+        assert err == ''
+
+    @pytest.mark.parametrize(
+        'encoding,text',
+        [
+            ('utf-8', 'crème 😀\n'),
+            ('utf-16', 'crème 😀\n'),
+            ('utf-32', 'crème 😀\n'),
+            ('utf-16-le', 'crème 😀\n'),
+            ('shift_jis', '日本語\n'),
+        ],
+    )
+    def test_output_split_anywhere_decodes_whole(
+        self, client: MockClient, encoding: str, text: str
+    ):
+        # The BOM-sniffing codecs (utf-16, utf-32) only see a byte order mark
+        # at the start of the stream, so every later message must be decoded
+        # with the state the earlier ones left behind.
+        data = text.encode(encoding)
+        for split in range(1, len(data)):
+            stdio, stderr, _ = self.add_responses(client, '123', 0)
+            stdio.receives.append(data[:split])
+            stdio.receives.append(data[split:])
+            stdio.receives.append('{"command":"end"}')
+            stderr.receives.append('{"command":"end"}')
+
+            process = client.exec(['echo'], encoding=encoding)
+            assert process.stdout is not None
+            pieces: list[str] = []
+            while piece := process.stdout.read():
+                pieces.append(piece)
+            process.wait()
+            assert ''.join(pieces) == text, f'split at byte {split}'
+
+    def test_stdout_read_multibyte_split_across_messages(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.append(b'cr\xc3')
+        stdio.receives.append(b'\xa8me\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        assert process.stdout is not None
+        # Each read returns one message, less any character that is only
+        # partly in it, which comes with the next message.
+        assert process.stdout.read() == 'cr'
+        assert process.stdout.read() == 'ème\n'
+        assert process.stdout.read() == ''
+        process.wait()
+
+    def test_websocket_to_writer_multibyte_split_across_messages(self):
+        ws = MockWebsocket()
+        ws.receives = [b'cr\xc3', b'\xa8me\n', '{"command":"end"}']
+        out = io.StringIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            'utf-8',
+        )
+        assert out.getvalue() == 'crème\n'
+
+    @pytest.mark.parametrize(
+        'receives,expected',
+        [
+            pytest.param([b'ok \xc3', '{"command":"end"}'], 'ok �', id='partial-then-end'),
+            pytest.param([b'ok \xc3'], 'ok �', id='partial-then-closed'),
+            pytest.param(
+                [b'a\xffb', b'more', '{"command":"end"}'], 'a�bmore', id='invalid-mid-stream'
+            ),
+        ],
+    )
+    def test_websocket_to_writer_replaces_undecodable_bytes(
+        self, receives: list[str | bytes], expected: str
+    ):
+        ws = MockWebsocket()
+        chunks = list(receives)
+
+        def recv():
+            if chunks:
+                return chunks.pop(0)
+            raise websocket.WebSocketConnectionClosedException('socket is already closed.')
+
+        ws.recv = recv
+        out = io.StringIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            'utf-8',
+        )
+        assert out.getvalue() == expected
+
+    def test_websocket_reader_holds_back_incomplete_character(self):
+        ws = MockWebsocket()
+        ws.receives = [b'cr\xc3', b'\xa8me \xf0', b'\x9f', b'\x98\x80\n', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        # Each read() returns one message's worth, less any incomplete
+        # character at the end, which is returned with the next message.
+        assert reader.read() == b'cr'
+        assert reader.read() == b'\xc3\xa8me '
+        # A message that is nothing but part of a character is joined with the next.
+        assert reader.read() == b'\xf0\x9f\x98\x80\n'
+        assert reader.read() == b''
+
+    def test_websocket_reader_incomplete_character_at_eof(self):
+        ws = MockWebsocket()
+        ws.receives = [b'ok \xc3', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        assert reader.read() == b'ok '
+        # There is nothing to complete it with, so the caller gets the bytes.
+        assert reader.read() == b'\xc3'
+        assert reader.read() == b''
+
+    def test_websocket_reader_invalid_bytes_do_not_raise(self):
+        ws = MockWebsocket()
+        ws.receives = [b'a\xffb', b'more', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        assert reader.read() == b'a\xffb'
+        assert reader.read() == b'more'
+        assert reader.read() == b''
+
+    @pytest.mark.parametrize(
+        'receives,expected',
+        [
+            pytest.param([b'ok \xc3'], 'ok �', id='partial-then-end'),
+            pytest.param([b'a\xffb', b'more'], 'a�bmore', id='invalid-mid-stream'),
+        ],
+    )
+    def test_wait_output_replaces_undecodable_bytes(
+        self, client: MockClient, receives: list[str | bytes], expected: str
+    ):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.extend([*receives, '{"command":"end"}'])
+        stderr.receives.extend([*receives, '{"command":"end"}'])
+
+        process = client.exec(['echo'])
+        assert process.wait_output() == (expected, expected)
+
+    def test_stdout_read_replaces_undecodable_bytes(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.extend([b'a\xffb', b'more', '{"command":"end"}'])
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        assert process.stdout is not None
+        assert process.stdout.read() == 'a�b'
+        assert process.stdout.read() == 'more'
+        assert process.stdout.read() == ''
+        process.wait()
+
+    def test_websocket_reader_bytes_reads_one_message(self):
+        ws = MockWebsocket()
+        ws.receives = [b'foo', b'bar', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws))
+        assert reader.read() == b'foo'
+        assert reader.read(1) == b'b'
+        assert reader.read() == b'ar'
+        assert reader.read() == b''
 
     def test_wait_output_combine_stderr(self, client: MockClient):
         stdio, _, _ = self.add_responses(client, '123', 0)

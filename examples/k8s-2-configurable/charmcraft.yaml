@@ -32,6 +32,19 @@ config:
       description: Default port on which FastAPI is available
       type: int
 
+# (Optional) Actions that an operator can run against a unit.
+# More information on this section at:
+# https://canonical.com/juju/docs/charmcraft/stable/reference/files/charmcraft-yaml-file/#actions
+# General actions documentation:
+# https://canonical.com/juju/docs/juju-cli/3.6/reference/action/
+actions:
+  restart:
+    description: |
+      Restart the workload service in the container.
+
+      Use this to apply a change that the workload only picks up on startup,
+      or to recover a workload that has stopped responding.
+
 containers:
   demo-server:
     resource: demo-server-image
@@ -42,7 +55,7 @@ resources:
     type: oci-image
     description: OCI image from GitHub Container registry
     # The upstream-source field is ignored by Charmcraft and Juju, but it can be
-    # useful to developers in identifying the source of the OCI image.  It is also
+    # useful to developers in identifying the source of the OCI image. It is also
     # used by the 'canonical/charming-actions' GitHub action for automated releases.
     # The test_deploy function in tests/integration/test_charm.py reads upstream-source
     # to determine which OCI image to use when running the charm's integration tests.

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,11 +24,11 @@ import urllib.request
 logger = logging.getLogger(__name__)
 
 
-def get_version(port: int) -> str:
+def get_version(port: int = 8000) -> str:
     """Get the version of fastapi_demo that is running.
 
     Args:
-        port: The port where fastapi_demo web server is listening.
+        port: The port where fastapi_demo web server is listening. Defaults to 8000.
     """
     response = urllib.request.urlopen(f"http://localhost:{port}/version")
     data = json.loads(response.read())

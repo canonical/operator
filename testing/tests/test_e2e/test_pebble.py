@@ -503,6 +503,18 @@ def test_pebble_custom_notice_in_charm(monkeypatch: pytest.MonkeyPatch):
     ctx.run(ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state)
 
 
+def test_get_notices_by_type():
+    custom = Notice('example.com/foo')
+    change_update = Notice('123', type=pebble.NoticeType.CHANGE_UPDATE)
+    container = Container(name='foo', can_connect=True, notices=[custom, change_update])
+    state = State(containers={container})
+    ctx = Context(Charm, meta={'name': 'foo', 'containers': {'foo': {}}})
+    with ctx(ctx.on.start(), state) as mgr:
+        ops_container = mgr.charm.unit.get_container('foo')
+        assert ops_container.get_notices(types=[pebble.NoticeType.CUSTOM]) == [custom._to_ops()]
+        assert ops_container.get_notices(types=['change-update']) == [change_update._to_ops()]
+
+
 class CheckFailedCharm(ops.CharmBase):
     infos: list[ops.LazyCheckInfo]
 
@@ -944,7 +956,7 @@ def test_layers_merge_in_plan(layer1_name: str, layer2_name: str):
     assert service.description == 'desc'
     # Service.startup is always a string, even though we have the enum.
     assert service.startup == ops.pebble.ServiceStartup.ENABLED.value
-    assert service.override == 'merge'
+    assert service.override == 'replace'
     assert service.command == '/bin/sleep 20'
 
     check = plan.checks['server-ready']
@@ -952,7 +964,7 @@ def test_layers_merge_in_plan(layer1_name: str, layer2_name: str):
     assert check.threshold == 10
     assert check.period == '1s'
     assert check.timeout == '28s'
-    assert check.override == 'merge'
+    assert check.override == 'replace'
     assert check.level == ops.pebble.CheckLevel.ALIVE
     http = check.http
     assert http is not None
@@ -962,7 +974,7 @@ def test_layers_merge_in_plan(layer1_name: str, layer2_name: str):
     assert log_target.type == 'loki'
     assert log_target.services == ['server']
     assert log_target.labels == {'foo': 'bar'}
-    assert log_target.override == 'merge'
+    assert log_target.override == 'replace'
     assert log_target.location == 'https://loki2.example.com'
 
 
