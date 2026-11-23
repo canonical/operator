@@ -58,8 +58,6 @@ class Charm(ops.CharmBase):
 @pytest.fixture(autouse=True)
 def reset_callback():
     Charm.callback = None
-    yield
-    Charm.callback = None
 
 
 def run(
@@ -195,23 +193,29 @@ def test_network_for_another_endpoint_is_not_used():
     assert seen['db:local/0'] == addresses('192.0.2.0', '192.0.2.0/24', JUJU_3)
 
 
-@pytest.mark.parametrize('juju_version', [JUJU_3, JUJU_4])
-def test_network_without_addresses_gives_no_keys(juju_version: str):
+@pytest.mark.parametrize(
+    'juju_version,ingress,egress,expected',
+    [
+        (JUJU_3, [], ['10.0.0.0/24'], {'egress-subnets': '10.0.0.0/24'}),
+        (JUJU_4, [], ['10.0.0.0/24'], {'egress-subnets': '10.0.0.0/24'}),
+        (
+            JUJU_3,
+            ['10.0.0.10'],
+            [],
+            {'ingress-address': '10.0.0.10', 'private-address': '10.0.0.10'},
+        ),
+        (JUJU_4, ['10.0.0.10'], [], {'ingress-address': '10.0.0.10'}),
+        (JUJU_3, [], [], {}),
+        (JUJU_4, [], [], {}),
+    ],
+)
+def test_network_without_addresses_gives_no_keys(
+    juju_version: str, ingress: list[str], egress: list[str], expected: dict[str, str]
+):
     relation = Relation('db')
-    no_ingress = Network('db', ingress_addresses=[], egress_subnets=['10.0.0.0/24'])
-    seen = seen_databags(State(relations={relation}, networks={no_ingress}), juju_version)
-    assert seen['db:local/0'] == {'egress-subnets': '10.0.0.0/24'}
-
-    no_egress = Network('db', ingress_addresses=['10.0.0.10'], egress_subnets=[])
-    seen = seen_databags(State(relations={relation}, networks={no_egress}), juju_version)
-    expected = {'ingress-address': '10.0.0.10'}
-    if juju_version == JUJU_3:
-        expected['private-address'] = '10.0.0.10'
+    network = Network('db', [], ingress_addresses=ingress, egress_subnets=egress)
+    seen = seen_databags(State(relations={relation}, networks={network}), juju_version)
     assert seen['db:local/0'] == expected
-
-    empty = Network('db', [], ingress_addresses=[], egress_subnets=[])
-    seen = seen_databags(State(relations={relation}, networks={empty}), juju_version)
-    assert seen['db:local/0'] == {}
 
 
 def test_subordinate_remote_unit_has_local_addresses():
