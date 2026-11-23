@@ -45,3 +45,4 @@ def test_block_on_invalid_config(charm: pathlib.Path, juju: jubilant.Juju):
     juju.config("tinyproxy", {"slug": "foo/bar"})
     juju.wait(jubilant.all_blocked)
     juju.config("tinyproxy", reset="slug")
+    juju.wait(jubilant.all_active)
