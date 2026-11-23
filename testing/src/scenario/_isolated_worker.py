@@ -86,7 +86,8 @@ def main() -> int:
     while (request := read_message(requests)) is not None:
         try:
             response = run(setup, request)
-        except Exception:
+        except (Exception, SystemExit):
+            # SystemExit too, so a charm calling sys.exit doesn't end the worker.
             response = {'error': traceback.format_exc()}
         write_message(responses, response)
     return 0

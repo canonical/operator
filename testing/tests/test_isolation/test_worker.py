@@ -122,6 +122,15 @@ def test_a_charm_that_raises_leaves_the_worker_running(workers: list[Worker]):
         assert 'crashed' not in str(caught.value)
 
 
+def test_a_charm_that_calls_sys_exit_leaves_the_worker_running(workers: list[Worker]):
+    worker = Worker(CHARMS / 'hardexit')
+    workers.append(worker)
+    with pytest.raises(IsolationError, match='SystemExit: 3') as caught:
+        worker.run(on.stop(), State())
+    assert 'crashed' not in str(caught.value)
+    assert worker.run(on.install(), State()).unit_status == ActiveStatus('installed')
+
+
 def test_a_crash_is_reported_and_the_worker_not_restarted(workers: list[Worker]):
     worker = Worker(CHARMS / 'hardexit')
     workers.append(worker)
