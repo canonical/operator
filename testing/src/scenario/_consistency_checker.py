@@ -31,9 +31,10 @@ from typing import (
     Callable,
     Iterable,
     NamedTuple,
+    cast,
 )
 
-from ops import pebble
+from ops import JujuVersion, pebble
 
 from .errors import InconsistentScenarioError
 from ._runtime import logger as scenario_logger
@@ -87,11 +88,13 @@ def check_consistency(
     that are not in the charm's ``charmcraft.yaml`` is nonsense, and the
     combination of the two is inconsistent.
     """
-    juju_version_: tuple[int, ...] = tuple(map(int, juju_version.split('.')))
-
     if os.getenv('SCENARIO_SKIP_CONSISTENCY_CHECKS'):
         logger.info('skipping consistency checks.')
         return
+
+    # Parsed by JujuVersion so that a tagged version such as 3.6-beta1 works. A bare
+    # major version such as '3' has always been accepted here, so keep accepting it.
+    version = JujuVersion(f'{juju_version}.0' if juju_version.isdigit() else juju_version)
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -113,7 +116,7 @@ def check_consistency(
             state=state,
             event=event,
             charm_spec=charm_spec,
-            juju_version=juju_version_,
+            juju_version=version,
             unit_id=unit_id,
         )
         errors.extend(results.errors)
@@ -338,9 +341,11 @@ def _check_action_param_types(
         'number': Number,
         'array': Sequence,
         'object': dict,
+        'null': type(None),
     }
     expected_param_type: dict[str, Any] = {}
-    for par_name, par_spec in actions[action.name].get('params', {}).items():
+    action_params: dict[str, dict[str, Any]] = actions[action.name].get('params', {})
+    for par_name, par_spec in action_params.items():
         value = par_spec.get('type')
         if not value:
             errors.append(
@@ -349,26 +354,38 @@ def _check_action_param_types(
             )
             continue
 
+        # JSON schema allows a list of types, such as ["string", "null"].
+        type_names = cast('list[Any]', value) if isinstance(value, list) else [value]
         try:
-            expected_param_type[par_name] = to_python_type[value]
-        except KeyError:
+            expected_param_type[par_name] = tuple(to_python_type[name] for name in type_names)
+        except (KeyError, TypeError):
             warnings.append(
                 f'unknown data type declared for parameter {par_name}: type={value}. '
                 f'Cannot consistency-check.',
             )
 
     for provided_param_name, provided_param_value in action.params.items():
-        expected_type = expected_param_type.get(provided_param_name)
-        if not expected_type:
+        if provided_param_name not in action_params:
             errors.append(
                 f'param {provided_param_name} is not a valid parameter for {action.name}: '
                 'missing from action specification',
             )
             continue
+        expected_type = expected_param_type.get(provided_param_name)
+        if expected_type is None:
+            declared_type = action_params[provided_param_name].get('type')
+            # A missing type has already been reported.
+            if declared_type:
+                errors.append(
+                    f'param {provided_param_name} has an unknown data type declared: '
+                    f'type={declared_type}',
+                )
+            continue
         if not isinstance(provided_param_value, expected_type):
+            expected = ' or '.join(t.__name__ for t in expected_type)
             errors.append(
                 f'param {provided_param_name} is of type {type(provided_param_value)}: '
-                f'expecting {expected_type}',
+                f'expecting {expected}',
             )
 
 
@@ -413,7 +430,7 @@ def check_config_consistency(
     *,
     state: State,
     charm_spec: _CharmSpec[CharmType],
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of the :class:`scenario.State` config with the charm_spec config."""
@@ -435,7 +452,7 @@ def check_config_consistency(
             'float': float,
             'boolean': bool,
         }
-        if juju_version >= (3, 4):
+        if juju_version >= '3.4':
             converters['secret'] = str
 
         validators = {
@@ -472,7 +489,7 @@ def check_secrets_consistency(
     *,
     event: _Event,
     state: State,
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Secret` in the :class:`scenario.State`."""
@@ -488,7 +505,7 @@ def check_secrets_consistency(
             f'(a secret with the same ID is not sufficient - you must pass the object '
             f'in the state to the event).',
         )
-    elif juju_version < (3,):
+    elif juju_version < '3.0':
         errors.append(
             f'secrets are not supported in the specified juju version {juju_version}. '
             f'Should be at least 3.0.',
@@ -728,14 +745,14 @@ def check_cloudspec_consistency(
     state: State,
     event: _Event,
     charm_spec: _CharmSpec[CharmType],
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of :attr:`scenario.State.cloud_spec` with the model type."""
     errors: list[str] = []
     warnings: list[str] = []
 
-    if state.model.type == 'kubernetes' and state.model.cloud_spec and juju_version < (3, 6, 10):
+    if state.model.type == 'kubernetes' and state.model.cloud_spec and juju_version < '3.6.10':
         errors.append(
             'CloudSpec is not available for Kubernetes charms with Juju < 3.6.10. '
             'Set the juju_version to 3.6.10+ or '

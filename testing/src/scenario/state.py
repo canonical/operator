@@ -57,7 +57,7 @@ if TYPE_CHECKING:  # pragma: no cover
         networks: Iterable[Network]
         containers: Iterable[Container]
         storages: Iterable[Storage]
-        opened_ports: Iterable[Port]
+        opened_ports: Iterable[Port | ops.Port]
         leader: bool
         model: Model
         secrets: Iterable[Secret]
@@ -1487,16 +1487,22 @@ class Port(_max_posargs(1)):
                 'Port cannot be instantiated directly; please use TCPPort, UDPPort, or ICMPPort',
             )
 
+    # The subclasses use eq=False so that they inherit this, rather than the
+    # dataclass-generated __eq__, which would compare the class as well.
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Port, ops.Port)):
             return (self.protocol, self.port) == (other.protocol, other.port)
         return False
 
+    # This matches the hash of an equal ops.Port, whose fields are the other way around.
+    def __hash__(self) -> int:
+        return hash((self.protocol, self.port))
+
     def _to_ops(self) -> ops.Port:
         return ops.Port(port=self.port, protocol=self.protocol)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=False)
 class TCPPort(Port):
     """Represents a TCP port on the charm host."""
 
@@ -1516,7 +1522,7 @@ class TCPPort(Port):
             )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=False)
 class UDPPort(Port):
     """Represents a UDP port on the charm host."""
 
@@ -1536,7 +1542,7 @@ class UDPPort(Port):
             )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=False)
 class ICMPPort(Port):
     """Represents an ICMP port on the charm host."""
 
@@ -1559,6 +1565,17 @@ _port_cls_by_protocol = {
     'udp': UDPPort,
     'icmp': ICMPPort,
 }
+
+
+def _port_from_ops(port: ops.Port) -> Port:
+    """Convert an :class:`ops.Port` to the matching Scenario port class."""
+    if port.protocol == 'icmp':
+        return ICMPPort(port=port.port)
+    if port.protocol not in _port_cls_by_protocol:
+        raise StateValidationError(f'unknown port protocol {port.protocol!r}')
+    if port.port is None:
+        raise StateValidationError(f'`port` is required for {port.protocol} ports')
+    return _port_cls_by_protocol[port.protocol](port.port)
 
 
 _next_storage_index_counter = 0  # storage indices start at 0
@@ -1651,8 +1668,12 @@ class State(_max_posargs(0)):
     If a storage is not attached, omit it from this listing."""
 
     # we don't use sets to make json serialization easier
-    opened_ports: Iterable[Port] = dataclasses.field(default_factory=frozenset)
-    """Ports opened by Juju on this charm."""
+    opened_ports: Iterable[Port | ops.Port] = dataclasses.field(default_factory=frozenset)
+    """Ports opened by Juju on this charm.
+
+    :class:`ops.Port` values passed to the constructor are converted to the
+    matching :class:`TCPPort`, :class:`UDPPort` or :class:`ICMPPort`.
+    """
     leader: bool = False
     """Whether this charm has leadership."""
     model: Model = Model()
@@ -1699,11 +1720,12 @@ class State(_max_posargs(0)):
             else:
                 raise TypeError(f'Invalid status.{name}: {val!r}')
         normalised_ports = [
-            Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
+            _port_from_ops(port) if isinstance(port, ops.Port) else port
             for port in self.opened_ports
         ]
-        if self.opened_ports != normalised_ports:
-            object.__setattr__(self, 'opened_ports', normalised_ports)
+        # Ports compare by value, so a converted ops.Port is equal to the original:
+        # always store the converted ports rather than comparing first.
+        object.__setattr__(self, 'opened_ports', normalised_ports)
         normalised_storage = [
             Storage(name=storage.name, index=storage.index)
             if isinstance(storage, ops.Storage)

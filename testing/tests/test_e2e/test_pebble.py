@@ -463,6 +463,18 @@ def test_pebble_custom_notice_in_charm():
     ctx.run(ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state)
 
 
+def test_get_notices_by_type(charm_cls: type[CharmBase]):
+    custom = Notice('example.com/foo')
+    change_update = Notice('123', type=pebble.NoticeType.CHANGE_UPDATE)
+    container = Container(name='foo', can_connect=True, notices=[custom, change_update])
+    state = State(containers={container})
+    ctx = Context(charm_cls, meta={'name': 'foo', 'containers': {'foo': {}}})
+    with ctx(ctx.on.start(), state) as mgr:
+        ops_container = mgr.charm.unit.get_container('foo')
+        assert ops_container.get_notices(types=[pebble.NoticeType.CUSTOM]) == [custom._to_ops()]
+        assert ops_container.get_notices(types=['change-update']) == [change_update._to_ops()]
+
+
 def test_pebble_check_failed():
     infos = []
 
@@ -834,7 +846,7 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert service.description == 'desc'
     # Service.startup is always a string, even though we have the enum.
     assert service.startup == pebble.ServiceStartup.ENABLED.value
-    assert service.override == 'merge'
+    assert service.override == 'replace'
     assert service.command == '/bin/sleep 20'
 
     check = plan.checks['server-ready']
@@ -842,7 +854,7 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert check.threshold == 10
     assert check.period == 1
     assert check.timeout == 28
-    assert check.override == 'merge'
+    assert check.override == 'replace'
     assert check.level == pebble.CheckLevel.ALIVE
     assert check.http['url'] == 'http://localhost:5050/version'
 
@@ -850,7 +862,7 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert log_target.type == 'loki'
     assert log_target.services == ['server']
     assert log_target.labels == {'foo': 'bar'}
-    assert log_target.override == 'merge'
+    assert log_target.override == 'replace'
     assert log_target.location == 'https://loki2.example.com'
 
 

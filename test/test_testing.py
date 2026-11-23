@@ -528,6 +528,9 @@ class TestHarness:
         )
         request.addfinalizer(harness.cleanup)
         harness.begin()
+        # The charm records every databag, including its own application one, so it
+        # needs to be the leader to read them all.
+        harness.set_leader(True)
         harness.charm.observe_relation_events('db')
         # First add a relation and unit
         rel_id = harness.add_relation('db', 'postgresql')
@@ -4146,7 +4149,7 @@ class TestTestingPebbleClient:
                   KEY3: VALUE3
                 on-failure: thing2
                 on-success: thing2
-                override: merge
+                override: replace
                 requires:
                 - thing1
                 - thing2
@@ -4331,12 +4334,10 @@ class TestTestingPebbleClient:
                     header2: value2
                   url: https://example.com:3100/health
                 level: ready
-                override: merge
                 period: 30s
                 threshold: 1
               ready-tcp:
                 level: ready
-                override: merge
                 period: 30s
                 tcp:
                   host: localhost
@@ -4349,7 +4350,6 @@ class TestTestingPebbleClient:
                     key1: value1
                     key2: value2
                 level: alive
-                override: merge
                 period: 30s
                 threshold: 1
             """)
@@ -4439,7 +4439,6 @@ class TestTestingPebbleClient:
                 labels:
                   key1: value1
                 location: https://example123.com:3100/loki/api/v1/push
-                override: merge
                 services:
                 - foo
                 - foo1
@@ -4636,7 +4635,6 @@ class TestTestingPebbleClient:
                 summary: Bar
               foo:
                 command: /bin/echo foob
-                override: merge
                 summary: Foo
             """)
             == client.get_plan().to_yaml()
@@ -7059,6 +7057,21 @@ class PebbleNoticesMixin:
         assert notices[1].key == key3
         assert notices[0].last_repeated < notices[1].last_repeated
 
+    def test_get_notices_by_type(self, client: PebbleClientType):
+        key = 'example.com/' + os.urandom(16).hex()
+        client.notify(pebble.NoticeType.CUSTOM, key)
+
+        notices = client.get_notices(types=[pebble.NoticeType.CUSTOM], keys=[key])
+        assert len(notices) == 1
+        assert notices[0].key == key
+
+        notices = client.get_notices(types=['custom'], keys=[key])
+        assert len(notices) == 1
+        assert notices[0].key == key
+
+        notices = client.get_notices(types=[pebble.NoticeType.CHANGE_UPDATE], keys=[key])
+        assert notices == []
+
 
 class TestNotices(PebbleNoticesMixin):
     @pytest.fixture
@@ -7331,7 +7344,7 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert service.description == 'desc'
     # Service.startup is always a string, even though we have the enum.
     assert service.startup == pebble.ServiceStartup.ENABLED.value
-    assert service.override == 'merge'
+    assert service.override == 'replace'
     assert service.command == '/bin/sleep 20'
 
     check = plan.checks['server-ready']
@@ -7339,7 +7352,7 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert check.threshold == 10
     assert check.period == '1s'
     assert check.timeout == '28s'
-    assert check.override == 'merge'
+    assert check.override == 'replace'
     assert check.level == pebble.CheckLevel.ALIVE
     assert check.http is not None
     assert check.http.get('url') == 'http://localhost:5050/version'
@@ -7348,7 +7361,7 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert log_target.type == 'loki'
     assert log_target.services == ['server']
     assert log_target.labels == {'foo': 'bar'}
-    assert log_target.override == 'merge'
+    assert log_target.override == 'replace'
     assert log_target.location == 'https://loki2.example.com'
 
 
@@ -7402,13 +7415,17 @@ def test_relation_validates_access(
             if self.unit.is_leader():
                 assert local_app_data['k'] == 'local val'  # test read
                 local_app_data['k'] = 'new val'  # test write
+                assert len(local_app_data.items()) == 1
+                assert 'k' in local_app_data
             else:
                 with pytest.raises(ops.RelationDataAccessError):
                     local_app_data['k']
-            # these probably fail at real runtime with a ModelError
-            # but pass here because the validation methods are only hooked up to get/set
-            assert len(local_app_data.items()) == 1
-            assert 'k' in local_app_data
+                # Juju refuses these too, so every route reports the same
+                # error rather than only the ones that go through __getitem__.
+                with pytest.raises(ops.RelationDataAccessError):
+                    len(local_app_data.items())
+                with pytest.raises(ops.RelationDataAccessError):
+                    _ = 'k' in local_app_data
 
     harness = ops.testing.Harness(
         Charm,
