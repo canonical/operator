@@ -50,6 +50,7 @@ from ops.model import (
 )
 from ops.pebble import Client, ExecError
 
+from . import _juju_unit_settings
 from .errors import ActionMissingFromContextError
 from .logger import logger as scenario_logger
 from .state import (
@@ -310,7 +311,23 @@ class _MockModelBackend(_ModelBackend):
         data = self._relation_get(
             relation_id, member_name=member_name, is_app=is_app, relation_name=relation_name
         )
-        return dict(data)
+        if is_app:
+            return dict(data)
+        # Juju writes some keys to each unit databag itself. They aren't in the
+        # state unless the test or the charm put them there, so fill in any
+        # that are missing. Values in the state win.
+        relation = self._get_relation_by_id(relation_id, relation_name)
+        juju_version = self._context.juju_version
+        if member_name == self.unit_name:
+            managed = _juju_unit_settings.local_unit_keys(
+                self._state, relation.endpoint, juju_version
+            )
+        else:
+            unit_id = int(member_name.split('/')[-1])
+            managed = _juju_unit_settings.remote_unit_keys(
+                self._state, relation, unit_id, juju_version
+            )
+        return {**managed, **data}
 
     def _relation_get(
         self,
@@ -486,7 +503,19 @@ class _MockModelBackend(_ModelBackend):
             tgt = cast('dict[str, str]', relation.local_app_data)
         else:
             tgt = cast('dict[str, str]', relation.local_unit_data)
+        juju_version = self._context.juju_version
         for key, value in data.items():
+            if not is_app and not _juju_unit_settings.charm_can_write(key, juju_version):
+                # Juju drops the charm's change to this key when it commits the
+                # hook. The charm still sees its own value for the rest of the
+                # hook, because ops has already updated its cache.
+                logger.warning(
+                    'Juju %s ignores changes to %r in the unit databag, so this '
+                    'change is not recorded in the output state.',
+                    juju_version,
+                    key,
+                )
+                continue
             if value == '':
                 # Match the behavior of Juju, which is that setting the value to an
                 # empty string will remove the key entirely from the relation data.

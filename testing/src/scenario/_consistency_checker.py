@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from ops import JujuVersion, pebble
 
+from . import _juju_unit_settings
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
 from .state import (
@@ -569,6 +570,7 @@ def check_relation_consistency(
     state: State,
     event: Event,
     charm_spec: _CharmSpec[CharmType],
+    juju_version: JujuVersion,
     unit_id: int,
     **_kwargs: Any,
 ) -> Results:
@@ -643,6 +645,26 @@ def check_relation_consistency(
                 f'for the unit under test (unit {unit_id}). '
                 f'Instead of `peers_data={{{unit_id}: x, other_unit: y}}`, use '
                 f'`peers_data={{other_unit: y}}, local_unit_data=x`.',
+            )
+
+    # The charm can't change some of the keys that Juju writes to its own unit
+    # databag, so if they're in the input state, they must have the values that
+    # Juju would have written.
+    for relation in state.relations:
+        expected = _juju_unit_settings.local_unit_keys(state, relation.endpoint, str(juju_version))
+        for key, value in relation.local_unit_data.items():
+            if key not in _juju_unit_settings.JUJU_MANAGED_KEYS:
+                continue
+            if _juju_unit_settings.charm_can_write(key, str(juju_version)):
+                continue
+            if value == expected.get(key):
+                continue
+            from_network = f'would be {expected[key]!r}' if key in expected else "wouldn't be set"
+            warnings.append(
+                f'the local unit databag for relation {relation.id} has {key}={value!r}, '
+                f'but on Juju {juju_version} only Juju sets that key, from the network '
+                f'for {relation.endpoint!r}, so it {from_network}. To change the '
+                f'address, put a Network for {relation.endpoint!r} in State.networks.',
             )
 
     # relation-joined, relation-changed, and relation-departed must all provide

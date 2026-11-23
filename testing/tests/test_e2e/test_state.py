@@ -15,7 +15,6 @@ import yaml
 from scenario.context import Context
 from scenario.errors import StateValidationError
 from scenario.state import (
-    _DEFAULT_JUJU_DATABAG,
     Address,
     BindAddress,
     CheckInfo,
@@ -182,10 +181,17 @@ def test_relation_get(mycharm: type[CharmBase]):
         for unit in rel.units:
             if unit is charm.unit:
                 continue
+            unit_id = unit.name.split('/')[-1]
+            # Juju writes each unit's addresses to its databag.
+            juju_keys = {
+                'egress-subnets': f'203.0.113.{unit_id}/32',
+                'ingress-address': f'203.0.113.{unit_id}',
+                'private-address': f'203.0.113.{unit_id}',
+            }
             if unit.name == 'remote/1':
-                assert rel.data[unit]['e'] == 'f'
+                assert dict(rel.data[unit]) == {'e': 'f', **juju_keys}
             else:
-                assert dict(rel.data[unit]) == _DEFAULT_JUJU_DATABAG
+                assert dict(rel.data[unit]) == juju_keys
 
     state = State(
         relations={
@@ -273,6 +279,7 @@ def test_relation_set(mycharm: type[CharmBase]):
         )
     )
     assert out.get_relation(relation.id).local_app_data == {'a': 'b'}
+    # The keys that Juju writes are only visible to the charm, not in the output.
     assert out.get_relation(relation.id).local_unit_data == {'c': 'd'}
 
 

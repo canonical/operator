@@ -92,9 +92,21 @@ def test_relation_data_access(mycharm: type[ops.CharmBase]):
 
         remote_app_data = foo_rel.data[foo_rel.app]
 
+        # Juju writes each unit's addresses to its databag, so the charm sees
+        # them alongside the data from the state.
         assert remote_units_data == {
-            'karlos/0': {'foo': 'bar'},
-            'karlos/1': {'baz': 'qux'},
+            'karlos/0': {
+                'foo': 'bar',
+                'egress-subnets': '203.0.113.0/32',
+                'ingress-address': '203.0.113.0',
+                'private-address': '203.0.113.0',
+            },
+            'karlos/1': {
+                'baz': 'qux',
+                'egress-subnets': '203.0.113.1/32',
+                'ingress-address': '203.0.113.1',
+                'private-address': '203.0.113.1',
+            },
         }
 
         assert remote_app_data == {'yaba': 'doodle'}
