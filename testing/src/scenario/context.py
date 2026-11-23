@@ -42,7 +42,6 @@ from .state import (
     Secret,
     Storage,
     _Action,
-    _apply_extensions,
     _CharmSpec,
 )
 from .state import (
@@ -188,10 +187,10 @@ class Manager(Generic[CharmType]):
         try:
             self.ops.run()
         except BaseException:
-            # Hand the exception to Runtime.exec()'s __exit__ to tear down the
-            # env. That __exit__ also suppresses a clean early exit (_Abort(0)),
-            # which is a normal completion.
-            if not self._exit_wrapped_ctx(*sys.exc_info()):
+            # Hand the exception to Runtime.exec()'s __exit__ to tear down the env.
+            # That __exit__ suppresses a clean early exit (_Abort(0)), which we shouldn't raise.
+            suppressed = self._exit_wrapped_ctx(*sys.exc_info())
+            if not suppressed:
                 raise
         # On success we must pass (None, None, None) explicitly — not
         # sys.exc_info(). When run() is invoked from Manager.__exit__ (the
@@ -760,7 +759,7 @@ class Context(Generic[CharmType]):
             ``actions`` will be automatically extracted from it (if not explicitly provided).
             Otherwise, if no meta, actions, or config were provided, will be loaded from the
             ``charmcraft.yaml`` file in the charm root (falling back to ``metadata.yaml``).
-            If the charm metadata contains an ``extensions`` key (for example,
+            If the ``charmcraft.yaml`` contains an ``extensions`` key (for example,
             ``extensions: [flask-framework]``), the extension's metadata,
             config, and actions will be automatically merged in.
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
@@ -801,17 +800,18 @@ class Context(Generic[CharmType]):
 
         else:
             meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
-            if actions is not None and 'actions' in meta:
+            if actions is None:
+                actions = meta.pop('actions', None)
+            elif 'actions' in meta:
                 raise ValueError('Cannot specify actions in both charmcraft.yaml and separately')
-            if config is not None and 'config' in meta:
+            else:
+                actions = copy.deepcopy(actions)
+            if config is None:
+                config = meta.pop('config', None)
+            elif 'config' in meta:
                 raise ValueError('Cannot specify config in both charmcraft.yaml and separately')
-            extensions = meta.pop('extensions', None)
-            if extensions:
-                _apply_extensions(meta, extensions)
-            # An explicit argument wins over what an extension provides.
-            meta_actions, meta_config = meta.pop('actions', None), meta.pop('config', None)
-            actions = copy.deepcopy(actions) if actions is not None else meta_actions
-            config = copy.deepcopy(config) if config is not None else meta_config
+            else:
+                config = copy.deepcopy(config)
             spec = _CharmSpec(charm_type=charm_type, meta=meta, actions=actions, config=config)
 
         self._charm_spec = spec

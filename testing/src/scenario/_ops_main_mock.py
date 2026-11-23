@@ -116,7 +116,10 @@ class UnitStateDB:
 def _attrs_of_type(obj: object, attr_type: type[_T], *, static: bool) -> Iterator[_T]:
     """Yield the attributes of obj that are of attr_type.
 
-    If static is true, properties aren't evaluated.
+    If static is true, only look up names whose stored value is already an
+    instance of attr_type. A property is never one, so its getter doesn't
+    run. The lookup still goes through getattr so that descriptors such as
+    ObjectEvents bind to obj.
     """
     for name in dir(obj):
         if static and not isinstance(inspect.getattr_static(obj, name, None), attr_type):
@@ -228,10 +231,11 @@ class Ops(_Manager, Generic[CharmType]):
             emitter_type = type(self.event._custom_event.emitter)
             # We require the event source to be an attribute on the charm object.
             # Essentially, we are replacing the unbound event with a bound one.
-            # The static pass avoids running every property on the charm and its
-            # objects. Running a property can raise or have side effects. Only an
-            # event source that can only be reached through a property needs the
-            # broader pass.
+            # The static pass avoids running properties on the charm and its
+            # objects, which real ops never does at this point. A property can
+            # raise, or succeed with side effects that leak into the output
+            # state (for example, logging or Pebble calls). Only an event source
+            # that can only be reached through a property needs the broader pass.
             for static in (True, False):
                 for attr in _attrs_of_type(self.charm, ops.Object, static=static):
                     for sub_attr in _attrs_of_type(attr, ops.ObjectEvents, static=static):

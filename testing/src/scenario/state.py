@@ -410,8 +410,7 @@ class Secret:
         object.__setattr__(self, 'expire', expire)
         object.__setattr__(self, 'rotate', rotate)
         object.__setattr__(self, '_tracked_revision', 1)
-        # Different latest content means there is a newer revision than the
-        # tracked one.
+        # Different latest content means there is a newer revision than the tracked one.
         has_newer = latest_content is not None and dict(latest_content) != dict(tracked_content)
         object.__setattr__(self, '_latest_revision', 2 if has_newer else 1)
 

@@ -615,7 +615,7 @@ class _MockModelBackend(_ModelBackend):
         self._check_can_manage_secret(secret)
 
         new_revision = content is not None
-        if content is not None and content == secret.latest_content:
+        if new_revision and content == secret.latest_content:
             # In Juju 3.6 and higher, this is a no-op, but it's good to warn
             # charmers if they are doing this, because it's not generally good
             # practice.
@@ -659,11 +659,11 @@ class _MockModelBackend(_ModelBackend):
         assert grantee is not None  # guaranteed by _raise_on_error=True
         grants = cast('dict[int, frozenset[str]]', secret.remote_grants)
         # Juju accepts revoking a grant that was never made.
-        remaining = grants.get(relation_id, frozenset()).difference({grantee})
-        if remaining:
-            grants[relation_id] = remaining
-        else:
-            grants.pop(relation_id, None)
+        if relation_id not in grants:
+            return
+        grants[relation_id] -= {grantee}
+        if not grants[relation_id]:
+            del grants[relation_id]
 
     @_hook_command('secret-remove', 'id', 'revision')
     def secret_remove(self, id: str, *, revision: int | None = None):
@@ -903,11 +903,11 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         self._root = container_root
 
-        self._notices: dict[tuple[str, str], pebble.Notice] = {}
-        self._last_notice_id = 0
         self._changes: dict[str, pebble.Change] = {}
 
         # load any existing notices and check information from the state
+        self._notices: dict[tuple[str, str], pebble.Notice] = {}
+        self._last_notice_id = 0
         self._check_infos: dict[str, pebble.CheckInfo] = {}
         try:
             container = state.get_container(self._container_name)
@@ -923,7 +923,9 @@ class _MockPebbleClient(_TestingPebbleClient):
                 else:
                     notice_type = str(notice.type)
                 self._notices[notice_type, notice.key] = notice._to_ops()
-                # New notices get the next numeric ID, as in Pebble.
+                # New notices get the next numeric ID, as in Pebble. A test can
+                # give a notice any string ID, but a non-numeric one can't clash
+                # with a generated ID.
                 if notice.id.isdigit():
                     self._last_notice_id = max(self._last_notice_id, int(notice.id))
             now = datetime.datetime.now()
