@@ -139,7 +139,7 @@ def test_a_crash_is_reported_and_the_worker_not_restarted(workers: list[Worker])
         worker.run(on.start(), State())
     assert 'Return code: 70' in str(caught.value)
     # install works in a fresh worker, so this fails only because it isn't restarted.
-    with pytest.raises(IsolationError, match='crashed earlier, and is not restarted'):
+    with pytest.raises(IsolationError, match="isn't restarted after it crashes"):
         worker.run(on.install(), State())
     fresh = Worker(CHARMS / 'hardexit')
     workers.append(fresh)
@@ -154,7 +154,7 @@ def test_a_worker_that_died_between_events_is_reported(workers: list[Worker]):
     with pytest.raises(IsolationError, match='crashed without responding') as caught:
         worker.run(on.install(), State())
     assert 'Return code: -9' in str(caught.value)
-    with pytest.raises(IsolationError, match='not restarted'):
+    with pytest.raises(IsolationError, match="isn't restarted after it crashes"):
         worker.run(on.install(), State())
 
 
@@ -165,7 +165,7 @@ def test_a_worker_that_exits_before_its_setup_is_reported(workers: list[Worker])
     workers.append(worker)
     with pytest.raises(IsolationError, match='crashed without responding'):
         worker.run(on.install(), State())
-    with pytest.raises(IsolationError, match='not restarted'):
+    with pytest.raises(IsolationError, match="isn't restarted after it crashes"):
         worker.run(on.install(), State())
 
 
@@ -238,7 +238,7 @@ def test_an_event_that_runs_too_long_kills_the_worker(
     with pytest.raises(IsolationError, match=r'more than 0\.5 seconds') as caught:
         worker.run(on.install(), State())
     assert 'about to hang' in str(caught.value)
-    with pytest.raises(IsolationError, match='not restarted'):
+    with pytest.raises(IsolationError, match="isn't restarted after it crashes"):
         worker.run(on.install(), State())
 
 

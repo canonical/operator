@@ -6,8 +6,10 @@
 The main test process never imports the charm: it reads the metadata from disk,
 and events and ``State`` cross to the worker as JSON. Each application has its
 own worker, which starts on the first event and is kept for later ones. A
-worker that dies or times out raises :class:`IsolationError`, and isn't started
-again.
+charm that raises gives an :class:`IsolationError` with its traceback, and the
+worker carries on. A worker that dies or times out also raises
+:class:`IsolationError`, but isn't started again, so every later event on it
+raises too.
 """
 
 from __future__ import annotations
@@ -133,7 +135,8 @@ class Worker:
         """
         if self._crashed:
             raise IsolationError(
-                f'The worker for {self.app_name!r} crashed earlier, and is not restarted.'
+                f'The worker for {self.app_name!r} crashed during an earlier event. '
+                "A worker isn't restarted after it crashes, so every later event fails too."
             )
         request = {
             'unit_id': unit_id,
