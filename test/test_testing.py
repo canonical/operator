@@ -4469,6 +4469,53 @@ class TestTestingPebbleClient:
             == client.get_plan().to_yaml()
         )
 
+    def test_add_layer_keeps_unknown_fields(self, client: _TestingPebbleClient):
+        # Pebble fields that ops doesn't model, such as workloads, are kept in
+        # the plan, as real Pebble would keep them.
+        client.add_layer(
+            'base',
+            yaml.safe_load("""
+services:
+  foo:
+    override: replace
+    command: echo foo
+    workload: wl1
+    keep: 1
+workloads:
+  wl1: {override: replace, user: alice}
+"""),
+        )
+        client.add_layer(
+            'base',
+            yaml.safe_load("""
+services:
+  foo:
+    override: merge
+    workload: wl2
+workloads:
+  wl2: {override: replace, user: bob}
+"""),
+            combine=True,
+        )
+        client.add_layer(
+            'other',
+            yaml.safe_load("""
+workloads:
+  wl1: {override: replace, user: carol}
+"""),
+        )
+        plan = client.get_plan().to_dict()
+        assert plan['services']['foo'] == {  # type: ignore
+            'override': 'replace',
+            'command': 'echo foo',
+            'workload': 'wl2',
+            'keep': 1,
+        }
+        assert plan['workloads'] == {  # type: ignore
+            'wl1': {'override': 'replace', 'user': 'carol'},
+            'wl2': {'override': 'replace', 'user': 'bob'},
+        }
+
     def test_add_layer_not_combined(self, client: _TestingPebbleClient):
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
