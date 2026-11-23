@@ -26,6 +26,7 @@ from typing_extensions import deprecated
 import ops
 from ops._private.harness import ActionFailed
 
+from . import _charmcraft_extensions
 from ._runtime import Runtime
 from .errors import (
     AlreadyEmittedError,
@@ -42,6 +43,7 @@ from .state import (
     Secret,
     Storage,
     _Action,
+    _apply_extensions,
     _CharmSpec,
 )
 from .state import (
@@ -65,6 +67,30 @@ if TYPE_CHECKING:  # pragma: no cover
 logger = scenario_logger.getChild('runtime')
 
 _DEFAULT_JUJU_VERSION = '3.6.14'
+
+
+def _check_extensions_allow(
+    extensions: list[str],
+    *,
+    actions: dict[str, Any] | None,
+    config: dict[str, Any] | None,
+) -> None:
+    """Raise ValueError if an extension provides config or actions that are also given separately.
+
+    This matches ``charmcraft pack``, which rejects a ``config.yaml`` or
+    ``actions.yaml`` file when an extension has already provided that section.
+    """
+    for ext_name in extensions:
+        if config is not None and _charmcraft_extensions.CONFIG.get(ext_name):
+            raise ValueError(
+                f'Cannot specify config separately when the {ext_name!r} extension '
+                "provides config; put the options in the charm metadata's 'config' section"
+            )
+        if actions is not None and _charmcraft_extensions.ACTIONS.get(ext_name):
+            raise ValueError(
+                f'Cannot specify actions separately when the {ext_name!r} extension '
+                "provides actions; put them in the charm metadata's 'actions' section"
+            )
 
 
 def _check_event(event: Event) -> None:
@@ -754,9 +780,11 @@ class Context(Generic[CharmType]):
             ``actions`` will be automatically extracted from it (if not explicitly provided).
             Otherwise, if no meta, actions, or config were provided, will be loaded from the
             ``charmcraft.yaml`` file in the charm root (falling back to ``metadata.yaml``).
-            If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+            If the charm metadata contains an ``extensions`` key (for example,
             ``extensions: [flask-framework]``), the extension's metadata,
-            config, and actions will be automatically merged in.
+            config, and actions will be automatically merged in. As with
+            ``charmcraft pack``, an extension that provides config or actions
+            can't be combined with separately specified ``config`` or ``actions``.
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
             If none is provided, will be extracted from ``meta`` if present.
             Otherwise, if no meta, actions, or config were provided, will be loaded from the
@@ -795,18 +823,16 @@ class Context(Generic[CharmType]):
 
         else:
             meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
-            if actions is None:
-                actions = meta.pop('actions', None)
-            elif 'actions' in meta:
+            if actions is not None and 'actions' in meta:
                 raise ValueError('Cannot specify actions in both charmcraft.yaml and separately')
-            else:
-                actions = copy.deepcopy(actions)
-            if config is None:
-                config = meta.pop('config', None)
-            elif 'config' in meta:
+            if config is not None and 'config' in meta:
                 raise ValueError('Cannot specify config in both charmcraft.yaml and separately')
-            else:
-                config = copy.deepcopy(config)
+            extensions = meta.pop('extensions', None)
+            if extensions:
+                _check_extensions_allow(extensions, actions=actions, config=config)
+                _apply_extensions(meta, extensions)
+            actions = copy.deepcopy(actions) if actions is not None else meta.pop('actions', None)
+            config = copy.deepcopy(config) if config is not None else meta.pop('config', None)
             spec = _CharmSpec(charm_type=charm_type, meta=meta, actions=actions, config=config)
 
         self._charm_spec = spec
