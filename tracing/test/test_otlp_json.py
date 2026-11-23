@@ -46,6 +46,21 @@ def test_span_kind(kind: SpanKind, otlp_kind: int):
     assert encoded_span['kind'] == otlp_kind
 
 
+def _sdk_keeps_any_value_attributes() -> bool:
+    tracer = TracerProvider().get_tracer('test')
+    span = tracer.start_span('span', attributes={'m': {'x': 1}})  # type: ignore
+    span.end()
+    return 'm' in (span.attributes or {})  # type: ignore
+
+
+# Older opentelemetry-sdk versions convert or drop bytes, mapping, and mixed-type
+# list attributes before the encoder sees them, so there's nothing to test there.
+requires_any_value_attributes = pytest.mark.skipif(
+    not _sdk_keeps_any_value_attributes(),
+    reason='this opentelemetry-sdk version drops these attribute values',
+)
+
+
 def _encode_span(attributes: dict[str, Any], limits: SpanLimits | None = None) -> dict[str, Any]:
     tracer = TracerProvider(span_limits=limits).get_tracer('test')
     span = tracer.start_span('span', attributes=attributes)
@@ -54,12 +69,14 @@ def _encode_span(attributes: dict[str, Any], limits: SpanLimits | None = None) -
     return payload['resourceSpans'][0]['scopeSpans'][0]['spans'][0]
 
 
+@requires_any_value_attributes
 def test_bytes_attribute_is_base64():
     encoded_span = _encode_span({'b': b'hi'})
 
     assert encoded_span['attributes'] == [{'key': 'b', 'value': {'bytesValue': 'aGk='}}]
 
 
+@requires_any_value_attributes
 def test_mapping_attribute_is_key_value_list():
     encoded_span = _encode_span({'m': {'x': 1, 'y': 'z'}})
 
@@ -97,6 +114,7 @@ def test_event_dropped_attributes_count_includes_sdk_limits():
     assert encoded_event['droppedAttributesCount'] == 2
 
 
+@requires_any_value_attributes
 def test_dropped_attributes_count_includes_unencodable_values():
     encoded_span = _encode_span({'a': 1, 'mixed': [1, 'x']})
 
