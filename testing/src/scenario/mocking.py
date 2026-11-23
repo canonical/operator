@@ -370,13 +370,34 @@ class _MockModelBackend(_ModelBackend):
             # consistency check to enforce that, but in case something has gone
             # wrong, filter it out to match Juju's behaviour.
             this_unit = int(self.unit_name.split('/')[-1])
-            return tuple(
+            units = tuple(
                 f'{self.app_name}/{unit_id}'
                 for unit_id in relation.peers_data
                 if unit_id != this_unit
             )
-        remote_name = self.relation_remote_app_name(relation_id, relation_name=relation_name)
-        return tuple(f'{remote_name}/{unit_id}' for unit_id in relation._remote_unit_ids)
+        else:
+            remote_name = self.relation_remote_app_name(relation_id, relation_name=relation_name)
+            units = tuple(f'{remote_name}/{unit_id}' for unit_id in relation._remote_unit_ids)
+        return self._without_departed_units(relation, units)
+
+    def _without_departed_units(
+        self, relation: RelationBase, units: tuple[str, ...]
+    ) -> tuple[str, ...]:
+        """Leave out the units that Juju no longer lists during this hook.
+
+        Juju removes the remote unit from the relation's members before it runs
+        relation-departed, and departs every remaining unit before it runs
+        relation-broken. The departing unit's data is still readable.
+        """
+        event = self._event
+        if event._relation is None or event._relation.id != relation.id:
+            return units
+        if event.name.endswith('_relation_broken'):
+            return ()
+        if event.name.endswith('_relation_departed'):
+            departed = self._juju_context.remote_unit_name
+            return tuple(unit for unit in units if unit != departed)
+        return units
 
     def config_get(self) -> dict[str, str | int | float | bool]:
         state_config = dict(self._state.config)  # dedup or we'll mutate the state!

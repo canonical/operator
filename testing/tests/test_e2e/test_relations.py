@@ -802,3 +802,67 @@ def test_peer_relation_units_does_not_contain_this_unit():
     state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
     rel_out = state.get_relation(rel_in.id)
     assert rel_out.local_unit_data.get('this-unit') == '<ops.model.Unit charm-name/0>'
+
+
+class UnitsCharm(ops.CharmBase):
+    seen: ClassVar[dict[str, Any]] = {}
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        for endpoint in ('db', 'other', 'peers'):
+            framework.observe(self.on[endpoint].relation_departed, self._record)
+            framework.observe(self.on[endpoint].relation_broken, self._record)
+
+    def _record(self, event: ops.RelationDepartedEvent | ops.RelationBrokenEvent):
+        seen = UnitsCharm.seen
+        seen['units'] = sorted(unit.name for unit in event.relation.units)
+        # ops keeps a departing remote unit's data readable, but not a peer's.
+        if event.unit is not None and event.unit in event.relation.data:
+            seen['departing_data'] = dict(event.relation.data[event.unit])
+        other = self.model.get_relation('other')
+        if other is not None:
+            seen['other_units'] = sorted(unit.name for unit in other.units)
+
+
+_UNITS_META = {
+    'name': 'local',
+    'requires': {'db': {'interface': 'db'}, 'other': {'interface': 'other'}},
+    'peers': {'peers': {'interface': 'peers'}},
+}
+
+
+def test_relation_departed_does_not_list_the_departing_unit():
+    # Juju removes the departing unit from relation-list before it runs
+    # relation-departed, but its data is still readable.
+    UnitsCharm.seen = {}
+    rel = Relation('db', remote_units_data={0: {'k': 'a'}, 1: {'k': 'b'}})
+    other = Relation('other', remote_units_data={0: {}, 1: {}})
+    ctx = Context(UnitsCharm, meta=_UNITS_META)
+    ctx.run(
+        ctx.on.relation_departed(rel, remote_unit=1, departing_unit=1),
+        State(relations={rel, other}),
+    )
+    assert UnitsCharm.seen == {
+        'units': ['remote/0'],
+        'departing_data': {'k': 'b'},
+        # Other relations are not affected.
+        'other_units': ['remote/0', 'remote/1'],
+    }
+
+
+def test_peer_relation_departed_does_not_list_the_departing_unit():
+    UnitsCharm.seen = {}
+    rel = PeerRelation('peers', peers_data={1: {'k': 'a'}, 2: {'k': 'b'}})
+    ctx = Context(UnitsCharm, meta=_UNITS_META)
+    ctx.run(ctx.on.relation_departed(rel, remote_unit=2, departing_unit=2), State(relations={rel}))
+    assert UnitsCharm.seen == {'units': ['local/1']}
+
+
+def test_relation_broken_lists_no_units():
+    # Juju departs every remaining unit before it runs relation-broken.
+    UnitsCharm.seen = {}
+    rel = Relation('db', remote_units_data={0: {}, 1: {}})
+    other = Relation('other', remote_units_data={0: {}})
+    ctx = Context(UnitsCharm, meta=_UNITS_META)
+    ctx.run(ctx.on.relation_broken(rel), State(relations={rel, other}))
+    assert UnitsCharm.seen == {'units': [], 'other_units': ['remote/0']}
