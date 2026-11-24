@@ -771,8 +771,8 @@ def check_containers_consistency(
             if check_threshold != plan_threshold:
                 errors.append(
                     f'container {container.name!r} has a check {check.name!r} with a '
-                    f"different 'threshold' ({check.threshold}) than the plan "
-                    f'({plan_check.threshold}).',
+                    f"different 'threshold' ({check_threshold}) than the plan "
+                    f'({plan_threshold}).',
                 )
 
     return Results(errors, [])
