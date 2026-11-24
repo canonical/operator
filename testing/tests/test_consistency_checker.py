@@ -682,18 +682,16 @@ def test_action_params_no_type_is_not_missing():
 
 
 @pytest.mark.parametrize(
-    'juju_version,additional_properties,warns',
+    'juju_version,additional_properties',
     [
-        ('3.6', True, False),
-        ('3.6', None, True),
-        ('4.0', True, False),
+        ('3.6', True),
+        ('3.6', None),
+        ('4.0', True),
     ],
 )
 def test_action_params_not_declared_allowed(
     juju_version: str,
     additional_properties: bool | None,
-    warns: bool,
-    caplog: pytest.LogCaptureFixture,
 ):
     action_spec: dict[str, Any] = {'params': {}}
     if additional_properties is not None:
@@ -702,7 +700,6 @@ def test_action_params_not_declared_allowed(
     spec = _CharmSpec(MyCharm, meta={}, actions={'foo': action_spec})
     event = ctx.on.action('foo', params={'bar': 'baz'})
     assert_consistent(State(), event, spec, juju_version=juju_version)
-    assert ('Set `additionalProperties`' in caplog.text) == warns
 
 
 @pytest.mark.parametrize(

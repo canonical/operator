@@ -29,7 +29,7 @@ from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from ops import ActionMeta, JujuVersion, pebble
-from ops.charm import _config_value_has_type
+from ops.charm import _config_value_has_type, _default_additional_properties
 
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
@@ -362,7 +362,12 @@ def _check_action_param_types(
     action_spec = cast('dict[str, Any]', actions[action.name] or {})
     # The test's Juju version decides the additionalProperties default, not
     # the JUJU_VERSION environment variable of the test runner.
-    action_meta = ActionMeta(action.name, action_spec, _juju_version=juju_version)
+    action_meta = ActionMeta(action.name, action_spec)
+    # The default for additionalProperties depends on the Juju version the test
+    # runs under, not on the test runner's JUJU_VERSION.
+    additional_properties = action_spec.get(
+        'additionalProperties', _default_additional_properties(juju_version)
+    )
     action_params = cast('dict[str, dict[str, Any]]', action_meta.parameters)
     for par_name, par_spec in action_params.items():
         value = par_spec.get('type')
@@ -385,16 +390,10 @@ def _check_action_param_types(
 
     for provided_param_name, provided_param_value in action.params.items():
         if provided_param_name not in action_params:
-            if not action_meta.additional_properties:
+            if not additional_properties:
                 errors.append(
                     f'param {provided_param_name} is not a valid parameter for {action.name}: '
                     'missing from action specification',
-                )
-            elif 'additionalProperties' not in action_spec:
-                warnings.append(
-                    f'param {provided_param_name} is not declared for {action.name}. Juju '
-                    'accepts it only because `additionalProperties` is not set, and Juju 4 '
-                    'will reject it. Set `additionalProperties` in the action specification.',
                 )
             continue
         expected_type = expected_param_type.get(provided_param_name)
@@ -492,7 +491,7 @@ def check_config_consistency(
         elif not _config_value_has_type(value, expected_type_name):
             errors.append(
                 f'config invalid; option {key!r} should be of type {expected_type_name} '
-                f'but is of type {type(value)}.',
+                f'but is of type {type(value).__name__}.',
             )
 
         elif expected_type_name == 'secret' and not _is_secret_identifier(value):

@@ -666,14 +666,22 @@ def test_actions_additional_properties(
 
 
 @pytest.mark.parametrize('juju_version,additional_properties', [('3.6', True), ('4.0', False)])
-def test_actions_additional_properties_given_juju_version(
+def test_default_additional_properties_given_juju_version(
     monkeypatch: pytest.MonkeyPatch, juju_version: str, additional_properties: bool
 ):
-    # ops.testing passes the version the test runs under, which wins over
-    # the environment's.
+    # A version that is passed in wins over the environment's.
     monkeypatch.setenv('JUJU_VERSION', '4.0' if additional_properties else '3.6')
-    action = ops.ActionMeta('foo', {}, _juju_version=ops.JujuVersion(juju_version))
-    assert action.additional_properties == additional_properties
+    default = ops.charm._default_additional_properties(ops.JujuVersion(juju_version))
+    assert default is additional_properties
+
+
+@pytest.mark.parametrize('juju_version,additional_properties', [('3.6', True), ('4.0', False)])
+def test_default_additional_properties_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch, juju_version: str, additional_properties: bool
+):
+    monkeypatch.setenv('JUJU_VERSION', juju_version)
+    assert ops.charm._default_additional_properties() is additional_properties
+    assert ops.ActionMeta('foo', {}).additional_properties is additional_properties
 
 
 @pytest.mark.parametrize(

@@ -2225,25 +2225,16 @@ class ActionMeta:
     additional_properties: bool
     """Whether parameters not listed in :attr:`parameters` are allowed."""
 
-    def __init__(
-        self,
-        name: str,
-        raw: dict[str, Any] | None = None,
-        *,
-        _juju_version: JujuVersion | None = None,
-    ) -> None:
+    def __init__(self, name: str, raw: dict[str, Any] | None = None) -> None:
         raw = raw or {}
         self.name = name
         self.title = raw.get('title', '')
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
-        # The default in Juju 4 is False. The default in earlier Juju versions is True.
-        # ops.testing passes the version the test runs under, rather than the
-        # environment's.
-        if _juju_version is None:
-            _juju_version = JujuVersion(os.environ.get('JUJU_VERSION', '0.0.0'))
-        self.additional_properties = raw.get('additionalProperties', _juju_version < '4.0.0')
+        self.additional_properties = raw.get(
+            'additionalProperties', _default_additional_properties()
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -2261,6 +2252,17 @@ class ConfigMeta:
 
     description: str | None
     """Description of the config option."""
+
+
+def _default_additional_properties(juju_version: JujuVersion | None = None) -> bool:  # pyright: ignore[reportUnusedFunction]
+    """Report whether an action that doesn't set ``additionalProperties`` allows extra parameters.
+
+    The default in Juju 4 is False. The default in earlier Juju versions is True.
+    Without a version, the one in ``JUJU_VERSION`` is used.
+    """
+    if juju_version is None:
+        juju_version = JujuVersion(os.environ.get('JUJU_VERSION', '0.0.0'))
+    return juju_version < '4.0.0'
 
 
 def _config_value_has_type(value: object, type_name: str) -> bool:  # pyright: ignore[reportUnusedFunction]
