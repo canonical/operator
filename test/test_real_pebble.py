@@ -235,6 +235,26 @@ class TestRealPebble:
             data = f.read()
             assert data == content
 
+    @pytest.mark.parametrize(
+        'name',
+        [
+            'back\\slash',  # \s isn't a tspecial, so this worked before the fix too.
+            'back\\;slash',
+            'back\\"slash',
+            'back\\\\slash',
+            'trailing\\',
+        ],
+    )
+    def test_push_pull_awkward_name(
+        self, client: pebble.Client, tmp_path: pathlib.Path, name: str
+    ):
+        path = tmp_path / name
+        content = 'foo\nbar\nbaz-42'
+        client.push(path, content)
+        assert path.read_text() == content
+        with client.pull(path) as f:
+            assert f.read() == content
+
     @pytest.mark.parametrize('path_type', (str, pathlib.Path))
     def test_list_files_path_type(
         self,
