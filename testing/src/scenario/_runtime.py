@@ -129,6 +129,18 @@ class Runtime(Generic[CharmType]):
 
             remote_unit_id = event._relation_remote_unit_id
 
+            # When a remote unit departs, Juju sets JUJU_REMOTE_UNIT and JUJU_DEPARTING_UNIT to
+            # the same unit, so default the remote unit to the departing one. On a peer relation
+            # the departing unit can be this unit, which is never a remote unit.
+            departed_unit_id = event._relation_departed_unit_id
+            if (
+                remote_unit_id is None
+                and departed_unit_id is not None
+                and event.name.endswith('_relation_departed')
+                and not (isinstance(relation, PeerRelation) and departed_unit_id == self._unit_id)
+            ):
+                remote_unit_id = departed_unit_id
+
             # don't check truthiness because remote_unit_id could be 0
             if remote_unit_id is None and not event.name.endswith(
                 ('_relation_created', 'relation_broken'),
@@ -159,7 +171,7 @@ class Runtime(Generic[CharmType]):
                 remote_unit = f'{remote_app_name}/{remote_unit_id}'
                 env['JUJU_REMOTE_UNIT'] = remote_unit
                 if event.name.endswith('_relation_departed'):
-                    if event._relation_departed_unit_id:
+                    if departed_unit_id is not None:
                         env['JUJU_DEPARTING_UNIT'] = (
                             f'{remote_app_name}/{event._relation_departed_unit_id}'
                         )

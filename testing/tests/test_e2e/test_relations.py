@@ -858,6 +858,46 @@ def test_peer_relation_departed_does_not_list_the_departing_unit():
     assert UnitsCharm.seen == {'units': ['local/1']}
 
 
+class DepartingCharm(ops.CharmBase):
+    seen: ClassVar[dict[str, Any]] = {}
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        for endpoint in ('db', 'peers'):
+            framework.observe(self.on[endpoint].relation_departed, self._on_departed)
+
+    def _on_departed(self, event: ops.RelationDepartedEvent):
+        DepartingCharm.seen = {
+            'remote': event.unit.name if event.unit else None,
+            'departing': event.departing_unit.name if event.departing_unit else None,
+            'units': sorted(unit.name for unit in event.relation.units),
+        }
+
+
+def test_relation_departed_defaults_the_remote_unit_to_the_departing_unit():
+    # Juju sets JUJU_REMOTE_UNIT and JUJU_DEPARTING_UNIT to the same unit when a remote unit
+    # departs, so a test that only passes the departing unit gets that as the remote unit too.
+    DepartingCharm.seen = {}
+    rel = Relation('db', remote_units_data={0: {}, 1: {}})
+    ctx = Context(DepartingCharm, meta=_UNITS_META)
+    ctx.run(ctx.on.relation_departed(rel, departing_unit=2), State(relations={rel}))
+    assert DepartingCharm.seen == {
+        'remote': 'remote/2',
+        'departing': 'remote/2',
+        'units': ['remote/0', 'remote/1'],
+    }
+
+
+def test_peer_relation_departed_by_this_unit_keeps_a_remote_peer_as_the_remote_unit():
+    # When this unit is the one departing a peer relation, it isn't a remote unit.
+    DepartingCharm.seen = {}
+    rel = PeerRelation('peers', peers_data={1: {}, 2: {}})
+    ctx = Context(DepartingCharm, meta=_UNITS_META)
+    ctx.run(ctx.on.relation_departed(rel, departing_unit=0), State(relations={rel}))
+    assert DepartingCharm.seen['remote'] == 'local/1'
+    assert DepartingCharm.seen['departing'] == 'local/0'
+
+
 def test_relation_broken_lists_no_units():
     # Juju departs every remaining unit before it runs relation-broken.
     UnitsCharm.seen = {}
