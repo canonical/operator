@@ -1894,6 +1894,11 @@ class Relation:
                 # data.destination will be stored under the Juju relation key 'to'
                 relation.save(data, self.unit)
 
+        A Pydantic field that has a ``serialization_alias`` is saved with that
+        alias as the key. :meth:`load` looks for the field's ``alias``, or its
+        name if it has none, so if the data needs to be loaded back, use
+        ``alias`` rather than ``serialization_alias``.
+
         If a Pydantic model's ``model_dump`` method omits any field (e.g. if its
         value is Pydantic's ``MISSING`` sentinel) the field will be erased from
         the relation data.
@@ -1928,8 +1933,10 @@ class Relation:
         elif hasattr(obj.__class__, 'model_fields'):
             # Pydantic models:
             for name, field in obj.__class__.model_fields.items():  # type: ignore
-                # Pydantic takes care of the alias.
-                fields[field.alias or name] = field.alias or name  # type: ignore
+                # Use the key that model_dump(by_alias=True) uses, which is the
+                # serialization alias if the field has one, so that the value is found.
+                key = field.serialization_alias or field.alias or name  # type: ignore
+                fields[key] = key
             values = obj.model_dump(mode='json', by_alias=True, exclude_defaults=False)  # type: ignore
         else:
             # If we could not otherwise determine the fields for the class,
