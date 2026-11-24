@@ -17,7 +17,7 @@
 ``ops_tracing._otlp_json`` is our own encoder. The tests build spans with the
 OpenTelemetry SDK, encode them with it, and parse the result into the real
 ``ExportTraceServiceRequest`` with ``google.protobuf.json_format``. The parse
-catches output that a strict collector would reject. The parsed request is
+catches output that a protobuf receiver would reject. The parsed request is
 then compared with what the official encoder,
 ``opentelemetry-exporter-otlp-proto-common``, builds for the same spans, which
 catches fields that are dropped or encoded differently.
@@ -38,16 +38,12 @@ from google.protobuf import json_format
 from hypothesis import given
 from hypothesis import strategies as st
 from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.common.trace_encoder import (
-    encode_spans as official_encode_spans,
-)
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
-from opentelemetry.sdk.trace.id_generator import IdGenerator
-from opentelemetry.trace import Link, SpanContext, SpanKind, Status, StatusCode, TraceFlags
-from opentelemetry.trace.span import TraceState
-from ops_tracing._otlp_json import encode_spans
+from opentelemetry.exporter.otlp.proto.common import trace_encoder
+from opentelemetry.proto.collector.trace.v1 import trace_service_pb2
+from opentelemetry.sdk import resources
+from opentelemetry.sdk import trace as sdk_trace
+from opentelemetry.sdk.trace import id_generator
+from ops_tracing import _otlp_json
 
 _INT64_MIN = -(2**63)
 _INT64_MAX = 2**63 - 1
@@ -77,13 +73,22 @@ _times = st.integers(1, _INT64_MAX // 2)
 _trace_ids = st.integers(1, 2**128 - 1)
 _span_ids = st.integers(1, 2**64 - 1)
 _statuses = st.one_of(
-    st.just(Status(StatusCode.UNSET)),
-    st.just(Status(StatusCode.OK)),
-    st.builds(Status, st.just(StatusCode.ERROR), st.text(max_size=20)),
+    st.just(trace.Status(trace.StatusCode.UNSET)),
+    st.just(trace.Status(trace.StatusCode.OK)),
+    st.builds(trace.Status, st.just(trace.StatusCode.ERROR), st.text(max_size=20)),
+)
+# A remote parent, as from an incoming request. Trace state is a known
+# difference (test_trace_state), so there is none here.
+_remote_parents = st.builds(
+    trace.SpanContext,
+    trace_id=_trace_ids,
+    span_id=_span_ids,
+    is_remote=st.just(True),
+    trace_flags=st.just(trace.TraceFlags(1)),
 )
 
 
-class _DrawnIds(IdGenerator):
+class _DrawnIds(id_generator.IdGenerator):
     """Trace and span IDs drawn by Hypothesis, rather than with ``random``."""
 
     def __init__(self, draw: st.DrawFn):
@@ -97,21 +102,29 @@ class _DrawnIds(IdGenerator):
 
 
 @st.composite
-def _spans(draw: st.DrawFn) -> list[ReadableSpan]:
-    """Spans from one tracer, some of them children of earlier ones.
+def _spans(draw: st.DrawFn) -> list[sdk_trace.ReadableSpan]:
+    """Spans from one or two providers and a few tracers, some of them children of earlier ones.
 
     The spans have no links, which are a known difference (test_links).
     """
-    provider = TracerProvider(resource=Resource(draw(_attributes)), id_generator=_DrawnIds(draw))
-    tracer = provider.get_tracer(draw(_names), draw(st.none() | _names))
+    tracers: list[trace.Tracer] = []
+    for _ in range(draw(st.integers(1, 2))):
+        provider = sdk_trace.TracerProvider(
+            resource=resources.Resource(draw(_attributes)), id_generator=_DrawnIds(draw)
+        )
+        for _ in range(draw(st.integers(1, 2))):
+            tracers.append(provider.get_tracer(draw(_names), draw(st.none() | _names)))
     spans: list[Any] = []
     for _ in range(draw(st.integers(1, 4))):
+        tracer = draw(st.sampled_from(tracers))
         parent = draw(st.none() | st.sampled_from(spans)) if spans else None
+        if parent is None and draw(st.booleans()):
+            parent = trace.NonRecordingSpan(draw(_remote_parents))
         start = draw(_times)
         span = tracer.start_span(
             draw(_names),
             context=trace.set_span_in_context(parent) if parent is not None else None,
-            kind=draw(st.sampled_from(SpanKind)),
+            kind=draw(st.sampled_from(trace.SpanKind)),
             attributes=draw(_attributes),
             start_time=start,
         )
@@ -129,6 +142,9 @@ def _spans(draw: st.DrawFn) -> list[ReadableSpan]:
 
 
 _ID_FIELDS = ('traceId', 'spanId', 'parentSpanId')
+# The low byte of a span's flags holds the W3C trace flags, which OTLP specifies
+# (SPAN_FLAGS_TRACE_FLAGS_MASK) and the official Python encoder leaves out.
+_TRACE_FLAGS_MASK = 0xFF
 
 
 def _hex_ids_to_base64(value: Any) -> Any:
@@ -137,6 +153,7 @@ def _hex_ids_to_base64(value: Any) -> Any:
     OTLP/JSON differs from the standard protobuf JSON mapping here: trace and
     span IDs are hex strings, not base64, so a receiver converts them before
     parsing (https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding).
+    ``json_format.Parse`` decodes bytes fields as URL-safe base64.
     """
     if isinstance(value, list):
         return [_hex_ids_to_base64(item) for item in cast('list[Any]', value)]
@@ -144,25 +161,48 @@ def _hex_ids_to_base64(value: Any) -> Any:
         converted: dict[str, Any] = {}
         for key, item in cast('dict[str, Any]', value).items():
             if key in _ID_FIELDS and isinstance(item, str) and item:
-                converted[key] = base64.b64encode(bytes.fromhex(item)).decode()
+                converted[key] = base64.urlsafe_b64encode(bytes.fromhex(item)).decode()
             else:
                 converted[key] = _hex_ids_to_base64(item)
         return converted
     return value
 
 
-def _parse(payload: bytes) -> ExportTraceServiceRequest:
-    """Parse an OTLP/JSON payload as a strict receiver would."""
+def _parse(payload: bytes) -> trace_service_pb2.ExportTraceServiceRequest:
+    """Parse an OTLP/JSON payload as a protobuf receiver would."""
     return json_format.Parse(
-        json.dumps(_hex_ids_to_base64(json.loads(payload))), ExportTraceServiceRequest()
+        json.dumps(_hex_ids_to_base64(json.loads(payload))),
+        trace_service_pb2.ExportTraceServiceRequest(),
     )
 
 
+def _comparable(request: trace_service_pb2.ExportTraceServiceRequest) -> dict[str, Any]:
+    """The request as a dict, in an order and with flags that both encoders agree on.
+
+    Our encoder sorts resources and scopes, and the official one keeps them in
+    the order it meets them, so both are sorted here. The trace flags in the low
+    byte of ``flags`` are masked out (see ``_TRACE_FLAGS_MASK``).
+    """
+    data = json_format.MessageToDict(request)
+    resource_spans = cast('list[dict[str, Any]]', data.get('resourceSpans', []))
+    for resource_span in resource_spans:
+        scope_spans = cast('list[dict[str, Any]]', resource_span.get('scopeSpans', []))
+        for scope_span in scope_spans:
+            for span in cast('list[dict[str, Any]]', scope_span.get('spans', [])):
+                if 'flags' in span:
+                    span['flags'] = int(span['flags']) & ~_TRACE_FLAGS_MASK
+                    if not span['flags']:
+                        del span['flags']
+        scope_spans.sort(key=lambda item: json.dumps(item.get('scope', {}), sort_keys=True))
+    resource_spans.sort(key=lambda item: json.dumps(item.get('resource', {}), sort_keys=True))
+    return data
+
+
 def _assert_same_as_official(spans: list[Any]):
-    ours = _parse(encode_spans(spans))
-    official = official_encode_spans(spans)
+    ours = _parse(_otlp_json.encode_spans(spans))
+    official = trace_encoder.encode_spans(spans)
     # Compared as dicts so that a failure shows which field differs.
-    assert json_format.MessageToDict(ours) == json_format.MessageToDict(official)
+    assert _comparable(ours) == _comparable(official)
 
 
 def _span(tracer: trace.Tracer, **kwargs: Any) -> Any:
@@ -175,74 +215,83 @@ def _span(tracer: trace.Tracer, **kwargs: Any) -> Any:
 
 
 @given(_spans())
-def test_encoding_matches_the_official_encoder(spans: list[ReadableSpan]):
+def test_encoding_matches_the_official_encoder(spans: list[sdk_trace.ReadableSpan]):
     _assert_same_as_official(spans)
 
 
 # ── known differences ───────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason='traceState is never sent')
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason='traceState is never sent')
 def test_trace_state():
-    tracer = TracerProvider().get_tracer('test')
-    parent = SpanContext(
+    tracer = sdk_trace.TracerProvider().get_tracer('test')
+    parent = trace.SpanContext(
         trace_id=1,
         span_id=2,
         is_remote=True,
-        trace_flags=TraceFlags(1),
-        trace_state=TraceState([('vendor', 'value')]),
+        trace_flags=trace.TraceFlags(1),
+        trace_state=trace.TraceState([('vendor', 'value')]),
     )
     context = trace.set_span_in_context(trace.NonRecordingSpan(parent))
     _assert_same_as_official([_span(tracer, context=context)])
 
 
-@pytest.mark.xfail(strict=True, reason='the resource schemaUrl is never sent')
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason='the resource schemaUrl is never sent'
+)
 def test_resource_schema_url():
-    resource = Resource({'a': 'b'}, schema_url='https://opentelemetry.io/schemas/1.21.0')
-    tracer = TracerProvider(resource=resource).get_tracer('test')
+    resource = resources.Resource({'a': 'b'}, schema_url='https://opentelemetry.io/schemas/1.21.0')
+    tracer = sdk_trace.TracerProvider(resource=resource).get_tracer('test')
     _assert_same_as_official([_span(tracer)])
 
 
-@pytest.mark.xfail(strict=True, reason='the scope schemaUrl is never sent')
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason='the scope schemaUrl is never sent')
 def test_scope_schema_url():
-    tracer = TracerProvider().get_tracer(
+    tracer = sdk_trace.TracerProvider().get_tracer(
         'test', schema_url='https://opentelemetry.io/schemas/1.21.0'
     )
     _assert_same_as_official([_span(tracer)])
 
 
-@pytest.mark.xfail(strict=True, reason='scope attributes are never sent')
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason='scope attributes are never sent')
 def test_scope_attributes():
-    tracer = TracerProvider().get_tracer('test', attributes={'a': 'b'})
+    tracer = sdk_trace.TracerProvider().get_tracer('test', attributes={'a': 'b'})
     _assert_same_as_official([_span(tracer)])
 
 
 @pytest.mark.xfail(
     strict=True,
+    raises=json_format.ParseError,
     reason='an integer outside int64 makes the whole payload fail to parse, '
     'where the official encoder drops only that attribute',
 )
 @pytest.mark.parametrize('value', [_INT64_MAX + 1, _INT64_MIN - 1])
 def test_out_of_range_int_attribute(value: int):
-    tracer = TracerProvider().get_tracer('test')
-    _assert_same_as_official([_span(tracer, attributes={'big': value, 'small': 1})])
+    tracer = sdk_trace.TracerProvider().get_tracer('test')
+    span = _span(tracer, attributes={'big': value, 'small': 1})
+    # Not compared with the official encoder: we count an attribute we can't
+    # encode in droppedAttributesCount, and the official encoder doesn't.
+    request = _parse(_otlp_json.encode_spans([span]))
+    (encoded,) = request.resource_spans[0].scope_spans[0].spans
+    assert [attribute.key for attribute in encoded.attributes] == ['small']
 
 
 @pytest.mark.xfail(
     strict=True,
+    raises=json_format.ParseError,
     reason='a float that is not finite is written as a bare Infinity, -Infinity or NaN, '
     'which is not JSON, so the whole payload fails to parse',
 )
 @pytest.mark.parametrize('value', [float('inf'), float('-inf'), float('nan')])
 def test_non_finite_float_attribute(value: float):
-    tracer = TracerProvider().get_tracer('test')
-    span = _span(tracer, attributes={'x': value})
-    # NaN never equals itself, so this checks the parse rather than comparing.
-    _parse(encode_spans([span]))
+    tracer = sdk_trace.TracerProvider().get_tracer('test')
+    # MessageToDict writes these as the strings 'NaN' and 'Infinity', so the
+    # comparison works even for NaN.
+    _assert_same_as_official([_span(tracer, attributes={'x': value})])
 
 
-@pytest.mark.xfail(strict=True, reason='span links are never sent')
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason='span links are never sent')
 def test_links():
-    tracer = TracerProvider().get_tracer('test')
-    link = Link(SpanContext(trace_id=1, span_id=2, is_remote=True), {'a': 'b'})
+    tracer = sdk_trace.TracerProvider().get_tracer('test')
+    link = trace.Link(trace.SpanContext(trace_id=1, span_id=2, is_remote=True), {'a': 'b'})
     _assert_same_as_official([_span(tracer, links=[link])])
