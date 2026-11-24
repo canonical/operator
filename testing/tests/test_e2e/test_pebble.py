@@ -803,8 +803,8 @@ class PlanReaderCharm(ops.CharmBase):
 
 
 def test_unknown_layer_fields_reach_the_plan():
-    # Pebble fields that ops doesn't model, such as workloads, are kept in
-    # the plan the charm sees.
+    # Pebble fields that aren't modelled, such as workloads, are kept in the
+    # plan the charm sees, with the entries of each layer merged.
     layer = ops.pebble.Layer(
         """
 services:
@@ -816,12 +816,21 @@ workloads:
   wl: {override: replace, user: alice}
 """
     )
-    container = Container('foo', can_connect=True, layers={'base': layer})
+    other = ops.pebble.Layer(
+        """
+workloads:
+  wl2: {override: replace, user: bob}
+"""
+    )
+    container = Container('foo', can_connect=True, layers={'base': layer, 'other': other})
     ctx = Context(PlanReaderCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
     ctx.run(ctx.on.pebble_ready(container), State(containers={container}))
     assert PlanReaderCharm.plan == {
         'services': {'svc': {'override': 'replace', 'command': 'echo', 'workload': 'wl'}},
-        'workloads': {'wl': {'override': 'replace', 'user': 'alice'}},
+        'workloads': {
+            'wl': {'override': 'replace', 'user': 'alice'},
+            'wl2': {'override': 'replace', 'user': 'bob'},
+        },
     }
     assert container.plan.to_dict() == PlanReaderCharm.plan
 

@@ -944,7 +944,7 @@ summary: Sum Mary
         assert s != 5
 
     def test_unknown_fields_round_trip(self):
-        # Fields that ops doesn't model, here a newer Pebble's workloads, are
+        # Fields that we don't model, here a newer Pebble's workloads, are
         # kept and written back out rather than dropped.
         layer_yaml = """
 summary: sum
@@ -5101,3 +5101,83 @@ class TestIdentity:
     def test_no_identity(self):
         with pytest.raises(ValueError):
             pebble.Identity(access=pebble.IdentityAccess.ADMIN)
+
+
+@pytest.mark.parametrize(
+    ('cls', 'args', 'fields'),
+    [
+        (pebble.Service, ('svc',), pebble._SERVICE_FIELDS),
+        (pebble.Check, ('chk',), pebble._CHECK_FIELDS),
+        (pebble.LogTarget, ('tgt',), pebble._LOG_TARGET_FIELDS),
+        (pebble.Layer, (), pebble._LAYER_FIELDS),
+    ],
+)
+def test_modelled_fields_match_the_attributes(
+    cls: typing.Any, args: tuple[str, ...], fields: typing.Any
+):
+    # A field that a class models but that is missing from its field set would
+    # be kept as unknown, and to_dict() would write that copy back over any
+    # change made to the attribute.
+    obj = cls(*args, {})
+    attributes = {key.replace('_', '-') for key in vars(obj) if not key.startswith('_')}
+    attributes.discard('name')
+    assert attributes == set(fields)
+
+
+@pytest.mark.parametrize(
+    ('cls', 'raw'),
+    [
+        (
+            pebble.Service,
+            {
+                'summary': 's',
+                'description': 'd',
+                'startup': 'enabled',
+                'override': 'replace',
+                'command': 'echo',
+                'after': ['a'],
+                'before': ['b'],
+                'requires': ['r'],
+                'environment': {'K': 'V'},
+                'user': 'u',
+                'user-id': 1,
+                'group': 'g',
+                'group-id': 2,
+                'working-dir': '/w',
+                'on-success': 'restart',
+                'on-failure': 'restart',
+                'on-check-failure': {'chk': 'restart'},
+                'backoff-delay': '1s',
+                'backoff-factor': 2.0,
+                'backoff-limit': '10s',
+                'kill-delay': '5s',
+            },
+        ),
+        (
+            pebble.Check,
+            {
+                'override': 'replace',
+                'level': 'alive',
+                'startup': 'enabled',
+                'period': '10s',
+                'timeout': '3s',
+                'threshold': 3,
+                'exec': {'command': 'true'},
+            },
+        ),
+        (
+            pebble.LogTarget,
+            {
+                'override': 'replace',
+                'type': 'loki',
+                'location': 'https://example.com',
+                'services': ['all'],
+                'labels': {'k': 'v'},
+            },
+        ),
+    ],
+)
+def test_every_modelled_field_round_trips_as_known(cls: typing.Any, raw: dict[str, typing.Any]):
+    obj = cls('x', raw)
+    assert obj._unknown_fields == {}
+    assert obj.to_dict() == raw

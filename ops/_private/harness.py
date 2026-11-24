@@ -3542,9 +3542,6 @@ class _TestingPebbleClient:
         plan.services.update(self._render_services())
         plan.checks.update(self._render_checks())
         plan.log_targets.update(self._render_log_targets())
-        # Pebble sections that ops doesn't model, such as workloads.
-        for layer in self._layers.values():
-            pebble._merge_unknown_sections(plan._unknown_fields, layer._unknown_fields)
         return plan
 
     def get_services(self, names: list[str] | None = None) -> list[pebble.ServiceInfo]:

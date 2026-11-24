@@ -4470,8 +4470,9 @@ class TestTestingPebbleClient:
         )
 
     def test_add_layer_keeps_unknown_fields(self, client: _TestingPebbleClient):
-        # Pebble fields that ops doesn't model, such as workloads, are kept in
-        # the plan, as real Pebble would keep them.
+        # Pebble fields that aren't modelled, such as workloads, are kept in the
+        # stored layer when another layer is combined into it. Only the starting
+        # layer defines workloads: real Pebble rejects a change to that section.
         client.add_layer(
             'base',
             yaml.safe_load("""
@@ -4483,6 +4484,7 @@ services:
     keep: 1
 workloads:
   wl1: {override: replace, user: alice}
+  wl2: {override: replace, user: bob}
 """),
         )
         client.add_layer(
@@ -4492,27 +4494,18 @@ services:
   foo:
     override: merge
     workload: wl2
-workloads:
-  wl2: {override: replace, user: bob}
 """),
             combine=True,
         )
-        client.add_layer(
-            'other',
-            yaml.safe_load("""
-workloads:
-  wl1: {override: replace, user: carol}
-"""),
-        )
-        plan = client.get_plan().to_dict()
-        assert plan['services']['foo'] == {  # type: ignore
+        layer = client._layers['base'].to_dict()
+        assert layer['services']['foo'] == {  # type: ignore
             'override': 'replace',
             'command': 'echo foo',
             'workload': 'wl2',
             'keep': 1,
         }
-        assert plan['workloads'] == {  # type: ignore
-            'wl1': {'override': 'replace', 'user': 'carol'},
+        assert layer['workloads'] == {  # type: ignore
+            'wl1': {'override': 'replace', 'user': 'alice'},
             'wl2': {'override': 'replace', 'user': 'bob'},
         }
 

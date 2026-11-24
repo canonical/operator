@@ -859,7 +859,7 @@ class Change:
         )
 
 
-# The layer fields that ops models. Any others are kept as they are.
+# The layer fields that are modelled. Any others are kept as they are.
 _PLAN_FIELDS = frozenset({'services', 'checks', 'log-targets'})
 _LAYER_FIELDS = _PLAN_FIELDS | {'summary', 'description'}
 _SERVICE_FIELDS = frozenset({
@@ -914,8 +914,8 @@ def _merge_unknown_sections(  # pyright: ignore[reportUnusedFunction]
 ) -> None:
     """Merge the unknown top-level sections of a layer into another.
 
-    Harness and ops.testing use this when they combine layers. ops doesn't
-    know how to merge the entries of a section it doesn't model, so each
+    Harness and ops.testing use this when they combine layers. We don't
+    know how to merge the entries of a section we don't model, so each
     entry replaces the entry with the same name, and any other value replaces
     the existing one.
     """
@@ -1147,7 +1147,7 @@ class Service:
         """
         for name, value in other.__dict__.items():
             if name == '_unknown_fields':
-                # ops doesn't know how to merge these, so each one replaces
+                # We don't know how to merge these, so each one replaces
                 # the existing value, and the others are kept.
                 self._unknown_fields.update(copy.deepcopy(value))
                 continue
@@ -1356,7 +1356,7 @@ class Check:
         """
         for name, value in other.__dict__.items():
             if name == '_unknown_fields':
-                # ops doesn't know how to merge these, so each one replaces
+                # We don't know how to merge these, so each one replaces
                 # the existing value, and the others are kept.
                 self._unknown_fields.update(copy.deepcopy(value))
                 continue
@@ -1456,7 +1456,7 @@ class LogTarget:
         """
         for name, value in other.__dict__.items():
             if name == '_unknown_fields':
-                # ops doesn't know how to merge these, so each one replaces
+                # We don't know how to merge these, so each one replaces
                 # the existing value, and the others are kept.
                 self._unknown_fields.update(copy.deepcopy(value))
                 continue
