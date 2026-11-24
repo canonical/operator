@@ -28,7 +28,7 @@ from ._main import (  # ruff: ignore[unused-import]
 )
 
 
-def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None = None):
+def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None = None) -> None:
     """Legacy entrypoint to set up the charm and dispatch the observed event.
 
     .. deprecated:: 2.16.0
