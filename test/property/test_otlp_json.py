@@ -105,12 +105,17 @@ class _DrawnIds(id_generator.IdGenerator):
 def _spans(draw: st.DrawFn) -> list[sdk_trace.ReadableSpan]:
     """Spans from one or two providers and a few tracers, some of them children of earlier ones.
 
-    The spans have no links, which are a known difference (test_links).
+    The spans have no links, which are a known difference (test_links). Each
+    provider's resource starts with its own ``provider.number``, which is too
+    long for ``_keys`` to draw, so no two resources are alike: resources that
+    share a key are known differences (test_resources_with_a_key_of_different_types
+    and test_equal_resources_of_different_types).
     """
     tracers: list[trace.Tracer] = []
-    for _ in range(draw(st.integers(1, 2))):
+    for number in range(draw(st.integers(1, 2))):
+        attributes = {'provider.number': str(number), **draw(_attributes)}
         provider = sdk_trace.TracerProvider(
-            resource=resources.Resource(draw(_attributes)), id_generator=_DrawnIds(draw)
+            resource=resources.Resource(attributes), id_generator=_DrawnIds(draw)
         )
         for _ in range(draw(st.integers(1, 2))):
             tracers.append(provider.get_tracer(draw(_names), draw(st.none() | _names)))
@@ -211,6 +216,12 @@ def _span(tracer: trace.Tracer, **kwargs: Any) -> Any:
     return span
 
 
+def _resource_span(attributes: dict[str, Any]) -> Any:
+    """A span from a provider of its own, with a resource that has these attributes."""
+    provider = sdk_trace.TracerProvider(resource=resources.Resource(attributes))
+    return _span(provider.get_tracer('test'))
+
+
 # ── properties ──────────────────────────────────────────────────────────────
 
 
@@ -295,3 +306,23 @@ def test_links():
     tracer = sdk_trace.TracerProvider().get_tracer('test')
     link = trace.Link(trace.SpanContext(trace_id=1, span_id=2, is_remote=True), {'a': 'b'})
     _assert_same_as_official([_span(tracer, links=[link])])
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=TypeError,
+    reason='resources are sorted by their attribute values, which fails when two '
+    'resources have the same key with values that cannot be compared',
+)
+def test_resources_with_a_key_of_different_types():
+    _assert_same_as_official([_resource_span({'a': 1}), _resource_span({'a': 'x'})])
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason='resources whose values are equal in Python but of different types, such as '
+    'True and 1, are merged into one, and the official encoder keeps them apart',
+)
+def test_equal_resources_of_different_types():
+    _assert_same_as_official([_resource_span({'a': True}), _resource_span({'a': 1})])
