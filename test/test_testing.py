@@ -4473,6 +4473,8 @@ class TestTestingPebbleClient:
         # Pebble fields that aren't modelled, such as workloads, are kept in the
         # stored layer when another layer is combined into it. Only the starting
         # layer defines workloads: real Pebble rejects a change to that section.
+        # A made-up section in both layers is merged by entry: an entry in the
+        # combined layer replaces the one with the same name, and the rest are kept.
         client.add_layer(
             'base',
             yaml.safe_load("""
@@ -4485,6 +4487,9 @@ services:
 workloads:
   wl1: {override: replace, user: alice}
   wl2: {override: replace, user: bob}
+made-up:
+  kept: {value: 1}
+  replaced: {value: 2}
 """),
         )
         client.add_layer(
@@ -4494,6 +4499,8 @@ services:
   foo:
     override: merge
     workload: wl2
+made-up:
+  replaced: {value: 3}
 """),
             combine=True,
         )
@@ -4508,6 +4515,7 @@ services:
             'wl1': {'override': 'replace', 'user': 'alice'},
             'wl2': {'override': 'replace', 'user': 'bob'},
         }
+        assert layer['made-up'] == {'kept': {'value': 1}, 'replaced': {'value': 3}}  # type: ignore
 
     def test_add_layer_not_combined(self, client: _TestingPebbleClient):
         plan = client.get_plan()

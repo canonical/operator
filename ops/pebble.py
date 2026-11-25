@@ -900,7 +900,7 @@ _LOG_TARGET_FIELDS = frozenset({'override', 'type', 'location', 'services', 'lab
 
 
 def _unknown_fields(dct: Mapping[str, Any], known: Collection[str]) -> dict[str, Any]:
-    """Return a copy of the keys of a layer dict that ops doesn't model.
+    """Return a copy of the keys of a layer dict that aren't modelled.
 
     Pebble adds layer fields over time. These are kept so that they are
     passed back to Pebble (and out of ``to_dict``) rather than silently

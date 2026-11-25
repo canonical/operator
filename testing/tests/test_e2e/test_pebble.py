@@ -804,7 +804,8 @@ class PlanReaderCharm(ops.CharmBase):
 
 def test_unknown_layer_fields_reach_the_plan():
     # Pebble fields that aren't modelled, such as workloads, are kept in the
-    # plan the charm sees, with the entries of each layer merged.
+    # plan the charm sees, with the entries of each layer merged. A later layer's
+    # entry replaces an earlier one with the same name.
     layer = ops.pebble.Layer(
         """
 services:
@@ -819,6 +820,7 @@ workloads:
     other = ops.pebble.Layer(
         """
 workloads:
+  wl: {override: replace, user: carol}
   wl2: {override: replace, user: bob}
 """
     )
@@ -828,7 +830,7 @@ workloads:
     assert PlanReaderCharm.plan == {
         'services': {'svc': {'override': 'replace', 'command': 'echo', 'workload': 'wl'}},
         'workloads': {
-            'wl': {'override': 'replace', 'user': 'alice'},
+            'wl': {'override': 'replace', 'user': 'carol'},
             'wl2': {'override': 'replace', 'user': 'bob'},
         },
     }
