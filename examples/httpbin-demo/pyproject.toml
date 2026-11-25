@@ -38,12 +38,12 @@ lint = [
 unit = [
     "coverage[toml]>=7.10,<8",
     "ops[testing]",  # uv will use the correct version based on the 'ops' dependency.
-    "pytest>=9.1,<10",
+    "pytest>=9.2.0,<10",
 ]
 # Dependencies of integration tests
 integration = [
     "jubilant>=1.14,<2",
-    "pytest>=9.1,<10",
+    "pytest>=9.2.0,<10",
     "pytest-jubilant>=2.3,<3",
     "PyYAML>=6.0,<7",
 ]
