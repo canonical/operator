@@ -36,7 +36,7 @@ lint = [
 ]
 # Dependencies of unit tests
 unit = [
-    "coverage[toml]>=7.10,<8",
+    "coverage[toml]>=7.16.2,<8",
     "ops[testing]",  # uv will use the correct version based on the 'ops' dependency.
     "pytest>=9.1,<10",
 ]
