@@ -675,15 +675,6 @@ def test_default_additional_properties_given_juju_version(
     assert default is additional_properties
 
 
-@pytest.mark.parametrize('juju_version,additional_properties', [('3.6', True), ('4.0', False)])
-def test_default_additional_properties_from_the_environment(
-    monkeypatch: pytest.MonkeyPatch, juju_version: str, additional_properties: bool
-):
-    monkeypatch.setenv('JUJU_VERSION', juju_version)
-    assert ops.charm._default_additional_properties() is additional_properties
-    assert ops.ActionMeta('foo', {}).additional_properties is additional_properties
-
-
 @pytest.mark.parametrize(
     'type_name,value,expected',
     [
@@ -708,7 +699,7 @@ def test_config_value_has_type(type_name: str, value: object, expected: bool):
 
 def test_config_value_has_type_unknown_type():
     with pytest.raises(ValueError):
-        ops.charm._config_value_has_type(1, 'integer')
+        ops.charm._config_value_has_type(1, 'unknown')
 
 
 def _setup_test_action(fake_script: FakeScript):

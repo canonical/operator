@@ -360,8 +360,6 @@ def _check_action_param_types(
     }
     expected_param_type: dict[str, Any] = {}
     action_spec = cast('dict[str, Any]', actions[action.name] or {})
-    # The test's Juju version decides the additionalProperties default, not
-    # the JUJU_VERSION environment variable of the test runner.
     action_meta = ActionMeta(action.name, action_spec)
     # The default for additionalProperties depends on the Juju version the test
     # runs under, not on the test runner's JUJU_VERSION.

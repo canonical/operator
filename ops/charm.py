@@ -2254,7 +2254,7 @@ class ConfigMeta:
     """Description of the config option."""
 
 
-def _default_additional_properties(juju_version: JujuVersion | None = None) -> bool:  # pyright: ignore[reportUnusedFunction]
+def _default_additional_properties(juju_version: JujuVersion | None = None) -> bool:
     """Report whether an action that doesn't set ``additionalProperties`` allows extra parameters.
 
     The default in Juju 4 is False. The default in earlier Juju versions is True.
@@ -2266,7 +2266,7 @@ def _default_additional_properties(juju_version: JujuVersion | None = None) -> b
 
 
 def _config_value_has_type(value: object, type_name: str) -> bool:  # pyright: ignore[reportUnusedFunction]
-    """Report whether Juju accepts a value for a config option of this type.
+    """Report whether a charm can get this value for a config option of this type.
 
     This follows Juju's schema checks: an ``int`` option doesn't accept a bool
     (although ``bool`` is a subclass of ``int`` in Python), and a ``float``

@@ -399,21 +399,25 @@ def test_config_secret(juju_version: str):
         State(config={'foo': 1}),
         Event('bar'),
         _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': 'secret'}}}),
+        juju_version=juju_version,
     )
     assert_inconsistent(
         State(config={'foo': 'co28kefmp25c77utl3n0'}),
         Event('bar'),
         _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': 'secret'}}}),
+        juju_version=juju_version,
     )
     assert_inconsistent(
         State(config={'foo': 'secret:secret'}),
         Event('bar'),
         _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': 'secret'}}}),
+        juju_version=juju_version,
     )
     assert_inconsistent(
         State(config={'foo': 'secret:co28kefmp25c77utl3n!'}),
         Event('bar'),
         _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': 'secret'}}}),
+        juju_version=juju_version,
     )
 
 
