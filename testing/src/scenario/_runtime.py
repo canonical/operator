@@ -37,6 +37,22 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = scenario_logger.getChild('runtime')
 
+
+def _departing_unit_is_remote(event: Event, unit_id: int) -> bool:
+    """Report whether the event's departing unit is used as its remote unit.
+
+    When a remote unit departs, Juju sets JUJU_REMOTE_UNIT and JUJU_DEPARTING_UNIT to the
+    same unit, so the remote unit defaults to the departing one. On a peer relation the
+    departing unit can be this unit, which is never a remote unit.
+    """
+    departed_unit_id = event._relation_departed_unit_id
+    return (
+        departed_unit_id is not None
+        and event.name.endswith('_relation_departed')
+        and not (isinstance(event._relation, PeerRelation) and departed_unit_id == unit_id)
+    )
+
+
 RUNTIME_MODULE = Path(__file__).parent
 
 
@@ -129,16 +145,8 @@ class Runtime(Generic[CharmType]):
 
             remote_unit_id = event._relation_remote_unit_id
 
-            # When a remote unit departs, Juju sets JUJU_REMOTE_UNIT and JUJU_DEPARTING_UNIT to
-            # the same unit, so default the remote unit to the departing one. On a peer relation
-            # the departing unit can be this unit, which is never a remote unit.
             departed_unit_id = event._relation_departed_unit_id
-            if (
-                remote_unit_id is None
-                and departed_unit_id is not None
-                and event.name.endswith('_relation_departed')
-                and not (isinstance(relation, PeerRelation) and departed_unit_id == self._unit_id)
-            ):
+            if remote_unit_id is None and _departing_unit_is_remote(event, self._unit_id):
                 remote_unit_id = departed_unit_id
 
             # don't check truthiness because remote_unit_id could be 0
@@ -172,9 +180,7 @@ class Runtime(Generic[CharmType]):
                 env['JUJU_REMOTE_UNIT'] = remote_unit
                 if event.name.endswith('_relation_departed'):
                     if departed_unit_id is not None:
-                        env['JUJU_DEPARTING_UNIT'] = (
-                            f'{remote_app_name}/{event._relation_departed_unit_id}'
-                        )
+                        env['JUJU_DEPARTING_UNIT'] = f'{remote_app_name}/{departed_unit_id}'
                     else:
                         env['JUJU_DEPARTING_UNIT'] = remote_unit
 

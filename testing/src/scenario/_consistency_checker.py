@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from ops import JujuVersion, pebble
 
+from ._runtime import _departing_unit_is_remote
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
 from .state import (
@@ -647,11 +648,12 @@ def check_relation_consistency(
 
     # relation-joined, relation-changed, and relation-departed must all provide
     # a remote unit, either explicitly or by having at least one remote unit
-    # with data.
+    # with data. relation-departed can also get it from the departing unit.
     if (
         event.name.endswith(('_relation_joined', '_relation_changed', '_relation_departed'))
         and event._relation_remote_unit_id is None
         and event._relation is not None  # Another check will have complained if it is None.
+        and not _departing_unit_is_remote(event, unit_id)
     ):
         try:
             relation = state.get_relation(event._relation.id)

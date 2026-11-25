@@ -809,7 +809,7 @@ class UnitsCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        for endpoint in ('db', 'other', 'peers'):
+        for endpoint in ('db', 'other', 'peers', 'sub'):
             framework.observe(self.on[endpoint].relation_departed, self._record)
             framework.observe(self.on[endpoint].relation_broken, self._record)
 
@@ -826,7 +826,11 @@ class UnitsCharm(ops.CharmBase):
 
 _UNITS_META = {
     'name': 'local',
-    'requires': {'db': {'interface': 'db'}, 'other': {'interface': 'other'}},
+    'requires': {
+        'db': {'interface': 'db'},
+        'other': {'interface': 'other'},
+        'sub': {'interface': 'sub', 'scope': 'container'},
+    },
     'peers': {'peers': {'interface': 'peers'}},
 }
 
@@ -878,13 +882,13 @@ def test_relation_departed_defaults_the_remote_unit_to_the_departing_unit():
     # Juju sets JUJU_REMOTE_UNIT and JUJU_DEPARTING_UNIT to the same unit when a remote unit
     # departs, so a test that only passes the departing unit gets that as the remote unit too.
     DepartingCharm.seen = {}
-    rel = Relation('db', remote_units_data={0: {}, 1: {}})
+    rel = Relation('db', remote_units_data={1: {}, 0: {}})
     ctx = Context(DepartingCharm, meta=_UNITS_META)
-    ctx.run(ctx.on.relation_departed(rel, departing_unit=2), State(relations={rel}))
+    ctx.run(ctx.on.relation_departed(rel, departing_unit=0), State(relations={rel}))
     assert DepartingCharm.seen == {
-        'remote': 'remote/2',
-        'departing': 'remote/2',
-        'units': ['remote/0', 'remote/1'],
+        'remote': 'remote/0',
+        'departing': 'remote/0',
+        'units': ['remote/1'],
     }
 
 
@@ -894,8 +898,11 @@ def test_peer_relation_departed_by_this_unit_keeps_a_remote_peer_as_the_remote_u
     rel = PeerRelation('peers', peers_data={1: {}, 2: {}})
     ctx = Context(DepartingCharm, meta=_UNITS_META)
     ctx.run(ctx.on.relation_departed(rel, departing_unit=0), State(relations={rel}))
-    assert DepartingCharm.seen['remote'] == 'local/1'
-    assert DepartingCharm.seen['departing'] == 'local/0'
+    assert DepartingCharm.seen == {
+        'remote': 'local/1',
+        'departing': 'local/0',
+        'units': ['local/2'],
+    }
 
 
 def test_relation_broken_lists_no_units():
@@ -906,3 +913,19 @@ def test_relation_broken_lists_no_units():
     ctx = Context(UnitsCharm, meta=_UNITS_META)
     ctx.run(ctx.on.relation_broken(rel), State(relations={rel, other}))
     assert UnitsCharm.seen == {'units': [], 'other_units': ['remote/0']}
+
+
+@pytest.mark.parametrize('event_name', ['departed', 'broken'])
+def test_subordinate_relation_lists_no_units_when_the_principal_leaves(event_name: str):
+    UnitsCharm.seen = {}
+    rel = SubordinateRelation('sub', remote_unit_data={'k': 'a'})
+    other = Relation('other', remote_units_data={0: {}})
+    ctx = Context(UnitsCharm, meta=_UNITS_META)
+    if event_name == 'departed':
+        event = ctx.on.relation_departed(rel, remote_unit=0, departing_unit=0)
+        expected = {'units': [], 'departing_data': {'k': 'a'}, 'other_units': ['remote/0']}
+    else:
+        event = ctx.on.relation_broken(rel)
+        expected = {'units': [], 'other_units': ['remote/0']}
+    ctx.run(event, State(relations={rel, other}))
+    assert UnitsCharm.seen == expected
