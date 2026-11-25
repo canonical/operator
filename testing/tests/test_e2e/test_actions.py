@@ -121,7 +121,16 @@ def test_action_params_default_is_copied():
     ctx = Context(
         MyCharm,
         meta={'name': 'foo'},
-        actions={'foo': {'params': {'tags': {'type': 'array', 'default': ['a']}}}},
+        actions={
+            'foo': {
+                'params': {
+                    'tags': {
+                        'type': 'array',
+                        'default': ['a'],
+                    },
+                },
+            },
+        },
     )
     ctx.run(ctx.on.action('foo'), State())
     ctx.run(ctx.on.action('foo'), State())
