@@ -71,6 +71,8 @@ benchmark = [
 ]
 property = [
     "hypothesis~=6.0",
+    "opentelemetry-exporter-otlp-proto-common~=1.30",
+    "protobuf>=5",
 ]
 integration = [
     "ops[testing,tracing]",
