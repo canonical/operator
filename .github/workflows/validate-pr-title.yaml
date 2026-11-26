@@ -19,3 +19,43 @@ jobs:
       - run: python3 .github/check-conventional-pr-title.py
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+
+  suggest:
+    # The title becomes the changelog entry, so this suggests the edits that
+    # the release review would otherwise make: code in backticks,
+    # abbreviations spelled out, product names capitalised. They are
+    # heuristics, so they are shown as warnings and never fail the check.
+    name: Suggest PR title improvements
+    runs-on: ubuntu-latest
+    # Dependabot's titles name packages, which the product-name check would
+    # flag, and nobody edits them.
+    if: github.event.pull_request.user.type != 'Bot'
+    env:
+      CHANGELOG: >-
+        git+https://github.com/canonical/charm-tech-code@9ae49c443d0feab3c3acd34d05e49ef04188896d#subdirectory=changelog
+    steps:
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          enable-cache: false
+      - name: Suggest improvements to the title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          suggestions=$(printf '%s' "$PR_TITLE" | uvx --from "$CHANGELOG" changelog suggest-title)
+          if [ -z "$suggestions" ]; then
+            echo 'No suggestions for the title.'
+            exit 0
+          fi
+          {
+            echo '### Suggestions for the PR title'
+            echo
+            echo 'The title becomes the changelog entry. These are heuristics, so ignore any that are wrong.'
+            echo
+            while IFS= read -r line; do echo "* $line"; done <<< "$suggestions"
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            # Escape the one character a workflow command treats specially
+            # within a single line.
+            echo "::warning title=PR title suggestion::${line//%/%25}"
+          done <<< "$suggestions"
