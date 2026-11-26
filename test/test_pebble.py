@@ -655,8 +655,8 @@ services:
   foo:
     override: replace
     command: echo foo
-    workload: wl
-workloads:
+    foo: wl
+foos:
   wl:
     override: replace
     user: alice
@@ -944,7 +944,7 @@ summary: Sum Mary
         assert s != 5
 
     def test_unknown_fields_round_trip(self):
-        # Fields that we don't model, here a newer Pebble's workloads, are
+        # Fields that we don't model, here made-up ones, are
         # kept and written back out rather than dropped.
         layer_yaml = """
 summary: sum
@@ -952,7 +952,7 @@ services:
   foo:
     override: replace
     command: echo foo
-    workload: wl
+    foo: wl
 checks:
   chk:
     override: replace
@@ -964,7 +964,7 @@ log-targets:
     override: replace
     type: loki
     future-target-field: [a, b]
-workloads:
+foos:
   wl:
     override: replace
     user: alice
@@ -973,7 +973,7 @@ workloads:
         assert layer.to_dict() == yaml.safe_load(layer_yaml)
         assert pebble.Layer(layer.to_yaml()) == layer
         assert pebble.Layer(layer.to_dict()) == layer
-        assert layer.services['foo'].to_dict()['workload'] == 'wl'  # type: ignore
+        assert layer.services['foo'].to_dict()['foo'] == 'wl'  # type: ignore
 
     def test_unknown_fields_are_copied(self):
         d = yaml.safe_load("""
@@ -981,17 +981,17 @@ services:
   foo:
     override: replace
     future: {a: 1}
-workloads:
+foos:
   wl: {user: alice}
 """)
         layer = pebble.Layer(d)
         d['services']['foo']['future']['a'] = 2
-        d['workloads']['wl']['user'] = 'bob'
+        d['foos']['wl']['user'] = 'bob'
         assert layer.to_dict()['services']['foo']['future'] == {'a': 1}  # type: ignore
-        assert layer.to_dict()['workloads'] == {'wl': {'user': 'alice'}}  # type: ignore
+        assert layer.to_dict()['foos'] == {'wl': {'user': 'alice'}}  # type: ignore
         out = layer.to_dict()
-        out['workloads']['wl']['user'] = 'carol'  # type: ignore
-        assert layer.to_dict()['workloads'] == {'wl': {'user': 'alice'}}  # type: ignore
+        out['foos']['wl']['user'] = 'carol'  # type: ignore
+        assert layer.to_dict()['foos'] == {'wl': {'user': 'alice'}}  # type: ignore
 
     def test_unknown_field_named_like_an_attribute(self):
         # The unknown fields are kept apart from the attributes, so a future
@@ -1126,14 +1126,12 @@ class TestService:
         # Each unknown field replaces the one with the same name, and the
         # others are kept.
         base = pebble.Service(
-            'svc', yaml.safe_load('{override: replace, workload: a, keep: {x: 1}, swap: [1]}')
+            'svc', yaml.safe_load('{override: replace, foo: a, keep: {x: 1}, swap: [1]}')
         )
-        base._merge(
-            pebble.Service('svc', yaml.safe_load('{override: merge, workload: b, swap: [2]}'))
-        )
+        base._merge(pebble.Service('svc', yaml.safe_load('{override: merge, foo: b, swap: [2]}')))
         assert base.to_dict() == {
             'override': 'replace',
-            'workload': 'b',
+            'foo': 'b',
             'keep': {'x': 1},
             'swap': [2],
         }
@@ -2476,8 +2474,8 @@ services:
   foo:
     override: replace
     command: echo bar
-    workload: wl
-workloads:
+    foo: wl
+foos:
   wl:
     override: replace
 """)
@@ -2492,8 +2490,8 @@ services:
   foo:
     command: echo bar
     override: replace
-    workload: wl
-workloads:
+    foo: wl
+foos:
   wl:
     override: replace
 """[1:]
@@ -5106,10 +5104,10 @@ class TestIdentity:
 @pytest.mark.parametrize(
     ('cls', 'args', 'fields'),
     [
-        (pebble.Service, ('svc',), pebble._SERVICE_FIELDS),
-        (pebble.Check, ('chk',), pebble._CHECK_FIELDS),
-        (pebble.LogTarget, ('tgt',), pebble._LOG_TARGET_FIELDS),
-        (pebble.Layer, (), pebble._LAYER_FIELDS),
+        (pebble.Service, ('svc',), pebble.Service._FIELDS),
+        (pebble.Check, ('chk',), pebble.Check._FIELDS),
+        (pebble.LogTarget, ('tgt',), pebble.LogTarget._FIELDS),
+        (pebble.Layer, (), pebble.Layer._FIELDS),
     ],
 )
 def test_modelled_fields_match_the_attributes(
@@ -5118,7 +5116,7 @@ def test_modelled_fields_match_the_attributes(
     # A field that a class models but that is missing from its field set would
     # be kept as unknown, and to_dict() would write that copy back over any
     # change made to the attribute.
-    obj = cls(*args, {})
+    obj: object = cls(*args, {})
     attributes = {key.replace('_', '-') for key in vars(obj) if not key.startswith('_')}
     attributes.discard('name')
     assert attributes == set(fields)

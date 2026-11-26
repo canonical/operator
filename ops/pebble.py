@@ -68,6 +68,7 @@ from typing import (
     Any,
     AnyStr,
     BinaryIO,
+    ClassVar,
     Generic,
     Literal,
     Protocol,
@@ -859,47 +860,7 @@ class Change:
         )
 
 
-# The layer fields that are modelled. Any others are kept as they are.
-_PLAN_FIELDS = frozenset({'services', 'checks', 'log-targets'})
-_LAYER_FIELDS = _PLAN_FIELDS | {'summary', 'description'}
-_SERVICE_FIELDS = frozenset({
-    'summary',
-    'description',
-    'startup',
-    'override',
-    'command',
-    'after',
-    'before',
-    'requires',
-    'environment',
-    'user',
-    'user-id',
-    'group',
-    'group-id',
-    'working-dir',
-    'on-success',
-    'on-failure',
-    'on-check-failure',
-    'backoff-delay',
-    'backoff-factor',
-    'backoff-limit',
-    'kill-delay',
-})
-_CHECK_FIELDS = frozenset({
-    'override',
-    'level',
-    'startup',
-    'period',
-    'timeout',
-    'threshold',
-    'http',
-    'tcp',
-    'exec',
-})
-_LOG_TARGET_FIELDS = frozenset({'override', 'type', 'location', 'services', 'labels'})
-
-
-def _unknown_fields(dct: Mapping[str, Any], known: Collection[str]) -> dict[str, Any]:
+def _get_unknown_fields(dct: Mapping[str, Any], known: Collection[str]) -> dict[str, Any]:
     """Return a copy of the keys of a layer dict that aren't modelled.
 
     Pebble adds layer fields over time. These are kept so that they are
@@ -935,6 +896,9 @@ class Plan:
     https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
 
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({'services', 'checks', 'log-targets'})
+
     def __init__(self, raw: str | PlanDict | None = None):
         if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
             d = yaml.safe_load(raw) or {}  # type: ignore
@@ -952,7 +916,7 @@ class Plan:
         self._log_targets: dict[str, LogTarget] = {
             name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
         }
-        self._unknown_fields = _unknown_fields(d, _PLAN_FIELDS)
+        self._unknown_fields = _get_unknown_fields(d, self._FIELDS)
 
     @property
     def services(self) -> dict[str, Service]:
@@ -1016,6 +980,15 @@ class Layer:
     https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
 
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
+        'summary',
+        'description',
+        'services',
+        'checks',
+        'log-targets',
+    })
+
     #: Summary of the purpose of this layer.
     summary: str
     #: Long-form description of this layer.
@@ -1043,7 +1016,7 @@ class Layer:
         self.log_targets = {
             name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
         }
-        self._unknown_fields = _unknown_fields(d, _LAYER_FIELDS)
+        self._unknown_fields = _get_unknown_fields(d, self._FIELDS)
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
@@ -1080,6 +1053,31 @@ class Layer:
 class Service:
     """Represents a service description in a Pebble configuration layer."""
 
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
+        'summary',
+        'description',
+        'startup',
+        'override',
+        'command',
+        'after',
+        'before',
+        'requires',
+        'environment',
+        'user',
+        'user-id',
+        'group',
+        'group-id',
+        'working-dir',
+        'on-success',
+        'on-failure',
+        'on-check-failure',
+        'backoff-delay',
+        'backoff-factor',
+        'backoff-limit',
+        'kill-delay',
+    })
+
     def __init__(self, name: str, raw: ServiceDict | None = None):
         self.name = name
         dct: ServiceDict = raw or {}
@@ -1104,7 +1102,7 @@ class Service:
         self.backoff_factor = dct.get('backoff-factor')
         self.backoff_limit = dct.get('backoff-limit', '')
         self.kill_delay = dct.get('kill-delay', '')
-        self._unknown_fields = _unknown_fields(dct, _SERVICE_FIELDS)
+        self._unknown_fields = _get_unknown_fields(dct, self._FIELDS)
 
     def to_dict(self) -> ServiceDict:
         """Convert this service object to its dict representation."""
@@ -1233,6 +1231,19 @@ class ServiceInfo:
 class Check:
     """Represents a check in a Pebble configuration layer."""
 
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
+        'override',
+        'level',
+        'startup',
+        'period',
+        'timeout',
+        'threshold',
+        'http',
+        'tcp',
+        'exec',
+    })
+
     def __init__(self, name: str, raw: CheckDict | None = None):
         self.name = name
         dct: CheckDict = raw or {}
@@ -1261,7 +1272,7 @@ class Check:
         if exec_ is not None:
             exec_ = copy.deepcopy(exec_)
         self.exec: ExecDict | None = exec_
-        self._unknown_fields = _unknown_fields(dct, _CHECK_FIELDS)
+        self._unknown_fields = _get_unknown_fields(dct, self._FIELDS)
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
@@ -1412,6 +1423,15 @@ class CheckStartup(enum.Enum):
 class LogTarget:
     """Represents a log target in a Pebble configuration layer."""
 
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
+        'override',
+        'type',
+        'location',
+        'services',
+        'labels',
+    })
+
     def __init__(self, name: str, raw: LogTargetDict | None = None):
         self.name = name
         dct: LogTargetDict = raw or {}
@@ -1422,7 +1442,7 @@ class LogTarget:
         labels = dct.get('labels')
         labels = copy.deepcopy(labels) if labels is not None else {}
         self.labels: dict[str, str] = labels
-        self._unknown_fields = _unknown_fields(dct, _LOG_TARGET_FIELDS)
+        self._unknown_fields = _get_unknown_fields(dct, self._FIELDS)
 
     def to_dict(self) -> LogTargetDict:
         """Convert this log target object to its dict representation."""
