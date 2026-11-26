@@ -8,13 +8,7 @@ Juju users can set the `juju-http-proxy`, `juju-https-proxy`, and `juju-no-proxy
 Use [](ops.Model.proxy_config) to get the model's proxy configuration. This returns an [](ops.ProxyConfig) instance:
 
 ```python
-import ops
-
-
 class MyCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-
     def _get_proxy_environ(self) -> dict[str, str]:
         proxy = self.model.proxy_config
         no_proxy = ','.join(sorted(proxy.no))
@@ -35,18 +29,11 @@ The `no` attribute of [](ops.ProxyConfig) contains the comma-separated entries o
 Juju doesn't fire an event when the proxy configuration changes, so the charm can only observe the change the next time an event fires. Charms can read the proxy configuration using the {ref}`reconciler pattern <handling-events-holistically>`:
 
 ```python
-import ops
-
-
 class MyCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.container = self.unit.get_container('workload')
-        framework.observe(self.on['workload'].pebble_ready, self._reconcile)
         framework.observe(self.on.config_changed, self._reconcile)
         framework.observe(self.on.update_status, self._reconcile)
-
-    ...
 
     def _reconcile(self, event: ops.EventBase) -> None:
         if not self.container.can_connect():
@@ -107,8 +94,6 @@ In the reconciler, add both layers and call [](ops.Container.replan). Pebble res
 
 ```python
 class MyCharm(ops.CharmBase):
-    ...
-
     def _reconcile(self, event: ops.EventBase) -> None:
         if not self.container.can_connect():
             return
@@ -125,11 +110,6 @@ class MyCharm(ops.CharmBase):
 A workload can read proxy configs from CLI options. The CLI options are part of the startup command for the service layer. To be able to configure them, the charm needs to add a Pebble layer that overrides the definition of the original service. With `'override': 'merge'`, the new layer only replaces the `command` of the service. The example below assumes that the `workload` command accepts the proxy configs as CLI options:
 
 ```python
-import shlex
-
-import ops
-
-
 class MyCharm(ops.CharmBase):
     ...
 
@@ -178,7 +158,6 @@ A machine workload can receive proxy configuration from its API or CLI options:
 The reconciler is similar to a Kubernetes charm: convert [](ops.ProxyConfig) into the format that the workload expects, compare the result with what the workload has, and restart the workload only if they differ. For example, a systemd service:
 
 ```python
-import ops
 from charmlibs import pathops, systemd
 
 SERVICE = 'workload.service'
@@ -186,15 +165,6 @@ PROXY_DROP_IN = pathops.LocalPath(f'/etc/systemd/system/{SERVICE}.d/proxy.conf')
 
 
 class MyCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        framework.observe(self.on.config_changed, self._reconcile)
-        framework.observe(self.on.update_status, self._reconcile)
-
-    def _get_proxy_environ(
-        self,
-    ) -> dict[str, str]: ...
-
     def _reconcile(self, event: ops.EventBase) -> None:
         lines = ['[Service]']
         for name, value in self._get_proxy_environ().items():
@@ -202,9 +172,11 @@ class MyCharm(ops.CharmBase):
             # can contain '%' in percent-encoded credentials.
             value = value.replace('%', '%%')
             lines.append(f'Environment="{name}={value}"')
-        if pathops.ensure_contents(
+
+        changed = pathops.ensure_contents(
             PROXY_DROP_IN, '\n'.join(lines) + '\n', mode=0o600
-        ):
+        )
+        if changed:
             systemd.daemon_reload()
             if systemd.service_running(SERVICE):
                 systemd.service_restart(SERVICE)
