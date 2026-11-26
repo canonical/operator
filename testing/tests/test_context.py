@@ -377,6 +377,47 @@ def test_init_with_full_charmcraft_yaml_as_meta():
     ctx.run(ctx.on.update_status(), State())
 
 
+def test_init_with_charmcraft_yaml_extensions_as_meta():
+    charmcraft_yaml = {'name': 'flask', 'extensions': ['flask-framework']}
+    spec = Context(MyCharm, charmcraft_yaml)._charm_spec
+    # Expanded the same way as when the file is loaded from the charm root.
+    assert 'extensions' not in spec.meta
+    assert 'flask-app' in spec.meta['containers']
+    assert spec.config is not None and 'webserver-threads' in spec.config['options']
+    assert spec.actions is not None and 'rotate-secret-key' in spec.actions
+
+
+def test_init_with_charmcraft_yaml_extensions_and_local_config():
+    config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
+    charmcraft_yaml = {'name': 'flask', 'extensions': ['flask-framework'], 'config': config}
+    spec = Context(MyCharm, charmcraft_yaml)._charm_spec
+    assert spec.config is not None
+    assert 'match' in spec.config['options']
+    assert 'webserver-threads' in spec.config['options']
+
+
+def test_init_with_charmcraft_yaml_extensions_and_explicit_config():
+    charmcraft_yaml = {'name': 'flask', 'extensions': ['flask-framework']}
+    config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
+    with pytest.raises(ValueError, match="'flask-framework' extension provides config"):
+        Context(MyCharm, charmcraft_yaml, config=config)
+
+
+def test_init_with_charmcraft_yaml_extensions_and_explicit_actions():
+    charmcraft_yaml = {'name': 'flask', 'extensions': ['flask-framework']}
+    actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
+    with pytest.raises(ValueError, match="'flask-framework' extension provides actions"):
+        Context(MyCharm, charmcraft_yaml, actions=actions)
+
+
+def test_init_with_unknown_extension_and_explicit_config():
+    charmcraft_yaml = {'name': 'foo', 'extensions': ['not-an-extension']}
+    config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
+    with pytest.warns(UserWarning, match='Unknown charmcraft extension'):
+        spec = Context(MyCharm, charmcraft_yaml, config=config)._charm_spec
+    assert spec.config == config
+
+
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
     charmcraft_yaml = {'name': 'elizabeth', 'config': CONFIG, 'actions': ACTIONS}
     config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
