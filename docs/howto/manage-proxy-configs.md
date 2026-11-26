@@ -60,37 +60,24 @@ The workload typically reads the proxy configuration itself, so the charm needs 
 
 When the workload runs in a sidecar container, the charm can pass the proxy configuration with Pebble.
 
-If the workload reads `*_proxy` or `*_PROXY` environment variables, put the variables in a separate Pebble layer that merges into the service definition. The charm defines the service in a base layer:
+If the workload reads `*_proxy` or `*_PROXY` environment variables, put the variables in the Pebble layer for the workload service:
 
 ```python
 class MyCharm(ops.CharmBase):
-    ...
-
-    def _base_layer(self) -> ops.pebble.Layer:
+    def _get_pebble_layer(self, proxy_env: dict[str, str]) -> ops.pebble.Layer:
         return ops.pebble.Layer({
             'services': {
                 'workload': {
                     'override': 'replace',
                     'command': 'workload --port=8000',
                     'startup': 'enabled',
-                },
-            },
-        })
-
-    def _proxy_layer(self, proxy_env: dict[str, str]) -> ops.pebble.Layer:
-        return ops.pebble.Layer({
-            'services': {
-                'workload': {
-                    'override': 'merge',
                     'environment': proxy_env,
                 },
             },
         })
 ```
 
-The proxy layer only adds environment variables to the service, so add it after the base layer. Keeping the proxy configs in their own layer means that the charm can update them without changing the base layer.
-
-In the reconciler, add both layers and call [](ops.Container.replan). Pebble restarts the service only if the plan changed, so the charm doesn't restart the workload when the proxy configs are the same:
+This method defines a service with `override` set to `replace`, so that [](ops.Container.replan) restart the workload when the proxy configuration changes:
 
 ```python
 class MyCharm(ops.CharmBase):
@@ -98,22 +85,17 @@ class MyCharm(ops.CharmBase):
         if not self.container.can_connect():
             return
         proxy_env = self._get_proxy_environ()
-        self.container.add_layer('base', self._base_layer(), combine=True)
         self.container.add_layer(
-            'proxy', self._proxy_layer(proxy_env), combine=True
+            'workload', self._get_pebble_layer(proxy_env), combine=True
         )
         self.container.replan()
 ```
 
-[`cos-coordinated-workers`](https://github.com/canonical/cos-coordinated-workers/blob/main/src/coordinated_workers/worker.py) uses a similar approach: it rebuilds the Pebble layer in every event that it reconciles, and restarts the services if the layer differs from the current plan.
-
-A workload can read proxy configs from CLI options. The CLI options are part of the startup command for the service layer. To be able to configure them, the charm needs to add a Pebble layer that overrides the definition of the original service. With `'override': 'merge'`, the new layer only replaces the `command` of the service. The example below assumes that the `workload` command accepts the proxy configs as CLI options:
+A workload may read proxy configuration from CLI options. The CLI options are part of the startup command for the service layer. The example below assumes that the `workload` command accepts the proxy configuration as CLI options:
 
 ```python
 class MyCharm(ops.CharmBase):
-    ...
-
-    def _command_layer(self) -> ops.pebble.Layer:
+    def _get_pebble_layer(self) -> ops.pebble.Layer:
         proxy = self.model.proxy_config
         args = ['workload', '--port=8000']
         if proxy.http:
@@ -125,7 +107,8 @@ class MyCharm(ops.CharmBase):
         return ops.pebble.Layer({
             'services': {
                 'workload': {
-                    'override': 'merge',
+                    'override': 'replace',
+                    'startup': 'enabled',
                     'command': shlex.join(args),
                 },
             },
@@ -134,9 +117,8 @@ class MyCharm(ops.CharmBase):
     def _reconcile(self, event: ops.EventBase) -> None:
         if not self.container.can_connect():
             return
-        self.container.add_layer('base', self._base_layer(), combine=True)
         self.container.add_layer(
-            'proxy-command', self._command_layer(), combine=True
+            'workload', self._get_pebble_layer(), combine=True
         )
         self.container.replan()
 ```
