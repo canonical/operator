@@ -76,6 +76,27 @@ updates:
           - "patch"
 
   # ===================================================================
+  # Python (uv), root, property-tests branch: Hypothesis only
+  # ===================================================================
+  # Hypothesis is only a dependency on the long-lived property-tests branch,
+  # so the main lane above never sees it. Everything else on that branch
+  # arrives by merging main, so this lane only bumps Hypothesis.
+  - package-ecosystem: "uv"
+    directory: "/"
+    target-branch: "property-tests"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    allow:
+      - dependency-name: "hypothesis"
+
+  # ===================================================================
   # Python (uv), examples/httpbin-demo: routine lane (same shape as root)
   # ===================================================================
   - package-ecosystem: "uv"
