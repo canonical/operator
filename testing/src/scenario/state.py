@@ -1862,12 +1862,12 @@ class Storage:
 class Resource:
     """Represents a resource made available to the charm.
 
-    From the perspective of a 'real' deployed charm, if your charm _has_
-    resources defined in its metadata, they _must_ be made available to the
-    charm. That is a Juju-enforced constraint: you can't deploy a charm without
-    attaching all resources it needs to it. However, when testing, this
-    constraint is unnecessarily strict since a charm will only notice that a
-    resource is not available when it explicitly asks for it.
+    If the charm fetches a resource that is declared in its metadata but not
+    in :attr:`State.resources`, ``fetch()`` raises :class:`ops.ModelError`, as
+    it does in Juju when a resource has nothing attached, for example if a
+    local charm is deployed without ``--resource``. On Kubernetes, Juju won't
+    deploy a local charm that's missing an ``oci-image`` resource, but Scenario
+    doesn't check this.
     """
 
     name: str
