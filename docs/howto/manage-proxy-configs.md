@@ -174,10 +174,12 @@ If the charm uses {external+python:func}`subprocess.run`, it can pass the proxy 
 
 ```python
 subprocess.run(
-    ['workload', '--port', '8000'],
+    [
+        'backup-tool',
+    ],
     env={
         **os.environ,
-        'HTTP_PROXY': 'example.com',
+        'HTTP_PROXY': 'https://proxy.example.com:3128',
     },
 )
 ```
