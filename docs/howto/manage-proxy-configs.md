@@ -280,74 +280,62 @@ def test_unchanged_proxy_configuration_doesnt_restart_the_workload(
 
 See first: {ref}`write-integration-tests-for-a-charm`
 
-In an integration test, change the proxy configs with [](jubilant.Juju.model_config), then check that the workload has the new values.
-
-Juju doesn't fire an event when the proxy configs change, so the charm only reads the new values in its next event. To make the next event come sooner, set the `update-status-hook-interval` model config to 1 minute for the test module.
+In an integration test, change the proxy configuration with [](jubilant.Juju.model_config), then check that the workload has the new values.
 
 #### Test a Kubernetes charm
 
-For a Kubernetes charm, read the Pebble plan of the workload container with the Pebble CLI at `/charm/bin/pebble`. The plan shows the environment that the charm asks Pebble to run the service with. This checks that the charm updated the plan. It doesn't check that Pebble restarted the service with the new environment.
+These tests assume:
 
-These tests assume that the charm is already deployed as `my-charm`, for example by a `test_deploy` test that uses the `charm` fixture, as described in {ref}`write-integration-tests-for-a-charm`.
+- The charm is already deployed as `my-charm`, for example by a `test_deploy` test that uses the `charm` fixture, as described in {ref}`write-integration-tests-for-a-charm`.
+- The charm has a configuration option `proxy-update`. We only use it to trigger `config-changed` and make the charm apply the new proxy configuration.
+- The charm has an action `show-proxy` that returns the proxy host and port from the workload. For example `proxy.example.com:3128`, or an empty string if no proxy configuration is set.
+
+Let's add a handler for the `show-proxy` action:
 
 ```python
-import jubilant
-import pytest
-import yaml
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        ...
+        framework.observe(self.on['show-proxy'].action, self._on_show_proxy)
 
-CONTAINER = 'workload'
-UNIT = 'my-charm/0'
-PROXY_URL = 'http://proxy.example.com:3128'
+    def _on_show_proxy(self, event: ops.ActionEvent) -> None:
+        # workload.get_proxy() is a helper function to get the proxy configuration
+        # from the workload.
+        # The workload may not be ready immediately after replan(),
+        # so try get_proxy() in a loop if needed.
+        proxy = workload.get_proxy()
+        event.set_results({'https-proxy': proxy})
+```
 
+In the test, change the proxy configuration, then change the `proxy-update` option to a new value, and probe the `show-proxy` action with [](jubilant.Juju.run) until it reports the expected proxy:
 
-@pytest.fixture(scope='module', autouse=True)
-def frequent_update_status(juju: jubilant.Juju):
-    juju.model_config({'update-status-hook-interval': '1m'})
-    yield
-    juju.model_config(reset='update-status-hook-interval')
+```python
+def test_proxy_configuration(juju: jubilant.Juju):
+    proxy_url = 'http://proxy.example.com:3128'
+    juju.model_config({'juju-https-proxy': proxy_url})
+    juju.config('my-charm', {'proxy-update': 'boo'})
+    juju.wait(
+        lambda _: (
+            juju.run('my-charm/0', 'show-proxy').results['https-proxy']
+            == 'proxy.example.com:3128'
+        ),
+        delay=2,
+        timeout=120,
+        successes=1,
+    )
 
-
-def workload_environment(juju: jubilant.Juju) -> dict[str, str]:
-    plan = juju.ssh(UNIT, '/charm/bin/pebble', 'plan', container=CONTAINER)
-    return yaml.safe_load(plan)['services']['workload'].get('environment', {})
-
-
-def test_proxy_configs(juju: jubilant.Juju):
-    try:
-        juju.model_config({
-            'juju-https-proxy': PROXY_URL,
-            'juju-no-proxy': 'localhost,10.0.0.0/8',
-        })
-        expected = {
-            'HTTP_PROXY': '',
-            'HTTPS_PROXY': PROXY_URL,
-            'NO_PROXY': '10.0.0.0/8,localhost',
-            'http_proxy': '',
-            'https_proxy': PROXY_URL,
-            'no_proxy': '10.0.0.0/8,localhost',
-        }
-        juju.wait(
-            lambda _: workload_environment(juju).items() >= expected.items(),
-            delay=5,
-            timeout=300,
-        )
-
-        juju.model_config(reset=['juju-https-proxy', 'juju-no-proxy'])
-        expected = {
-            'HTTP_PROXY': '',
-            'HTTPS_PROXY': '',
-            'NO_PROXY': '127.0.0.1,::1,localhost',
-            'http_proxy': '',
-            'https_proxy': '',
-            'no_proxy': '127.0.0.1,::1,localhost',
-        }
-        juju.wait(
-            lambda _: workload_environment(juju).items() >= expected.items(),
-            delay=5,
-            timeout=300,
-        )
-    finally:
-        juju.model_config(reset=['juju-https-proxy', 'juju-no-proxy'])
+    juju.model_config(reset='juju-https-proxy')
+    juju.config('my-charm', {'proxy-update': 'bar'})
+    juju.wait(
+        lambda _: (
+            juju.run('my-charm/0', 'show-proxy').results['https-proxy'] == ''
+        ),
+        delay=2,
+        timeout=120,
+        successes=1,
+    )
+    # Use juju.model_config to restore model config if necessary.
 ```
 
 #### Test a machine charm
