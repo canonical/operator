@@ -16,9 +16,6 @@ class MyCharm(ops.CharmBase):
             'HTTP_PROXY': proxy.http or '',
             'HTTPS_PROXY': proxy.https or '',
             'NO_PROXY': no_proxy,
-            'http_proxy': proxy.http or '',
-            'https_proxy': proxy.https or '',
-            'no_proxy': no_proxy,
         }
 ```
 
@@ -196,27 +193,19 @@ To set the proxy configuration in a unit test, pass a [](ops.testing.ProxyConfig
 If you don't pass a `proxy_config` to [](ops.testing.Model), the charm gets no proxy configuration, and `self.model.proxy_config.no` is an empty tuple. This exists for backward compatibility, and might change in a future major release of Ops.
 ```
 
-We want to test that the proxy configs reach the workload, and stay in sync with the proxy model configs.
+We want to test that the proxy configuration reaches the workload.
 
 #### Test a Kubernetes charm
 
-These tests are for `MyCharm` from {ref}`manage-proxy-configuration-kubernetes`:
+These tests are for the {ref}`Kubernetes charm shown above <manage-proxy-configuration-kubernetes>`:
 
 ```python
-import dataclasses
-
-from ops import testing
-
-from charm import MyCharm
-
-PROXY_URL = 'http://proxy.example.com:3128'
-
-
-def test_proxy_configs_reach_the_workload():
+def test_proxy_configuration_reaches_the_workload():
+    proxy_url = 'http://proxy.example.com:3128'
     ctx = testing.Context(MyCharm)
     container = testing.Container('workload', can_connect=True)
     proxy_config = testing.ProxyConfig(
-        https=PROXY_URL,
+        https=proxy_url,
         no=('localhost', '10.0.0.0/8'),
     )
     state_in = testing.State(
@@ -228,51 +217,18 @@ def test_proxy_configs_reach_the_workload():
 
     plan = state_out.get_container('workload').plan
     environment = plan.services['workload'].environment
-    assert environment['HTTPS_PROXY'] == PROXY_URL
-    assert environment['https_proxy'] == PROXY_URL
+    assert environment['HTTPS_PROXY'] == proxy_url
     assert environment['HTTP_PROXY'] == ''
     assert environment['NO_PROXY'] == '10.0.0.0/8,localhost'
-
-
-def test_removed_proxy_configs_are_cleared():
-    ctx = testing.Context(MyCharm)
-    container = testing.Container('workload', can_connect=True)
-    state_in = testing.State(
-        containers={container},
-        model=testing.Model(proxy_config=testing.ProxyConfig(https=PROXY_URL)),
-    )
-    state_with_proxy = ctx.run(ctx.on.pebble_ready(container), state_in)
-    state_without_proxy = dataclasses.replace(
-        state_with_proxy,
-        model=testing.Model(proxy_config=testing.ProxyConfig()),
-    )
-
-    state_out = ctx.run(ctx.on.update_status(), state_without_proxy)
-
-    plan = state_out.get_container('workload').plan
-    environment = plan.services['workload'].environment
-    assert environment['HTTPS_PROXY'] == ''
-    assert environment['https_proxy'] == ''
 ```
 
 #### Test a machine charm
 
 For a machine charm, check the file or API that the charm writes the proxy configuration to. Mock out those parts so that the unit tests do not modify the testing environment, and are deterministic.
 
-These tests are for `MyCharm` from {ref}`manage-proxy-configuration-machine`:
+These tests are for the {ref}`machine charm shown above <manage-proxy-configuration-machine>`:
 
 ```python
-import pathlib
-from unittest import mock
-
-import pytest
-from ops import testing
-
-import charm
-
-PROXY_URL = 'http://proxy.example.com:3128'
-
-
 @pytest.fixture(autouse=True)
 def service_restart(monkeypatch: pytest.MonkeyPatch) -> mock.Mock:
     restart = mock.Mock(return_value=True)
@@ -282,52 +238,35 @@ def service_restart(monkeypatch: pytest.MonkeyPatch) -> mock.Mock:
     return restart
 
 
-def test_proxy_configs_reach_the_workload(
+def test_proxy_configuration_reaches_the_workload(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ):
+    proxy_url = 'http://proxy.example.com:3128'
     drop_in = tmp_path / 'proxy.conf'
     monkeypatch.setattr(charm, 'PROXY_DROP_IN', drop_in)
     ctx = testing.Context(charm.MyCharm)
     proxy_config = testing.ProxyConfig(
-        https=PROXY_URL, no=('localhost', '10.0.0.0/8')
+        https=proxy_url, no=('localhost', '10.0.0.0/8')
     )
     state_in = testing.State(model=testing.Model(proxy_config=proxy_config))
 
     ctx.run(ctx.on.config_changed(), state_in)
 
     content = drop_in.read_text()
-    assert f'Environment="HTTPS_PROXY={PROXY_URL}"' in content
-    assert f'Environment="https_proxy={PROXY_URL}"' in content
+    assert f'Environment="HTTPS_PROXY={proxy_url}"' in content
     assert 'Environment="NO_PROXY=10.0.0.0/8,localhost"' in content
 
 
-def test_removed_proxy_configs_are_cleared(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-):
-    drop_in = tmp_path / 'proxy.conf'
-    monkeypatch.setattr(charm, 'PROXY_DROP_IN', drop_in)
-    drop_in.write_text(f'[Service]\nEnvironment="HTTPS_PROXY={PROXY_URL}"\n')
-    ctx = testing.Context(charm.MyCharm)
-    state_in = testing.State(
-        model=testing.Model(proxy_config=testing.ProxyConfig())
-    )
-
-    ctx.run(ctx.on.update_status(), state_in)
-
-    content = drop_in.read_text()
-    assert PROXY_URL not in content
-    assert 'Environment="HTTPS_PROXY="' in content
-
-
-def test_unchanged_proxy_configs_dont_restart_the_workload(
+def test_unchanged_proxy_configuration_doesnt_restart_the_workload(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: pathlib.Path,
     service_restart: mock.Mock,
 ):
+    proxy_url = 'http://proxy.example.com:3128'
     monkeypatch.setattr(charm, 'PROXY_DROP_IN', tmp_path / 'proxy.conf')
     ctx = testing.Context(charm.MyCharm)
     state_in = testing.State(
-        model=testing.Model(proxy_config=testing.ProxyConfig(https=PROXY_URL)),
+        model=testing.Model(proxy_config=testing.ProxyConfig(https=proxy_url)),
     )
     ctx.run(ctx.on.config_changed(), state_in)
     service_restart.reset_mock()
