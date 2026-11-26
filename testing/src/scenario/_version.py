@@ -5,4 +5,4 @@
 
 from __future__ import annotations
 
-version: str = '8.10.0'
+version: str = '8.11.0.dev0'
