@@ -42,27 +42,27 @@ jobs:
       - name: Install Charmcraft
         run: sudo snap install charmcraft --classic
       - name: Fetch any charmlibs
+        working-directory: ${{ matrix.dir }}
         run: |
-          cd ${{ matrix.dir }}
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
       - name: Lock dependencies
         # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
+        working-directory: ${{ matrix.dir }}
         run: |
-          cd ${{ matrix.dir }}
           if [ ! -f uv.lock ]; then uv lock; fi
       - name: Run linting and static checks
+        working-directory: ${{ matrix.dir }}
         run: |
-          cd ${{ matrix.dir }}
           tox -e lint
-      - name: Run unit tests
+      - name: Run unit tests with Ops and Scenario from PyPI
+        # Catches broken example charms - especially important for the tutorials.
+        working-directory: ${{ matrix.dir }}
         run: |
-          cd ${{ matrix.dir }}
           tox -e unit
       - name: Run unit tests with Ops and Scenario from this branch
-        # The step above uses the versions from PyPI, as the tutorials do. This one catches a
-        # change on this branch that breaks the example charms before it is released.
+        # Catches changes that would break the example charms on release.
         working-directory: ${{ matrix.dir }}
         env:
           # The same paths as the charm's tox.ini.
