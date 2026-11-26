@@ -59,11 +59,11 @@ Submit any newly-proposed public interfaces for review, to ensure that:
 
 See more: [](#set-up-production-integrations), [Charmlibs documentation](https://canonical.com/juju/docs/charmlibs/)
 
-### The charm respects the Juju proxy configs
+### The charm respects the Juju proxy configuration
 
 `juju-http-proxy`, `juju-https-proxy`, and `juju-no-proxy` should influence the charm's behavior when the charm or charm workload makes any HTTP request.
 
-To access these settings for your charm, see {ref}`manage-proxy-configs`.
+To access these settings for your charm, see {ref}`manage-proxy-configuration`.
 
 ### The charm upgrades the application safely
 
