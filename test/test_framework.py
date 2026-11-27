@@ -391,6 +391,41 @@ class TestFramework:
         with pytest.raises(AttributeError):
             new_obs._stored.myotherdata
 
+    def test_observer_not_found_by_name(
+        self, request: pytest.FixtureRequest, caplog: pytest.LogCaptureFixture
+    ):
+        framework = create_framework(request)
+
+        class MyEvent(ops.EventBase):
+            pass
+
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
+
+        def unwrapped(func: typing.Callable[..., None]) -> typing.Callable[..., None]:
+            # A decorator without functools.wraps leaves the method named
+            # 'wrapper', which is not an attribute of the observer.
+            def wrapper(self: ops.Object, event: ops.EventBase):
+                return func(self, event)
+
+            return wrapper
+
+        class MyObserver(ops.Object):
+            @unwrapped
+            def _on_foo(self, event: ops.EventBase):
+                pass
+
+        pub = MyNotifier(framework, '1')
+        obs = MyObserver(framework, '1')
+        with caplog.at_level(logging.WARNING):
+            framework.observe(pub.foo, obs._on_foo)
+        assert "MyObserver has no attribute 'wrapper'" in caplog.text
+
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            pub.foo.emit()
+        assert 'has no method wrapper' in caplog.text
+
     def test_defer_and_reemit(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
 
