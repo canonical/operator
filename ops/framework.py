@@ -89,7 +89,8 @@ class Handle:
     same parent and kind will have unique keys.
 
     The handle key is a string uniquely identifying the object. No other objects
-    under the same parent and kind may have the same key.
+    under the same parent and kind may have the same key. The key must not contain
+    ``/``, ``[``, or ``]``.
     """
 
     def __init__(self, parent: Handle | Object | None, kind: str, key: str | None):
@@ -99,6 +100,11 @@ class Handle:
         self._parent: Handle | None = parent
         self._kind = kind
         self._key = key
+        if key and ('/' in key or '[' in key or ']' in key):
+            # The path is parsed back into handles by from_path, so a key
+            # containing the separators would be stored but could not be
+            # restored, and the error would only appear in a later dispatch.
+            raise ValueError(f'handle key {key!r} must not contain "/", "[" or "]"')
         if parent:
             if key:
                 self._path = f'{parent}/{kind}[{key}]'

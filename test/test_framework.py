@@ -162,6 +162,13 @@ class TestFramework:
         else:
             pytest.fail('exception NoSnapshotError not raised')
 
+    @pytest.mark.parametrize('key', ['a/b', 'a[b', 'a]b', 'on/foo[1]'])
+    def test_handle_key_with_separators(self, key: str):
+        # The key would be written into the path but could not be read back out
+        # by from_path, so it is rejected up front.
+        with pytest.raises(ValueError):
+            ops.Handle(None, 'kind', key)
+
     def test_snapshot_roundtrip(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class Foo:
             handle_kind = 'foo'
