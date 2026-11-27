@@ -20,19 +20,21 @@ A charm should ideally cover all the complex operational logic within the code, 
 
 Unfortunately, that is not always possible. As a charm developer, it is thus useful to know that you can also expose charm operational tasks to the charm user by defining special methods called `actions`.
 
-This can be done by adding an `actions` section in your `charmcraft.yaml` file and then adding action event handlers to the `src/charm.py` file.
+Actions are defined in the `actions` block in the `charmcraft.yaml` file, with corresponding event handlers in `src/charm.py`.
 
 In this part of the tutorial we will follow this process to add an action that will allow a charm user to view the current database access points and, if set, also the username and the password.
 
 ## Define the actions
 
-Open the `charmcraft.yaml` file and add to it a block defining an action, as below. As you can see, the  action is called `get-db-info` and it is intended to help the user access database authentication information. The action has a single parameter, `show-password`; if set to `True`, it will show the username and the password.
+Open the `charmcraft.yaml` file and replace the `actions` block with:
 
 ```{literalinclude} ../../../examples/k8s-4-action/charmcraft.yaml
 :language: yaml
 :start-at: 'actions:'
 :end-at: 'additionalProperties: false'
 ```
+
+The action is called `get-db-info` and it is intended to help the user access database authentication information. The action has a single parameter, `show-password`; if set to `True`, it will show the username and the password.
 
 ## Define an action class
 

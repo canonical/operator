@@ -604,6 +604,21 @@ def test_trigger_sub_relation():
     )
 
 
+def test_subordinate_relation_large_remote_unit_id():
+    # Small ints are interned, so an identity comparison only fails above 256.
+    meta = {'name': 'local', 'requires': {'foo': {'interface': 'foo', 'scope': 'container'}}}
+    relation = SubordinateRelation('foo', remote_unit_id=1000, remote_unit_data={'k': 'v'})
+
+    def post_event(charm: ops.CharmBase):
+        rel = charm.model.get_relation('foo')
+        assert rel is not None
+        (unit,) = rel.units
+        assert unit.name == 'remote/1000'
+        assert rel.data[unit]['k'] == 'v'
+
+    trigger(State(relations={relation}), 'update_status', Charm, meta=meta, post_event=post_event)
+
+
 def test_cannot_instantiate_relationbase():
     with pytest.raises(RuntimeError):
         RelationBase('')
