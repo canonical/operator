@@ -15,7 +15,9 @@
 from __future__ import annotations
 
 import contextlib
+import copy
 import datetime
+import gc
 import io
 import ipaddress
 import json
@@ -30,7 +32,7 @@ import typing
 import unittest
 import warnings
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
 from textwrap import dedent
 from typing import Any
 from unittest import mock
@@ -244,6 +246,18 @@ class TestModel:
                 ('relation_remote_app_name', 2, {'relation_name': 'db0'}),
             ],
         )
+
+    def test_relation_data_keeps_uncached_relation_alive(
+        self, harness: ops.testing.Harness[ops.CharmBase]
+    ):
+        # A relation fetched by an ID that relation-ids does not list (as
+        # happens during relation-broken) is not cached by the model.
+        relation = self.ensure_relation(harness, 'db1', 7)
+        data = relation.data
+        del relation
+        gc.collect()
+        assert data.relation.name == 'db1'
+        assert data[harness.model.unit] == {}
 
     def test_get_relation_wrong_endpoint(self, harness: ops.testing.Harness[ops.CharmBase]):
         # Regression test for https://github.com/canonical/operator/issues/2327
@@ -1059,6 +1073,27 @@ class TestModel:
         for expected, status in test_cases.items():
             assert repr(status) == expected
 
+    def test_status_subclass_does_not_replace_builtin(self):
+        class ActiveWithReason(ops.ActiveStatus):
+            def __init__(self, message: str, reason: str):
+                super().__init__(message)
+                self.reason = reason
+
+        assert ActiveWithReason('ready', 'all checks up').name == 'active'
+        # The status that Juju reports back is still constructed as the
+        # built-in class, which ActiveWithReason could not be.
+        status = ops.StatusBase.from_name('active', 'ready')
+        assert type(status) is ops.ActiveStatus
+        assert status.message == 'ready'
+
+    def test_status_register_does_not_replace_builtin(self):
+        class ActiveWithReason(ops.ActiveStatus):
+            pass
+
+        with pytest.deprecated_call():
+            ops.StatusBase.register(ActiveWithReason)
+        assert type(ops.StatusBase.from_name('active', 'ready')) is ops.ActiveStatus
+
     def test_status_eq(self):
         status_types = [
             ops.ActiveStatus,
@@ -1798,6 +1833,124 @@ def test_push_path_relative(case: PushPullCase, request: pytest.FixtureRequest):
                 assert content == 'test'
         finally:
             os.chdir(cwd)
+
+
+@pytest.fixture
+def push_pull_container() -> Generator[ops.Container]:
+    ctx = ops.testing.Context(
+        ops.CharmBase,
+        meta={'name': 'test-app', 'containers': {'foo': {'resource': 'foo-image'}}},
+    )
+    state = ops.testing.State(containers={ops.testing.Container('foo', can_connect=True)})
+    with ctx(ctx.on.update_status(), state) as mgr:
+        yield mgr.charm.unit.get_container('foo')
+        mgr.run()
+
+
+def test_push_path_symlinks_in_a_tree(
+    push_pull_container: ops.Container, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+):
+    src = tmp_path / 'src'
+    (src / 'sub').mkdir(parents=True)
+    (src / 'file.txt').write_text('file')
+    (src / 'file.txt').chmod(0o640)
+    (src / 'sub' / 'inner.txt').write_text('inner')
+    (src / 'link-to-file').symlink_to(src / 'file.txt')
+    (src / 'link-to-dir').symlink_to(src / 'sub')
+    (src / 'dangling').symlink_to(src / 'missing')
+
+    # A link to a directory or a dangling link must not stop the rest of the tree.
+    with caplog.at_level(logging.INFO, logger='ops.model'):
+        push_pull_container.push_path(src, '/dst')
+
+    assert f'skipped 2 symbolic link(s) under {src}' in caplog.messages[-1]
+
+    pushed = {info.name for info in push_pull_container.list_files('/dst/src')}
+    assert pushed == {'file.txt', 'link-to-file', 'sub'}
+    with push_pull_container.pull('/dst/src/sub/inner.txt') as f:
+        assert f.read() == 'inner'
+    # A link to a file is copied with the contents and permissions of its target.
+    with push_pull_container.pull('/dst/src/link-to-file') as f:
+        assert f.read() == 'file'
+    assert push_pull_container.list_files('/dst/src/link-to-file')[0].permissions == 0o640
+
+
+def test_push_path_follows_named_symlink(
+    push_pull_container: ops.Container, tmp_path: pathlib.Path
+):
+    # The link is the source path itself, rather than an entry found inside a directory.
+    target = tmp_path / 'target.txt'
+    target.write_text('target')
+    target.chmod(0o640)
+    link = tmp_path / 'link.txt'
+    link.symlink_to(target)
+
+    push_pull_container.push_path(link, '/dst')
+
+    with push_pull_container.pull('/dst/link.txt') as f:
+        assert f.read() == 'target'
+    assert push_pull_container.list_files('/dst/link.txt')[0].permissions == 0o640
+
+
+def test_push_path_named_dangling_symlink_is_an_error(
+    push_pull_container: ops.Container, tmp_path: pathlib.Path
+):
+    link = tmp_path / 'link.txt'
+    link.symlink_to(tmp_path / 'missing')
+
+    with pytest.raises(ops.MultiPushPullError) as excinfo:
+        push_pull_container.push_path(link, '/dst')
+
+    assert [(p, type(e)) for p, e in excinfo.value.errors] == [(str(link), FileNotFoundError)]
+
+
+def test_push_path_continues_after_error(
+    push_pull_container: ops.Container, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    src = tmp_path / 'src'
+    src.mkdir()
+    for name in ('a.txt', 'b.txt', 'c.txt'):
+        (src / name).write_text(name)
+
+    real_push = push_pull_container.push
+
+    def failing_push(path: str | pathlib.PurePath, *args: Any, **kwargs: Any):
+        if pathlib.PurePath(path).name == 'b.txt':
+            raise pebble.PathError('generic-file-error', 'disk full')
+        return real_push(path, *args, **kwargs)
+
+    monkeypatch.setattr(push_pull_container, 'push', failing_push)
+    with pytest.raises(ops.MultiPushPullError) as excinfo:
+        push_pull_container.push_path(src, '/dst')
+
+    assert [(pathlib.Path(p).name, type(e)) for p, e in excinfo.value.errors] == [
+        ('b.txt', pebble.PathError)
+    ]
+    pushed = {info.name for info in push_pull_container.list_files('/dst/src')}
+    assert pushed == {'a.txt', 'c.txt'}
+
+
+def test_pull_path_continues_after_error(
+    push_pull_container: ops.Container, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    for name in ('a.txt', 'b.txt', 'c.txt'):
+        push_pull_container.push(f'/src/{name}', name, make_dirs=True)
+
+    real_pull = push_pull_container.pull
+
+    def failing_pull(path: str | pathlib.PurePath, *args: Any, **kwargs: Any):
+        if pathlib.PurePath(path).name == 'b.txt':
+            raise pebble.PathError('generic-file-error', 'read error')
+        return real_pull(path, *args, **kwargs)
+
+    monkeypatch.setattr(push_pull_container, 'pull', failing_pull)
+    with pytest.raises(ops.MultiPushPullError) as excinfo:
+        push_pull_container.pull_path('/src', tmp_path)
+
+    assert [(pathlib.Path(p).name, type(e)) for p, e in excinfo.value.errors] == [
+        ('b.txt', pebble.PathError)
+    ]
+    assert {p.name for p in (tmp_path / 'src').iterdir()} == {'a.txt', 'c.txt'}
 
 
 class TestApplication:
@@ -2907,6 +3060,30 @@ class TestModelBindings:
         self._check_binding_data(binding_name, binding)
         assert fake_script.calls(clear=True) == expected_calls
 
+    def test_cidr_with_host_bits(self, fake_script: FakeScript, model: ops.Model):
+        # Juju reports the interface's own address with the subnet prefix
+        # length, so the host bits are set.
+        network_get_out_obj = {
+            'bind-addresses': [
+                {
+                    'mac-address': '',
+                    'interface-name': 'eth0',
+                    'addresses': [
+                        {'hostname': '', 'value': '10.1.89.35', 'cidr': '10.1.89.35/24'}
+                    ],
+                }
+            ],
+            'egress-subnets': ['10.1.89.35/24'],
+            'ingress-addresses': ['10.1.89.35'],
+        }
+        network_get_out = json.dumps(network_get_out_obj)
+        fake_script.write(
+            'network-get', f"""[ "$2" = db0 ] && echo '{network_get_out}' || exit 1"""
+        )
+        binding = self.ensure_binding(model, 'db0')
+        assert binding.network.interfaces[0].subnet == ipaddress.ip_network('10.1.89.0/24')
+        assert binding.network.egress_subnets == [ipaddress.ip_network('10.1.89.0/24')]
+
     def test_binding_no_iface_name(self, fake_script: FakeScript, model: ops.Model):
         network_get_out_obj = {
             'bind-addresses': [
@@ -3829,6 +4006,31 @@ class TestModelBackend:
             backend.juju_log('BAR', 'foo')
         assert fake_script.calls(clear=True) == [['juju-log', '--log-level', 'BAR', '--', 'foo']]
 
+    @pytest.mark.parametrize(
+        'method,args,kwargs',
+        [
+            ('juju_log', ('INFO', 'foo'), {}),
+            ('relation_model_get', (1,), {}),
+            ('secret_get', (), {'id': 'secret:123'}),
+            ('reboot', (), {}),
+        ],
+    )
+    def test_missing_command(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+        root_logging: None,
+        backend: _ModelBackend,
+        method: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ):
+        # On Juju 2.9, for example, the secret and relation-model-get hook
+        # commands don't exist.
+        monkeypatch.setenv('PATH', str(tmp_path))
+        with pytest.raises(FileNotFoundError):
+            getattr(backend, method)(*args, **kwargs)
+
     def test_valid_metrics(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('add-metric', 'exit 0')
         test_cases: list[_ValidMetricsTestCase] = [
@@ -4567,7 +4769,7 @@ class TestSecretInfo:
         assert repr(info).startswith('SecretInfo(')
         assert repr(info).endswith(')')
 
-    def test_from_dict(self):
+    def test_from_dict(self, caplog: pytest.LogCaptureFixture):
         utc = datetime.timezone.utc
         info = ops.SecretInfo.from_dict(
             'secret:4',
@@ -4589,15 +4791,19 @@ class TestSecretInfo:
         assert info.rotates == datetime.datetime(2023, 1, 9, 14, 10, 0, tzinfo=utc)
         assert info.description == 'desc'
 
-        info = ops.SecretInfo.from_dict(
-            '4',
-            {
-                'label': 'fromdict',
-                'revision': 8,
-                'rotation': 'badvalue',
-            },
-            model_uuid='abcd',
-        )
+        with caplog.at_level(level='WARNING', logger='ops.model'):
+            info = ops.SecretInfo.from_dict(
+                '4',
+                {
+                    'label': 'fromdict',
+                    'revision': 8,
+                    'rotation': 'badvalue',
+                },
+                model_uuid='abcd',
+            )
+        assert [r.getMessage() for r in caplog.records] == [
+            "Unknown secret rotation policy 'badvalue' from Juju for secret 4."
+        ]
         assert info.id == 'secret://abcd/4'
         assert info.label == 'fromdict'
         assert info.revision == 8
@@ -4605,6 +4811,12 @@ class TestSecretInfo:
         assert info.rotation is None
         assert info.rotates is None
         assert info.description is None
+
+        caplog.clear()
+        with caplog.at_level(level='WARNING', logger='ops.model'):
+            info = ops.SecretInfo.from_dict('7', {'revision': 1}, model_uuid='abcd')
+        assert info.rotation is None
+        assert caplog.records == []
 
         with pytest.warns(DeprecationWarning, match='`model_uuid` should always be provided'):
             info = ops.SecretInfo.from_dict('5', {'revision': 9})
@@ -4754,6 +4966,17 @@ class TestSecretClass:
             ['secret-info-get', '--format=json', f'secret://{model._backend.model_uuid}/x'],
         ]
 
+    def test_get_info_no_label_or_description(self, model: ops.Model, fake_script: FakeScript):
+        # Juju omits the label and description keys when the secret has neither.
+        fake_script.write('secret-info-get', """echo '{"x": {"revision": 7}}'""")
+
+        secret = self.make_secret(model, id='x')
+        info = secret.get_info()
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
+        assert info.label is None
+        assert info.description is None
+        assert info.revision == 7
+
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
         fake_script.write('secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
@@ -4773,16 +4996,12 @@ class TestSecretClass:
         assert fake_script.calls(clear=True) == [
             [
                 'secret-set',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/x',
                 mock.ANY,
             ],
             ['secret-info-get', '--format=json', '--label', 'y'],
             [
                 'secret-set',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/z',
                 mock.ANY,
             ],
@@ -4819,8 +5038,6 @@ class TestSecretClass:
                 '2022-12-09T16:59:00',
                 '--rotate',
                 'monthly',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/x',
             ],
             ['secret-info-get', '--format=json', '--label', 'y'],
@@ -4828,14 +5045,33 @@ class TestSecretClass:
                 'secret-set',
                 '--label',
                 'lbl',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/z',
             ],
         ]
 
         with pytest.raises(TypeError):
             secret.set_info()  # no args provided
+
+    def test_content_is_copied(self, model: ops.Model):
+        content = {'foo': 'bar'}
+        secret = self.make_secret(model, id='x', content=content)
+        content['foo'] = 'changed'
+        assert secret.get_content() == {'foo': 'bar'}
+
+    def test_get_info_unknown_rotation(
+        self, model: ops.Model, fake_script: FakeScript, caplog: pytest.LogCaptureFixture
+    ):
+        fake_script.write(
+            'secret-info-get',
+            """echo '{"x": {"label": "y", "revision": 7, "rotation": "fortnightly"}}'""",
+        )
+        secret = self.make_secret(model, id='x')
+        with caplog.at_level(level='WARNING', logger='ops'):
+            info = secret.get_info()
+        assert info.revision == 7
+        assert info.rotation is None
+        assert "'fortnightly'" in caplog.text
+        assert 'for secret x.' in caplog.text
 
     def test_set_content_then_info(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
@@ -4849,8 +5085,6 @@ class TestSecretClass:
         assert calls == [
             [
                 'secret-set',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/q',
                 mock.ANY,
             ],
@@ -4858,12 +5092,10 @@ class TestSecretClass:
                 'secret-set',
                 '--description',
                 description,
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/q',
             ],
         ]
-        assert re.fullmatch(r'foo#file=.*/foo', calls[0][-1])
+        assert re.fullmatch(r'foo#file=.*/0', calls[0][-1])
 
     def test_set_content_then_info_pre36(
         self, model_pre36: ops.Model, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch
@@ -4881,21 +5113,19 @@ class TestSecretClass:
         secret_uri = f'secret://{model_pre36._backend.model_uuid}/q'
         assert calls == [
             ['secret-info-get', '--format=json', secret_uri],
-            ['secret-set', '--owner', 'application', secret_uri, mock.ANY],
+            ['secret-set', secret_uri, mock.ANY],
             ['secret-get', '--format=json', secret_uri, '--peek'],
             ['secret-info-get', '--format=json', secret_uri],
             [
                 'secret-set',
                 '--description',
                 'desc',
-                '--owner',
-                'application',
                 secret_uri,
                 mock.ANY,
             ],
         ]
-        assert re.fullmatch(r'foo#file=.*/foo', calls[1][-1])
-        assert re.fullmatch(r'foo#file=.*/foo', calls[4][-1])
+        assert re.fullmatch(r'foo#file=.*/0', calls[1][-1])
+        assert re.fullmatch(r'foo#file=.*/0', calls[4][-1])
 
     def test_set_info_then_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
@@ -4908,10 +5138,10 @@ class TestSecretClass:
         calls = fake_script.calls(clear=True)
         secret_uri = f'secret://{model._backend.model_uuid}/q'
         assert calls == [
-            ['secret-set', '--description', 'desc', '--owner', 'application', secret_uri],
-            ['secret-set', '--owner', 'application', secret_uri, mock.ANY],
+            ['secret-set', '--description', 'desc', secret_uri],
+            ['secret-set', secret_uri, mock.ANY],
         ]
-        assert re.fullmatch(r'foo#file=.*/foo', calls[1][-1])
+        assert re.fullmatch(r'foo#file=.*/0', calls[1][-1])
 
     def test_set_info_then_content_pre36(self, model_pre36: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
@@ -4935,8 +5165,6 @@ class TestSecretClass:
                 'secret-set',
                 '--description',
                 'desc',
-                '--owner',
-                'application',
                 secret_uri,
                 mock.ANY,
             ],
@@ -4945,14 +5173,12 @@ class TestSecretClass:
                 'secret-set',
                 '--description',
                 'desc',
-                '--owner',
-                'application',
                 secret_uri,
                 mock.ANY,
             ],
         ]
-        assert re.fullmatch(r'old#file=.*/old', calls[2][-1])
-        assert re.fullmatch(r'new#file=.*/new', calls[4][-1])
+        assert re.fullmatch(r'old#file=.*/0', calls[2][-1])
+        assert re.fullmatch(r'new#file=.*/0', calls[4][-1])
 
     def test_set_content_aggregates(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
@@ -4964,14 +5190,10 @@ class TestSecretClass:
         calls = fake_script.calls(clear=True)
         assert calls[0][:-1] == [
             'secret-set',
-            '--owner',
-            'application',
             f'secret://{model._backend.model_uuid}/q',
         ]
         assert calls[0][:-1] == [
             'secret-set',
-            '--owner',
-            'application',
             f'secret://{model._backend.model_uuid}/q',
         ]
         assert fake_script.secrets() == {'foo': 'newbar', 'baz': 'qux'}
@@ -5248,6 +5470,17 @@ class TestPorts:
             ['opened-ports', '--format=json'],
         ]
 
+    def test_set_ports_protocol_case(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+        fake_script.write('close-port', 'exit 0')
+        fake_script.write('opened-ports', """echo '["8000/tcp"]'""")
+        # Not what the type hints allow, but open_port and close_port lowercase
+        # the protocol, and the port must not be closed and reopened.
+        unit.set_ports(ops.Port(typing.cast('typing.Literal["tcp"]', 'TCP'), 8000))
+        assert fake_script.calls(clear=True) == [
+            ['opened-ports', '--format=json'],
+        ]
+
 
 class TestUnit:
     @staticmethod
@@ -5337,6 +5570,11 @@ class TestLazyNotice:
         with pytest.raises(AttributeError):
             assert n.not_exist
 
+        # Copying creates the new object without running __init__, so the
+        # private attributes are looked up through __getattr__.
+        assert copy.copy(n).id == '123'
+        assert calls == 1
+
     def test_repr(self):
         workload = typing.cast('ops.Container', None)
         n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
@@ -5344,6 +5582,34 @@ class TestLazyNotice:
 
         n = ops.model.LazyNotice(workload, '123', 'foobar', 'example.com/a')
         assert repr(n) == "LazyNotice(id='123', type='foobar', key='example.com/a')"
+
+
+class TestLazyCheckInfo:
+    def test_lazy_check_info(self):
+        calls = 0
+
+        class FakeWorkload:
+            def get_check(self, name: str):
+                nonlocal calls
+                calls += 1
+                return ops.pebble.CheckInfo(
+                    name=name,
+                    level=ops.pebble.CheckLevel.ALIVE,
+                    status=ops.pebble.CheckStatus.UP,
+                )
+
+        workload = typing.cast('ops.Container', FakeWorkload())
+        info = ops.model.LazyCheckInfo(workload, 'http')
+        assert info.name == 'http'
+        assert calls == 0
+        # Copying creates the new object without running __init__, so the
+        # private attributes are looked up through __getattr__.
+        assert copy.copy(info).name == 'http'
+        assert calls == 0
+        assert info.status == ops.pebble.CheckStatus.UP
+        assert calls == 1
+        with pytest.raises(AttributeError):
+            assert info.not_exist
 
 
 class TestCloudCredential:

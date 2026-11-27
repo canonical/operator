@@ -177,7 +177,15 @@ Charmcraft created several files, including:
 - `src/charm.py` - The Python file that will contain the main logic of your charm.
 - `src/tinyproxy.py` - A helper module that will contain functions for interacting with tinyproxy.
 
-These files currently contain placeholder code and configuration. It would be possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
+These files currently contain placeholder code and configuration. It's possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
+
+Charmcraft didn't create a lock file. Create one now:
+
+```text
+uv lock
+```
+
+This creates a file called `uv.lock`, which specifies the exact dependency versions that will be installed when you test and build your charm. When you commit your charm to source control, include `uv.lock`.
 
 ## Write your charm
 
@@ -190,6 +198,8 @@ Open `~/tinyproxy-tutorial/charmcraft.yaml` in your usual text editor or IDE, th
 :start-at: 'title: Reverse Proxy Demo'
 :end-at: how to write a machine charm with Ops.
 ```
+
+Next, remove the `actions` block. Your charm won't define any actions.
 
 ### Write a helper module
 
@@ -232,22 +242,63 @@ You can also run these commands in `~/tinyproxy-tutorial` if uv and tox are avai
 
 ### Handle the install event
 
-We'll now write the charm code that handles events from Juju. Charmcraft created `src/charm.py` as the location for this logic, containing a class called `TinyproxyCharm`. We'll refer to `TinyproxyCharm` as the "charm class".
+We'll now write the charm code that handles events from Juju. Charmcraft created `src/charm.py` as the location for this logic.
 
-In `src/charm.py`, replace the `_on_install` method of the charm class with:
+The placeholder code in `src/charm.py` covers more functionality than we'll need. Replace the contents of `src/charm.py` with:
 
-```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
-:language: python
-:pyobject: TinyproxyCharm._on_install
+```py
+#!/usr/bin/env python3
+
+"""Charm the application."""
+
+import logging
+
+import ops
+
+# A standalone module for workload-specific logic (no charming concerns):
+import tinyproxy
+
+logger = logging.getLogger(__name__)
+
+
+class TinyproxyCharm(ops.CharmBase):
+    """Charm the application."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+
+    def _on_install(self, event: ops.InstallEvent) -> None:
+        """Install tinyproxy on the machine."""
+        if not tinyproxy.is_installed():
+            tinyproxy.install()
+            version = tinyproxy.get_version()
+            self.unit.set_workload_version(version)
+
+    def _on_start(self, event: ops.StartEvent) -> None:
+        """Handle start event."""
+        pass  # We'll implement this later.
+
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+        """Handle config-changed event."""
+        pass  # We'll implement this later.
+
+
+if __name__ == "__main__":  # pragma: nocover
+    ops.main(TinyproxyCharm)
 ```
 
-When your charm receives the "install" event from Juju, Ops runs this method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
+We'll refer to `TinyproxyCharm` as the "charm class". When your charm receives the "install" event from Juju, Ops runs the `_on_install` method, which tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
 
 As you write your charm, keep in mind that the charm code only runs when there's an event to handle.
 
 ```{important}
 Juju executes `charm.py` on every event, with event data in the environment. Your call to `ops.main` creates a fresh instance of the charm class, then Ops runs the appropriate method on the charm class. You can't persist data between Juju events by storing it in memory.
 ```
+
+Before continuing, run `tox -e lint`. You'll see errors about unknown imports, which occur because `tests/unit/test_charm.py` depends on the version of `src/charm.py` you just replaced. Delete `tests/unit/test_charm.py` for now; we'll recreate `test_charm.py` later in the tutorial.
 
 ### Define a configuration option
 
@@ -321,22 +372,12 @@ We're now ready to implement the logic to load `slug` and configure and start ti
 
 The `configure_and_run` method ensures that tinyproxy is running and correctly configured, regardless of whether tinyproxy was already running. We can therefore use this method to handle two different Juju events: "start" and "config-changed".
 
-Replace the `_on_start` method of the charm class with:
+Replace the `_on_start` and `_on_config_changed` methods of the charm class with:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
 :language: python
 :pyobject: TinyproxyCharm._on_start
 ```
-
-Next, add the following line to the `__init__` method of the charm class:
-
-```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
-:language: python
-:start-at: framework.observe(self.on.config_changed
-:end-at: framework.observe(self.on.config_changed
-```
-
-Then add the following method to the charm class:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
 :language: python
@@ -549,10 +590,10 @@ Create a file `tests/unit/test_tinyproxy.py` containing:
 :start-at: import pytest
 ```
 
-We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, run:
+To check that this test passes, run:
 
 ```text
-tox -e unit -- -k test_version
+tox -e unit
 ```
 
 ### Write state-transition tests
@@ -567,7 +608,7 @@ It's helpful to think of each test this way:
 2. Ops runs the event handler with the mocked input, which simulates your charm receiving the event.
 3. You assert that the event handler acted correctly.
 
-Replace the contents of `tests/unit/test_charm.py` with:
+Create a file `tests/unit/test_charm.py` containing:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/tests/unit/test_charm.py
 :language: python
@@ -603,9 +644,11 @@ TOTAL                118     31     26      7    69%
 
 Integration tests are an important way to check that your charm works correctly when deployed. In contrast to unit tests, integration tests require Juju to be available, and events aren't simulated.
 
-When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides the `juju` fixture used in the tests. We'll expand the tests to cover more of your charm's functionality.
+When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides the `juju` fixture used in the tests.
 
-In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
+The integration tests cover functionality that we removed from the placeholder charm code. We'll adapt the tests to match your charm's functionality.
+
+First, in `tests/integration/test_charm.py`, remove all functions except `test_deploy` and `test_workload_version_is_set`. Then change `juju.wait(jubilant.all_active)` to:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/tests/integration/test_charm.py
 :language: python

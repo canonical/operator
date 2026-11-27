@@ -44,7 +44,7 @@ def close_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-):
+) -> None:
     """Register a request to close a port or port range.
 
     For more details, see:
@@ -89,7 +89,7 @@ def open_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-):
+) -> None:
     """Register a request to open a port or port range.
 
     For more details, see:
@@ -146,10 +146,11 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
     # '8000-8999/tcp' or '8000-8999/udp' (where the two numbers can be any ports)
     # '8000-8999' (where these could be any port number)
     # If ``--endpoints`` is used, then each port will be followed by a
-    # (possibly empty) tuple of endpoints.
+    # parenthesised list of endpoints separated by ', ', for example
+    # '80/tcp (db, web)', or '(*)' if the port applies to all endpoints.
     for port in result:
         if endpoints:
-            port, port_endpoints = port.rsplit(' ', 1)
+            port, port_endpoints = port.split(' ', 1)
             port_endpoints = [e.strip() for e in port_endpoints.strip('()').split(',')]
         else:
             port_endpoints = None

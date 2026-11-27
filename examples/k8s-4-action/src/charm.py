@@ -185,6 +185,9 @@ class FastAPIDemoCharm(ops.CharmBase):
             try:
                 version = fastapi_demo.get_version(config.server_port)
                 break
+            except urllib.error.HTTPError as error:
+                error.close()  # Prevent a file handle leak.
+                continue
             except urllib.error.URLError:
                 continue
         else:

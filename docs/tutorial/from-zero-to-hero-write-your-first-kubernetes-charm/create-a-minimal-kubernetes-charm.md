@@ -42,7 +42,15 @@ Charmcraft created several files, including:
 - `src/charm.py` - The Python file that will contain the logic of your charm.
 - `src/fastapi_demo.py` - A helper module that will contain functions for interacting with your workload application.
 
-These files currently contain placeholder code and configuration.
+These files currently contain placeholder code and configuration. It's possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
+
+Charmcraft didn't create a lock file. Create one now:
+
+```text
+uv lock
+```
+
+This creates a file called `uv.lock`, which specifies the exact dependency versions that will be installed when you test and build your charm. When you commit your charm to source control, include `uv.lock`.
 
 ## Write your charm
 
@@ -78,7 +86,7 @@ Replace the content of `src/fastapi_demo.py` with:
 
 ```{literalinclude} ../../../examples/k8s-1-minimal/src/fastapi_demo.py
 :language: python
-:start-at: import json
+:start-at: '"""Functions for interacting with the workload.'
 ```
 
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
@@ -106,8 +114,6 @@ Replace the contents of `src/charm.py` with:
 
 import ops
 
-import fastapi_demo
-
 
 class FastAPIDemoCharm(ops.CharmBase):
     """Charm the service."""
@@ -121,6 +127,8 @@ if __name__ == "__main__":  # pragma: nocover
 ```
 
 As you can see, a charm is a pure Python class that inherits from the [`CharmBase`](ops.CharmBase) class of Ops and which we pass to [](ops.main). We'll refer to `FastAPIDemoCharm` as the "charm class".
+
+Before continuing, run `tox -e lint`. You'll see errors about unknown imports, which occur because `tests/unit/test_charm.py` depends on the version of `src/charm.py` you just replaced. Delete `tests/unit/test_charm.py` for now; we'll recreate `test_charm.py` later in the tutorial.
 
 ### Add logger functionality
 
@@ -201,7 +209,11 @@ In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready`
 :end-at: self.unit.set_workload_version(version)
 ```
 
-Then, still in `src/charm.py`, add `import time` and `import urllib.error` in the imports at the top of the file.
+Then, still in `src/charm.py`, add the following lines at the top of the file:
+
+- `import time`
+- `import urllib.error`
+- `import fastapi_demo`
 
 We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju.
 
@@ -331,7 +343,7 @@ In this section we'll write a test to check that the `fastapi` service is starte
 
 ### Write a test
 
-Replace the contents of `tests/unit/test_charm.py` with:
+Create a file `tests/unit/test_charm.py` containing:
 
 ```{literalinclude} ../../../examples/k8s-1-minimal/tests/unit/test_charm.py
 :language: python
@@ -356,23 +368,15 @@ The result should be similar to the following output:
 
 ```text
 ...
-============================================ test session starts =============================================
-platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python3
-cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/fastapi-demo
-configfile: pyproject.toml
-collected 1 item
 
-tests/unit/test_charm.py::test_pebble_layer PASSED
-
-============================================= 1 passed in 0.54s ==============================================
+============================= 1 passed in 0.54s ==============================
 unit: commands[1]> coverage report
 Name                  Stmts   Miss Branch BrPart  Cover   Missing
 -----------------------------------------------------------------
-src/charm.py             20      0      0      0   100%
+src/charm.py             25      5      4      2    76%   34, 38-42
 src/fastapi_demo.py       8      3      0      0    62%   35-37
 -----------------------------------------------------------------
-TOTAL                    28      3      0      0    89%
+TOTAL                    33      8      4      2    73%
   unit: OK (1.91=setup[0.09]+cmd[1.54,0.28] seconds)
   congratulations :) (1.93 seconds)
 ```

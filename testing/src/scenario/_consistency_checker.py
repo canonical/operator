@@ -24,11 +24,11 @@ import marshal
 import os
 import re
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
-from ops import pebble
+from ops import JujuVersion, pebble
 
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
@@ -81,11 +81,12 @@ def check_consistency(
     that are not in the charm's ``charmcraft.yaml`` is nonsense, and the
     combination of the two is inconsistent.
     """
-    juju_version_: tuple[int, ...] = tuple(map(int, juju_version.split('.')))
-
     if os.getenv('SCENARIO_SKIP_CONSISTENCY_CHECKS'):
         logger.info('skipping consistency checks.')
         return
+
+    # Parsed by JujuVersion so that a tagged version such as 3.6-beta1 works.
+    version = JujuVersion(juju_version)
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -107,7 +108,7 @@ def check_consistency(
             state=state,
             event=event,
             charm_spec=charm_spec,
-            juju_version=juju_version_,
+            juju_version=version,
             unit_id=unit_id,
         )
         errors.extend(results.errors)
@@ -127,6 +128,21 @@ def check_consistency(
         )
 
 
+def _duplicates(kind: str, field: str, keys: Iterable[Hashable]) -> list[str]:
+    """Describe each key that appears more than once.
+
+    Call this for each State collection whose entities must have unique identifiers,
+    such as ``(c.name for c in state.containers)``. The entities compare by every field,
+    so a State's frozenset can hold two that share an identifier but differ elsewhere,
+    which isn't possible with a real Juju.
+    """
+    return [
+        f'duplicate {kind} in State: {field} {key!r} appears {n} times.'
+        for key, n in Counter(keys).items()
+        if n > 1
+    ]
+
+
 def check_resource_consistency(
     *,
     state: State,
@@ -137,6 +153,7 @@ def check_resource_consistency(
     errors: list[str] = []
     warnings: list[str] = []
 
+    errors.extend(_duplicates('resource', 'name', (r.name for r in state.resources)))
     resources_from_meta = set(charm_spec.meta.get('resources', {}))
     resources_from_state = {resource.name for resource in state.resources}
     if not resources_from_meta.issuperset(resources_from_state):
@@ -335,6 +352,7 @@ def _check_action_param_types(
         'number': Number,
         'array': Sequence,
         'object': dict,
+        'null': type(None),
     }
     expected_param_type: dict[str, Any] = {}
     action_spec = cast('dict[str, Any]', actions[action.name] or {})
@@ -348,26 +366,38 @@ def _check_action_param_types(
             )
             continue
 
+        # JSON schema allows a list of types, such as ["string", "null"].
+        type_names = cast('list[Any]', value) if isinstance(value, list) else [value]
         try:
-            expected_param_type[par_name] = to_python_type[value]
-        except KeyError:
+            expected_param_type[par_name] = tuple(to_python_type[name] for name in type_names)
+        except (KeyError, TypeError):
             warnings.append(
                 f'unknown data type declared for parameter {par_name}: type={value}. '
                 f'Cannot consistency-check.',
             )
 
     for provided_param_name, provided_param_value in action.params.items():
-        expected_type = expected_param_type.get(provided_param_name)
-        if not expected_type:
+        if provided_param_name not in action_params:
             errors.append(
                 f'param {provided_param_name} is not a valid parameter for {action.name}: '
                 'missing from action specification',
             )
             continue
+        expected_type = expected_param_type.get(provided_param_name)
+        if expected_type is None:
+            declared_type = action_params[provided_param_name].get('type')
+            # A missing type has already been reported.
+            if declared_type:
+                errors.append(
+                    f'param {provided_param_name} has an unknown data type declared: '
+                    f'type={declared_type}',
+                )
+            continue
         if not isinstance(provided_param_value, expected_type):
+            expected = ' or '.join(t.__name__ for t in expected_type)
             errors.append(
                 f'param {provided_param_name} is of type {type(provided_param_value)}: '
-                f'expecting {expected_type}',
+                f'expecting {expected}',
             )
 
 
@@ -412,7 +442,7 @@ def check_config_consistency(
     *,
     state: State,
     charm_spec: _CharmSpec[CharmType],
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of the :class:`scenario.State` config with the charm_spec config."""
@@ -434,7 +464,7 @@ def check_config_consistency(
             'float': float,
             'boolean': bool,
         }
-        if juju_version >= (3, 4):
+        if juju_version >= '3.4':
             converters['secret'] = str
 
         validators = {
@@ -471,11 +501,11 @@ def check_secrets_consistency(
     *,
     event: Event,
     state: State,
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Secret` in the :class:`scenario.State`."""
-    errors: list[str] = []
+    errors = _duplicates('secret', 'id', (s.id for s in state.secrets))
     if not event._is_secret_event:
         return Results(errors, [])
 
@@ -487,7 +517,7 @@ def check_secrets_consistency(
             f'(a secret with the same ID is not sufficient - you must pass the object '
             f'in the state to the event).',
         )
-    elif juju_version < (3,):
+    elif juju_version < '3.0':
         errors.append(
             f'secrets are not supported in the specified juju version {juju_version}. '
             f'Should be at least 3.0.',
@@ -504,7 +534,7 @@ def check_network_consistency(
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Network` in the :class:`scenario.State`."""
-    errors: list[str] = []
+    errors = _duplicates('network', 'binding_name', (n.binding_name for n in state.networks))
 
     meta_bindings = set(charm_spec.meta.get('extra-bindings', ()))
     # add the implicit juju-info binding so we can override its network without
@@ -659,7 +689,7 @@ def check_containers_consistency(
     state_containers = [c.name for c in state.containers]
     all_notices = {notice.id for c in state.containers for notice in c.notices}
     all_checks = {(c.name, check.name) for c in state.containers for check in c.check_infos}
-    errors: list[str] = []
+    errors = _duplicates('container', 'name', state_containers)
 
     # it's fine if you have containers in meta that are not in state.containers (yet), but it's
     # not fine if:
@@ -713,9 +743,7 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            # Scenario allows None for unset, Pebble defaults to UNSET.
-            check_level = check.level if check.level is not None else pebble.CheckLevel.UNSET
-            if check_level != plan_check.level:
+            if check.level != plan_check.level:
                 errors.append(
                     f'container {container.name!r} has a check {check.name!r} with a '
                     f"different 'level' ({check.level}) than the plan ({plan_check.level}).",
@@ -754,14 +782,14 @@ def check_cloudspec_consistency(
     state: State,
     event: Event,
     charm_spec: _CharmSpec[CharmType],
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of :attr:`scenario.State.cloud_spec` with the model type."""
     errors: list[str] = []
     warnings: list[str] = []
 
-    if state.model.type == 'kubernetes' and state.model.cloud_spec and juju_version < (3, 6, 10):
+    if state.model.type == 'kubernetes' and state.model.cloud_spec and juju_version < '3.6.10':
         errors.append(
             'CloudSpec is not available for Kubernetes charms with Juju < 3.6.10. '
             'Set the juju_version to 3.6.10+ or '
