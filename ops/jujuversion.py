@@ -41,6 +41,30 @@ class JujuVersion:
         re.VERBOSE,
     )
 
+    major: int
+    """Major version number, for example ``3`` in ``'3.6.1'``."""
+
+    minor: int
+    """Minor version number, for example ``6`` in ``'3.6.1'``."""
+
+    tag: str
+    """Pre-release tag, or an empty string if not set.
+
+    For example, ``'beta'`` in ``'3.6-beta2'``.
+    """
+
+    patch: int
+    """Patch number, or ``0`` if not set.
+
+    For example, ``1`` in ``'3.6.1'``, or ``2`` in ``'3.6-beta2'``.
+    """
+
+    build: int
+    """Build number, or ``0`` if not set.
+
+    For example, ``1`` in ``'2.9.42.1'``.
+    """
+
     def __init__(self, version: str):
         m = self._pattern_re.match(version)
         if not m:

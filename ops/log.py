@@ -27,17 +27,21 @@ import typing
 import warnings
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Callable
+
     from .model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):
     """A handler for sending logs and warnings to Juju via juju-log."""
 
+    model_backend: _ModelBackend
+
     def __init__(self, model_backend: _ModelBackend, level: int = logging.DEBUG):
         super().__init__(level)
         self.model_backend = model_backend
 
-    def emit(self, record: logging.LogRecord):
+    def emit(self, record: logging.LogRecord) -> None:
         """Send the specified logging record to the Juju backend.
 
         This method is not used directly by the ops library, but by
@@ -48,7 +52,7 @@ class JujuLogHandler(logging.Handler):
 
 def setup_root_logging(
     model_backend: _ModelBackend, debug: bool = False, exc_stderr: bool = False
-):
+) -> None:
     """Setup Python logging to forward messages to juju-log.
 
     By default, logging is set to DEBUG level, and messages will be filtered by Juju.
@@ -75,7 +79,7 @@ def setup_root_logging(
         lineno: int,
         file: typing.TextIO | None = None,
         line: str | None = None,
-    ):
+    ) -> None:
         """Direct the warning to Juju's debug-log, and don't include the code."""
         logger.warning('%s:%s: %s: %s', filename, lineno, category.__name__, message)
 
@@ -89,7 +93,7 @@ def setup_root_logging(
 
     def except_hook(
         etype: type[BaseException], value: BaseException, tb: types.TracebackType | None
-    ):
+    ) -> None:
         logger.error('Uncaught exception while in charm code:', exc_info=(etype, value, tb))
         if exc_stderr:
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)
@@ -129,7 +133,7 @@ class _SecurityEventLevel(enum.Enum):
 
 
 @functools.cache
-def _get_juju_log_and_app_id():
+def _get_juju_log_and_app_id() -> tuple[Callable[[str, str], None], str]:
     logger = logging.getLogger()
     for juju_handler in logger.handlers:
         if isinstance(juju_handler, JujuLogHandler):
@@ -145,7 +149,7 @@ def _get_juju_log_and_app_id():
         RuntimeWarning,
     )
 
-    def juju_log(level: str, message: str):
+    def juju_log(level: str, message: str) -> None:
         logger.debug(message)
 
     return juju_log, 'charm'
@@ -157,7 +161,7 @@ def _log_security_event(
     event_data: str,
     *,
     description: str,
-):
+) -> None:
     """Send a structured security event log to Juju, as defined by SEC0045.
 
     Args:

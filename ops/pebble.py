@@ -40,6 +40,7 @@ import dataclasses
 import datetime
 import email.message
 import email.parser
+import email.utils
 import enum
 import http.client
 import io
@@ -2977,8 +2978,14 @@ class Client:
         Raises:
             PathError: If there was an error writing the file to the path; for example, if the
                 destination path doesn't exist and ``make_dirs`` is not used.
+            ValueError: If the path contains a carriage return, line feed, or null
+                character, which can't be sent to Pebble.
         """
         path = str(path)
+        # These would end the filename early in the multipart header, and Pebble
+        # would reject the request with an error that doesn't mention the path.
+        if any(c in path for c in '\r\n\x00'):
+            raise ValueError(f'cannot push to a path containing CR, LF, or NUL: {path!r}')
         with self._start_span('pebble push') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
@@ -3035,7 +3042,11 @@ class Client:
         else:
             source_io: _AnyStrFileLikeIO = source
         boundary = binascii.hexlify(os.urandom(16))
-        path_escaped = path.replace('"', '\\"').encode('utf-8')
+        # Pebble reads this with Go's mime.ParseMediaType, where a backslash
+        # escapes the next character if it's a tspecial. Escape \ and " as Go's
+        # multipart.Writer does. It also percent-encodes CR and LF, which can't
+        # be undone, so push() refuses those instead.
+        path_escaped = path.replace('\\', '\\\\').replace('"', '\\"').encode('utf-8')
         content_type = f'multipart/form-data; boundary="{boundary.decode("utf-8")}"'
 
         def generator() -> Generator[bytes, None, None]:
@@ -3778,8 +3789,10 @@ class _FilesParser:
         self._parser.feed(b'\r\n')
 
     def _process_header(self, data: bytearray):
-        parser = email.parser.BytesFeedParser()
-        parser.feed(data)
+        # The bytes parser replaces anything outside ASCII in a header value,
+        # which loses a non-ASCII path. Pebble sends the headers as UTF-8.
+        parser = email.parser.FeedParser()
+        parser.feed(data.decode('utf-8', 'replace'))
         self._headers = parser.close()
 
         content_disposition = self._headers.get_content_disposition()
@@ -3788,7 +3801,11 @@ class _FilesParser:
 
         name = self._headers.get_param('name', header='content-disposition')
         if name == 'files':
-            filename = self._headers.get_filename()
+            # Not get_filename(), because that strips leading and trailing
+            # whitespace, which can be part of the path.
+            filename = self._headers.get_param('filename', header='content-disposition')
+            if isinstance(filename, tuple):
+                filename = email.utils.collapse_rfc2231_value(filename)
             if filename is None:
                 raise ProtocolError('multipart "files" part missing filename')
             self._prepare_tempfile(filename)
