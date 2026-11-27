@@ -20,7 +20,8 @@ import logging
 import pathlib
 import ssl
 import urllib.error
-from unittest.mock import ANY, patch
+import urllib.request
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from opentelemetry.trace import get_tracer_provider
@@ -123,3 +124,135 @@ def test_exporter_http_error_log_format(tmp_path: pathlib.Path, caplog: pytest.L
     # The body must be capped at 1000 bytes to bound log size.
     assert repr(b'x' * 1000) in message
     assert repr(b'x' * 1001) not in message
+
+
+def _http_error(url: str, code: int) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError(url, code, 'error', email.message.Message(), io.BytesIO(b'body'))
+
+
+@pytest.mark.parametrize(
+    'code,kept',
+    [
+        (400, False),
+        (413, False),
+        (415, False),
+        (422, False),
+        (401, True),
+        (404, True),
+        (429, True),
+        (503, True),
+    ],
+)
+def test_exporter_rejected_payload_is_dropped(tmp_path: pathlib.Path, code: int, kept: bool):
+    """A chunk the collector will never accept is removed so that it does not block the rest."""
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    url = 'http://collector.example/v1/traces'
+    exporter.buffer.save_destination(Destination(url, None))
+    rv = exporter.buffer.pushpop((b'\x00', 'application/json'))
+    assert rv
+
+    with patch('urllib.request.urlopen', side_effect=_http_error(url, code)):
+        exporter.do_export(*rv)
+
+    assert (exporter.buffer.pushpop() is not None) is kept
+
+
+@pytest.mark.parametrize('ca', ['FIRST\nSECOND', 'héllo'])
+def test_exporter_invalid_ca_is_reported_once(
+    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture, ca: str
+):
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    url = 'https://collector.example/v1/traces'
+    exporter.buffer.save_destination(Destination(url, ca))
+    rv = exporter.buffer.pushpop((b'\x00', 'application/json'))
+    assert rv
+
+    with patch('urllib.request.urlopen') as urlopen, caplog.at_level(
+        logging.ERROR, logger='ops_tracing._export'
+    ):
+        exporter.do_export(*rv)
+        exporter.do_export(*rv)
+
+    urlopen.assert_not_called()
+    errors = [r for r in caplog.records if 'Cannot load the CA list' in r.getMessage()]
+    assert len(errors) == 1
+    assert errors[0].exc_info is None
+    # The data is kept until a usable CA list is provided.
+    assert exporter.buffer.pushpop() == rv
+
+
+def test_exporter_retries_after_ca_change(tmp_path: pathlib.Path):
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    url = 'https://collector.example/v1/traces'
+    exporter.buffer.save_destination(Destination(url, 'not a CA list'))
+    rv = exporter.buffer.pushpop((b'\x00', 'application/json'))
+    assert rv
+
+    with patch('urllib.request.urlopen') as urlopen:
+        exporter.do_export(*rv)
+        urlopen.assert_not_called()
+
+        exporter.buffer.save_destination(Destination(url, 'a different CA list'))
+        with patch.object(exporter, 'ssl_context', return_value=ssl.create_default_context()):
+            exporter.do_export(*rv)
+
+    urlopen.assert_called_once()
+    assert exporter.buffer.pushpop() is None
+
+
+def _exporter_with_backlog(tmp_path: pathlib.Path, chunks: int) -> BufferingSpanExporter:
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    exporter.buffer.save_destination(Destination('http://collector.example/v1/traces', None))
+    for _ in range(chunks):
+        exporter.buffer.pushpop((b'{}', 'application/json'))
+    return exporter
+
+
+@pytest.mark.parametrize('code', [503, 429, None])
+def test_export_stops_at_the_first_chunk_not_sent(tmp_path: pathlib.Path, code: int | None):
+    """A chunk that wasn't sent is the oldest, so trying again would only resend it."""
+    exporter = _exporter_with_backlog(tmp_path, 3)
+
+    def urlopen_result(request: urllib.request.Request, **kwargs: object) -> MagicMock:
+        if code is None:
+            raise urllib.error.URLError('unreachable')
+        raise _http_error(request.full_url, code)
+
+    with patch('urllib.request.urlopen', side_effect=urlopen_result) as urlopen, patch(
+        'ops_tracing._otlp_json.encode_spans', return_value=b'{}'
+    ):
+        exporter.export([ANY])
+
+    urlopen.assert_called_once()
+
+
+def test_export_without_destination_sends_nothing(tmp_path: pathlib.Path):
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    exporter.buffer.pushpop((b'{}', 'application/json'))
+
+    with patch('urllib.request.urlopen') as urlopen, patch(
+        'ops_tracing._otlp_json.encode_spans', return_value=b'{}'
+    ):
+        exporter.export([ANY])
+
+    urlopen.assert_not_called()
+
+
+@pytest.mark.parametrize('code', [None, 400])
+def test_export_sends_the_backlog(tmp_path: pathlib.Path, code: int | None):
+    """Chunks that leave the buffer, sent or rejected for good, let the next one go out."""
+    exporter = _exporter_with_backlog(tmp_path, 2)
+
+    def urlopen_result(request: urllib.request.Request, **kwargs: object) -> MagicMock:
+        if code is None:
+            return MagicMock()
+        # Each response needs its own error, because the exporter closes the body.
+        raise _http_error(request.full_url, code)
+
+    with patch('urllib.request.urlopen', side_effect=urlopen_result) as urlopen, patch(
+        'ops_tracing._otlp_json.encode_spans', return_value=b'{}'
+    ):
+        exporter.export([ANY])
+
+    assert urlopen.call_count == 3
+    assert exporter.buffer.pushpop() is None

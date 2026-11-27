@@ -133,6 +133,9 @@ class Tracing(ops.Object):
             ):
                 self.framework.observe(event, self._reconcile)
 
+            # The destination is stored in the buffer file, so is lost if that is discarded.
+            self.framework.observe(self.framework.on.commit, self._on_commit)
+
             if ca_relation_name:
                 relation = self.charm.meta.relations.get(ca_relation_name)
                 if not relation:
@@ -161,6 +164,13 @@ class Tracing(ops.Object):
     def _reconcile(self, _event: ops.EventBase):
         dst = self._get_destination()
         ops.tracing.set_destination(url=dst.url, ca=dst.ca)
+
+    def _on_commit(self, event: ops.CommitEvent):
+        try:
+            self._reconcile(event)
+        except ops.ModelError as e:
+            # Most hook commands are unavailable in restricted contexts, such as collect-metrics.
+            logger.debug('Could not check the tracing destination: %s', e)
 
     def _get_destination(self) -> Destination:
         try:
