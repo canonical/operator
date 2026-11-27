@@ -221,29 +221,6 @@ class _Dispatcher:
         return self.event_name in ('collect_metrics', 'meter_status_changed')
 
 
-def _should_use_controller_storage(
-    db_path: Path, meta: _charm.CharmMeta, juju_context: JujuContext
-) -> bool:
-    """Figure out whether we want to use controller storage or not."""
-    # if local state has been used previously, carry on using that
-    if db_path.exists():
-        return False
-
-    # only use controller storage for Kubernetes podspec charms
-    is_podspec = 'kubernetes' in meta.series
-    if not is_podspec:
-        logger.debug('Using local storage: not a Kubernetes podspec charm')
-        return False
-
-    # are we in a new enough Juju?
-    if juju_context.version.has_controller_storage():
-        logger.debug('Using controller storage: JUJU_VERSION=%s', juju_context.version)
-        return True
-    else:
-        logger.debug('Using local storage: JUJU_VERSION=%s', juju_context.version)
-        return False
-
-
 class _Abort(Exception):  # ruff: ignore[error-suffix-on-exception-name]
     """Raised when something happens that should interrupt ops execution."""
 
@@ -345,26 +322,21 @@ class _Manager:
         logger.debug('ops %s up and running.', version)
 
     def _make_storage(self, dispatcher: _Dispatcher):
-        charm_state_path = self._charm_root / self._charm_state_path
+        if not self._use_juju_for_storage:
+            return _storage.SQLiteStorage(self._charm_root / self._charm_state_path)
 
-        use_juju_for_storage = self._use_juju_for_storage
-        if use_juju_for_storage and not _storage.juju_backend_available():
+        if not _storage.juju_backend_available():
             # raise an exception; the charm is broken and needs fixing.
             msg = 'charm set use_juju_for_storage=True, but Juju version {} does not support it'
             raise RuntimeError(msg.format(self._juju_context.version))
 
-        if use_juju_for_storage is None:
-            use_juju_for_storage = _should_use_controller_storage(
-                charm_state_path, self._charm_meta, self._juju_context
-            )
-        elif use_juju_for_storage:
-            warnings.warn(
-                "Controller storage is deprecated; it's intended for "
-                'podspec charms and will be removed in a future release.',
-                category=DeprecationWarning,
-            )
+        warnings.warn(
+            "Controller storage is deprecated; it's intended for "
+            'podspec charms and will be removed in a future release.',
+            category=DeprecationWarning,
+        )
 
-        if use_juju_for_storage and dispatcher.is_restricted_context():
+        if dispatcher.is_restricted_context():
             # TODO: jam 2020-06-30 This unconditionally avoids running a collect metrics event
             #  Though we eventually expect that Juju will run collect-metrics in a
             #  non-restricted context. Once we can determine that we are running
@@ -377,11 +349,7 @@ class _Manager:
             # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
             raise _Abort(0)
 
-        if self._use_juju_for_storage:
-            store = _storage.JujuStorage()
-        else:
-            store = _storage.SQLiteStorage(charm_state_path)
-        return store
+        return _storage.JujuStorage()
 
     def _make_framework(self, dispatcher: _Dispatcher):
         # If we are in a RelationBroken event, we want to know which relation is
