@@ -899,11 +899,16 @@ class TestFramework:
             cause = str(excinfo.value.__cause__)
         assert cause == 'EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar'
 
-    def test_reemit_ignores_unknown_event_type(self, request: pytest.FixtureRequest):
+    def test_reemit_ignores_unknown_event_type(
+        self,
+        request: pytest.FixtureRequest,
+        caplog: pytest.LogCaptureFixture,
+        tmp_path: pathlib.Path,
+    ):
         # The event type may have been gone for good, and nobody cares,
         # so this shouldn't be an error scenario.
 
-        framework = create_framework(request)
+        framework = create_framework(request, tmpdir=tmp_path)
 
         class MyEvent(ops.EventBase):
             handle_kind = 'test'
@@ -932,10 +937,13 @@ class TestFramework:
         framework.commit()
         framework.close()
 
-        framework_copy = create_framework(request)
+        framework_copy = create_framework(request, tmpdir=tmp_path)
 
-        # No errors on missing event types here.
-        framework_copy.reemit()
+        # No errors on missing event types here, but the dropped event is logged.
+        with caplog.at_level(logging.WARNING):
+            framework_copy.reemit()
+        assert 'Dropping the deferred event' in caplog.text
+        assert str(event_handle) in caplog.text
 
         # Register the type and check that the event is gone from storage.
         framework_copy.register_type(MyEvent, event_handle.parent, event_handle.kind)

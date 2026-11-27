@@ -988,6 +988,11 @@ class Framework(Object):
             try:
                 event = self.load_snapshot(event_handle)
             except NoTypeError:
+                logger.warning(
+                    'Dropping the deferred event %s: its type is no longer registered. '
+                    'Observe the event in every dispatch for deferred events to be re-emitted.',
+                    event_path,
+                )
                 self._storage.drop_notice(event_path, observer_path, method_name)
                 continue
 
