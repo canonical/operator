@@ -1,0 +1,115 @@
+name: Selected Example Charm Integration Tests
+
+on:
+  pull_request:
+    paths:
+      - examples/**
+
+permissions: {}
+
+jobs:
+  selection:
+    runs-on: ubuntu-latest
+    outputs:
+      k8s-charms: ${{ steps.k8s.outputs.charms }}
+      machine-charms: ${{ steps.machine.outputs.charms }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # Need full history to diff against the base branch.
+      - name: Select the K8s charms that changed
+        id: k8s
+        run: |
+          charms=$(
+            for charm in \
+              examples/k8s-1-minimal \
+              examples/k8s-2-configurable \
+              examples/k8s-3-postgresql \
+              examples/k8s-4-action \
+              examples/k8s-5-observe \
+              examples/httpbin-demo
+            do
+              git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- "$charm/" || printf '"%s"\n' "$charm"
+            done | jq --slurp --compact-output .
+          )
+          echo "charms=$charms" >> "$GITHUB_OUTPUT"
+      - name: Select the machine charms that changed
+        id: machine
+        run: |
+          charms=$(
+            for charm in \
+              examples/machine-tinyproxy
+            do
+              git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- "$charm/" || printf '"%s"\n' "$charm"
+            done | jq --slurp --compact-output .
+          )
+          echo "charms=$charms" >> "$GITHUB_OUTPUT"
+
+  k8s-examples-integration:
+    needs: selection
+    if: ${{ needs.selection.outputs.k8s-charms != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.selection.outputs.k8s-charms) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - name: Install tox, tox-uv, and Concierge
+        run: |
+          uv tool install tox --with tox-uv
+          sudo snap install --classic concierge
+      - name: Prepare for deploying K8s charms
+        run: sudo concierge prepare -p k8s
+        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
+      - name: Lock dependencies
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
+        working-directory: ${{ matrix.dir }}
+        run: if [ ! -f uv.lock ]; then uv lock; fi
+      - name: Fetch libs and pack the charm
+        working-directory: ${{ matrix.dir }}
+        run: |
+          if grep -Eq "^charm-libs:" charmcraft.yaml; then
+            charmcraft fetch-libs
+          fi
+          charmcraft pack
+      - name: Run integration tests
+        working-directory: ${{ matrix.dir }}
+        run: tox -e integration
+
+  machine-examples-integration:
+    needs: selection
+    if: ${{ needs.selection.outputs.machine-charms != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.selection.outputs.machine-charms) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - name: Install tox, tox-uv, and Concierge
+        run: |
+          uv tool install tox --with tox-uv
+          sudo snap install --classic concierge
+      - name: Prepare for deploying machine charms
+        run: sudo concierge prepare -p machine
+        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
+      - name: Lock dependencies
+        # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
+        working-directory: ${{ matrix.dir }}
+        run: if [ ! -f uv.lock ]; then uv lock; fi
+      - name: Pack charm
+        working-directory: ${{ matrix.dir }}
+        run: charmcraft pack
+      - name: Run integration tests
+        working-directory: ${{ matrix.dir }}
+        run: tox -e integration
