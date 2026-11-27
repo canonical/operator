@@ -672,8 +672,8 @@ class RelationJoinedEvent(RelationEvent):
     remote unit is first observed by the unit. Callback methods bound
     to this event may set any local unit data that can be
     determined using no more than the name of the joining unit and the
-    remote ``private-address`` setting, which is always available when
-    the relation is created and is by convention not deleted.
+    remote unit's ``ingress-address`` setting (also ``private-address`` on
+    Juju 3), which Juju sets when the unit enters the relation.
 
     See also: `Juju | Hook | <endpoint>-relation-joined <https://documentation.ubuntu.com/juju/3.6/reference/hook/#endpoint-relation-joined>`_.
     """
