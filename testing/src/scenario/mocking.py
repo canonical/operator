@@ -168,6 +168,14 @@ def _hook_command(cmd: str, *params: str, **renamed: str) -> Callable[[_F], _F]:
     return decorator
 
 
+_RESERVED_ACTION_RESULT_KEYS = frozenset({
+    'stdout',
+    'stdout-encoding',
+    'stderr',
+    'stderr-encoding',
+})
+
+
 # pyright: reportIncompatibleMethodOverride=false
 class _MockModelBackend(_ModelBackend):
     def __init__(
@@ -717,7 +725,13 @@ class _MockModelBackend(_ModelBackend):
                 'not in the context of an action event: cannot action-set',
             )
         # let ops validate the results dict
-        _format_action_result_dict(results)
+        flat_results = _format_action_result_dict(results)
+        # Juju's action-set also rejects these names as any part of a key. ops
+        # leaves that to Juju, so the charm gets Juju's error.
+        for key in flat_results:
+            for part in key.split('.'):
+                if part in _RESERVED_ACTION_RESULT_KEYS:
+                    raise ModelError(f'ERROR cannot set reserved action key "{part}"')
         # but then we will store it in its unformatted,
         # original form for testing ease
         if self._context.action_results:
