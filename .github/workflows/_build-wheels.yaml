@@ -26,6 +26,13 @@ jobs:
       - name: Build wheels
         run: uv build --all
 
+      # The same check runs before publishing, but catching a version mismatch
+      # between the packages here means it fails on the PR, not the release.
+      - name: Check the packages install together
+        run: |
+          set -xueo pipefail
+          uvx --with "$(echo -n dist/ops-*.whl)[testing,tracing]" --with dist/ops_scenario-*.whl --with dist/ops_tracing-*.whl python -c 'import ops, scenario, ops_tracing; print("OK")'
+
       - name: Set artifact name
         id: artifact-name
         run: echo "name=operator-wheels-${{ github.sha }}" >> "$GITHUB_OUTPUT"
