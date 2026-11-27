@@ -168,6 +168,9 @@ def test_parse_duration(input: str, expected: datetime.timedelta):
         '3hY',
         'X3hY',
         '3.4.5s',
+        '1h!!30m',
+        '1h 30m',
+        '9' * 30 + 'h',
     ],
 )
 def test_parse_duration_errors(input: str):
