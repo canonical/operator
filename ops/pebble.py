@@ -2673,7 +2673,7 @@ class Client:
         Return a dict of any options in the header, e.g., {'boundary': ...}.
         """
         ctype = headers.get_content_type()
-        params = headers.get_params() or {}
+        params = headers.get_params() or []
         options = {key: value for key, value in params if value}
         if ctype != expected:
             raise ProtocolError(f'expected Content-Type {expected!r}, got {ctype!r}')
