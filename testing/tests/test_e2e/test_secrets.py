@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import collections
 import datetime
+import re
 from typing import Literal, cast
 from unittest.mock import ANY
 
 import pytest
-from scenario import Context, Relation, Secret, State
+from scenario import Context, Relation, Secret, State, errors
 
 import ops
 from test.charms.test_secrets.src.charm import Result, SecretsCharm
@@ -159,6 +160,154 @@ def test_add(app: bool):
     secret = output.get_secret(label='mylabel')
     assert secret.latest_content == secret.tracked_content == {'foo': 'bar'}
     assert secret.label == 'mylabel'
+
+
+def test_add_app_secret_not_leader():
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=False)) as mgr:
+        # Juju's secret-add only lets the leader create a secret owned by the application.
+        with pytest.raises(ops.ModelError, match='this unit is not the leader'):
+            mgr.charm.app.add_secret({'foo': 'bar'}, label='mylabel')
+        output = mgr.run()
+
+    assert not output.secrets
+
+
+@pytest.mark.parametrize('first_owner', ('app', 'unit'))
+@pytest.mark.parametrize('second_owner', ('app', 'unit'))
+def test_add_secret_label_used_in_same_hook(first_owner: str, second_owner: str):
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=True)) as mgr:
+        charm = mgr.charm
+        getattr(charm, first_owner).add_secret({'foo': 'bar'}, label='mylabel')
+        # Juju rejects the label whatever the owners of the two secrets are.
+        with pytest.raises(ops.ModelError, match='secret with label "mylabel" already exists'):
+            getattr(charm, second_owner).add_secret({'foo': 'baz'}, label='mylabel')
+        output = mgr.run()
+
+    (secret,) = output.secrets
+    assert secret.latest_content == {'foo': 'bar'}
+
+
+@pytest.mark.parametrize(
+    'owner,juju_version,message',
+    [
+        ('unit', '3.6.14', 'cannot apply changes: creating secrets: secret with label "mylabel"'),
+        ('app', '3.6.14', 'cannot apply changes: creating secrets: secret with label "mylabel"'),
+        ('unit', '4.0.0', 'cannot apply changes: create secrets: creating secret "'),
+        ('app', '4.0.0', 'cannot apply changes: executing leadership func: create secrets: '),
+    ],
+)
+def test_add_secret_label_used_in_earlier_hook(
+    owner: Literal['unit', 'app'],
+    juju_version: str,
+    message: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    # The hook's changes are rejected when Juju commits them, so this is never wrapped.
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    existing = Secret({'foo': 'bar'}, label='mylabel', owner=owner)
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version=juju_version)
+    with ctx(ctx.on.update_status(), State(leader=True, secrets={existing})) as mgr:
+        # In Juju, secret-add succeeds: the label is only checked when the hook ends.
+        getattr(mgr.charm, owner).add_secret({'foo': 'baz'}, label='mylabel')
+        with pytest.raises(errors.HookCommitError, match=re.escape(message)):
+            mgr.run()
+
+
+@pytest.mark.parametrize(
+    'existing_owner,new_owner,juju_version,message',
+    [
+        (
+            'app',
+            'unit',
+            '3.6.14',
+            'cannot apply changes: creating secrets: '
+            'secret label "mylabel" for application "local" already exists',
+        ),
+        (
+            'unit',
+            'app',
+            '3.6.14',
+            'cannot apply changes: creating secrets: '
+            'secret label "mylabel" for a unit of application "local" already exists',
+        ),
+        ('app', 'unit', '4.0.0', 'secret with label "mylabel" already exists'),
+        ('unit', 'app', '4.0.0', 'secret with label "mylabel" already exists'),
+    ],
+)
+def test_add_secret_label_used_in_earlier_hook_by_other_owner(
+    existing_owner: Literal['unit', 'app'],
+    new_owner: Literal['unit', 'app'],
+    juju_version: str,
+    message: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    # App and unit secrets share labels. A non-leader sees the app's secrets too,
+    # so it can't give a unit secret one of their labels either.
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    existing = Secret({'foo': 'bar'}, label='mylabel', owner=existing_owner)
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version=juju_version)
+    leader = new_owner == 'app'
+    with ctx(ctx.on.update_status(), State(leader=leader, secrets={existing})) as mgr:
+        getattr(mgr.charm, new_owner).add_secret({'foo': 'baz'}, label='mylabel')
+        with pytest.raises(errors.HookCommitError) as exc_info:
+            mgr.run()
+
+    (actual,) = exc_info.value.messages
+    assert actual.endswith(message)
+
+
+def test_add_secret_label_used_in_earlier_hook_and_removed(monkeypatch: pytest.MonkeyPatch):
+    # Juju creates a hook's secrets before it removes any, so removing the old
+    # secret first doesn't free its label for a new one in the same hook.
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    existing = Secret({'foo': 'bar'}, label='mylabel', owner='unit')
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=True, secrets={existing})) as mgr:
+        mgr.charm.model.get_secret(label='mylabel').remove_all_revisions()
+        mgr.charm.unit.add_secret({'foo': 'baz'}, label='mylabel')
+        with pytest.raises(errors.HookCommitError, match='secret with label "mylabel"'):
+            mgr.run()
+
+
+def test_add_secret_labels_used_in_earlier_hook_messages(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    first = Secret({'foo': 'bar'}, label='first', owner='unit')
+    second = Secret({'foo': 'bar'}, label='second', owner='unit')
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version='3.6.14')
+    with ctx(ctx.on.update_status(), State(leader=True, secrets={first, second})) as mgr:
+        mgr.charm.unit.add_secret({'foo': 'baz'}, label='first')
+        mgr.charm.unit.add_secret({'foo': 'baz'}, label='second')
+        with pytest.raises(errors.HookCommitError) as exc_info:
+            mgr.run()
+
+    assert exc_info.value.messages == [
+        'cannot apply changes: creating secrets: secret with label "first" already exists',
+        'cannot apply changes: creating secrets: secret with label "second" already exists',
+    ]
+
+
+def test_add_secret_label_used_by_observed_secret():
+    # A label on a secret the charm only observes is a consumer label, which isn't checked.
+    observed = Secret({'foo': 'bar'}, label='mylabel')
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=True, secrets={observed})) as mgr:
+        mgr.charm.unit.add_secret({'foo': 'baz'}, label='mylabel')
+        output = mgr.run()
+
+    assert len(output.secrets) == 2
+
+
+def test_add_secret_label_free_after_remove():
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(leader=True)) as mgr:
+        charm = mgr.charm
+        charm.unit.add_secret({'foo': 'bar'}, label='mylabel').remove_all_revisions()
+        charm.unit.add_secret({'foo': 'baz'}, label='mylabel')
+        output = mgr.run()
+
+    assert output.get_secret(label='mylabel').latest_content == {'foo': 'baz'}
 
 
 def test_set_legacy_behaviour():
