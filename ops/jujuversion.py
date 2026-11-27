@@ -92,7 +92,7 @@ class JujuVersion:
         if isinstance(other, str):
             other = type(self)(other)
         elif not isinstance(other, JujuVersion):
-            raise RuntimeError(f'cannot compare Juju version "{self}" with "{other}"')
+            return NotImplemented
         return (
             self.major == other.major
             and self.minor == other.minor
@@ -142,15 +142,15 @@ class JujuVersion:
 
     def has_app_data(self) -> bool:
         """Report whether this Juju version supports app data."""
-        return (self.major, self.minor, self.patch) >= (2, 7, 0)
+        return self >= '2.7.0'
 
     def is_dispatch_aware(self) -> bool:
         """Report whether this Juju version supports dispatch."""
-        return (self.major, self.minor, self.patch) >= (2, 8, 0)
+        return self >= '2.8.0'
 
     def has_controller_storage(self) -> bool:
         """Report whether this Juju version supports controller-side storage."""
-        return (self.major, self.minor, self.patch) >= (2, 8, 0)
+        return self >= '2.8.0'
 
     @property
     def has_secrets(self) -> bool:
@@ -159,21 +159,21 @@ class JujuVersion:
         # * In 3.0.2, secret-get "--update" was renamed to "--refresh", and
         #   secret-get-info was separated into its own hook command
         # * In 3.0.3, a bug with observer labels was fixed (juju/juju#14916)
-        return (self.major, self.minor, self.patch) >= (3, 0, 3)
+        return self >= '3.0.3'
 
     @property
     def supports_open_port_on_k8s(self) -> bool:
         """Report whether this Juju version supports open-port on Kubernetes."""
         # Support added: https://bugs.launchpad.net/juju/+bug/1920960
-        return (self.major, self.minor, self.patch) >= (3, 0, 3)
+        return self >= '3.0.3'
 
     @property
     def supports_exec_service_context(self) -> bool:
         """Report whether this Juju version supports exec's service_context option."""
-        if (self.major, self.minor, self.patch) < (3, 1, 6):
+        if self < '3.1.6':
             # First released in 3.1.6
             return False
-        if (self.major, self.minor, self.patch) == (3, 2, 0):
+        if (self.major, self.minor) == (3, 2) and self < '3.2.1':
             # 3.2.0 was released before Pebble was updated, but all other 3.2
             # releases have the change (3.2.1 tag was never released).
             return False
@@ -187,14 +187,14 @@ class JujuVersion:
         # cutoff. Juju 3.4.0 was the first to have Pebble 1.6 (actually 1.7).
         # https://github.com/canonical/pebble/releases/tag/v1.6.0
         # https://github.com/juju/juju/blob/e1b7dcd7390348c37f8b860011e7436e6ed3f4cc/go.mod#L27
-        return (self.major, self.minor, self.patch) >= (3, 4, 0)
+        return self >= '3.4.0'
 
     @property
     def supports_pebble_identities(self) -> bool:
         """Report whether this Juju version supports Pebble identities."""
-        return (self.major, self.minor, self.patch) >= (3, 6, 4)
+        return self >= '3.6.4'
 
     @property
     def supports_pebble_metrics(self) -> bool:
         """Report whether this Juju version supports Pebble metrics."""
-        return (self.major, self.minor, self.patch) >= (3, 6, 4)
+        return self >= '3.6.4'
