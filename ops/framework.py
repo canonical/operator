@@ -786,7 +786,7 @@ class Framework(Object):
             framework.observe(someobj.something_happened, self._on_something_happened)
 
         Raises:
-            RuntimeError: if bound_event or observer are the wrong type.
+            TypeError: if bound_event or observer are the wrong type.
         """
         if not isinstance(bound_event, BoundEvent):
             raise TypeError(
@@ -826,6 +826,16 @@ class Framework(Object):
                 f'{type(observer_obj).__name__}.{method_name} must be callable with '
                 "only 'self' and the 'event'"
             ) from e
+
+        # The observer is stored by name and looked up again when the event is
+        # emitted, so a name that doesn't find the method is never called.
+        if not hasattr(observer_obj, method_name):
+            logger.warning(
+                '%s has no attribute %r, so this observer will not be called: observers '
+                'must be methods, accessed by the name they are defined with.',
+                type(observer_obj).__name__,
+                method_name,
+            )
 
         # TODO Prevent the exact same parameters from being registered more than once.
 
@@ -1014,7 +1024,14 @@ class Framework(Object):
                     logger.debug('Emitting custom event %s.', event)
 
                 custom_handler = getattr(observer, method_name, None)
-                if custom_handler:
+                if custom_handler is None:
+                    logger.warning(
+                        'Observer %s has no method %s to handle the event %s.',
+                        observer_path,
+                        method_name,
+                        event,
+                    )
+                else:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
                     if event_is_from_juju:
