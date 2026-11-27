@@ -6,6 +6,10 @@ The charming community has developed two approaches to writing robust, stateless
 - Holistic charms reconcile towards a goal state on every event.
 - Delta charms handle each Juju event individually.
 
+```{tip}
+We recommend the holistic approach for most charms. Holistic charms are easier to make robust and easier to test well. See [choosing an approach](#which-approach-to-use) for when a delta charm is still a reasonable choice.
+```
+
 ## Handling events holistically
 
 A typical holistic charm subscribes the same observer method, often called `_reconcile`, to all interesting Juju events.
@@ -206,11 +210,13 @@ However, the charm code and tests can get messy when dependencies between events
 
 A good rule of thumb is this: if you're starting to use `defer` in various places, consider whether it's time to rewrite the charm using the reconciler pattern.
 
+(which-approach-to-use)=
 ## Which approach to use?
 
-At a high level, simple workloads are served well by delta charms.
-Complex workloads are more robust if the reconciler pattern is followed.
-The reconciler pattern is especially suitable for mature, feature-rich charms that use several charm libraries.
+Start new charms with a reconciler.
+Complex workloads are more robust with the reconciler pattern, especially in mature, feature-rich charms that use several charm libraries.
+
+Simple workloads can still be served well by a delta charm, if their behaviour maps directly onto Juju events.
 
 ### Dedicated handlers for specific Juju events
 
@@ -258,4 +264,4 @@ This comes down to two observations:
 
 A delta approach is most appropriate when the Juju event model can be mapped directly to the workload semantics. Simple operators can typically be written as delta charms.
 
-See [SSSD Operator](https://github.com/canonical/sssd-operator/blob/9118ecec6e45820f79dda97f6f7dd287a20b39ac/src/charm.py#L44-L69) and [Apache Kafka Rack Awareness Operator](https://github.com/canonical/kafka-broker-rack-awareness-operator/blob/980781a49b6d65e6d4356819c1f3a2c57a0e3625/src/charm.py#L27-L30) for examples of workloads where a delta charm is suitable. Notably, machine charms map to the delta model more readily than Kubernetes charms.
+See [SSSD Operator](https://github.com/canonical/sssd-operator/blob/9118ecec6e45820f79dda97f6f7dd287a20b39ac/src/charm.py#L44-L69) and [Apache Kafka Rack Awareness Operator](https://github.com/canonical/kafka-broker-rack-awareness-operator/blob/980781a49b6d65e6d4356819c1f3a2c57a0e3625/src/charm.py#L27-L30) for examples of workloads where a delta charm is suitable. The Juju event model maps more directly to machine charms than to Kubernetes charms. Even so, the reconciler pattern is the better default for most machine charms too.

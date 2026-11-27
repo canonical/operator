@@ -39,7 +39,7 @@ tracing
 
 ## Handling events
 
-Charms typically either handle events holistically, using a shared reconciler method, or individually.
+Charms typically either handle events holistically, using a shared reconciler method, or individually. We recommend the holistic approach for most charms.
 
 ```{toctree}
 :maxdepth: 1
