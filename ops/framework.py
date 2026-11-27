@@ -574,7 +574,7 @@ https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-co
 
 """
 
-_event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
+_event_regex = r'^(|.*/)on/\w+\[\d+\]$'
 
 
 class Framework(Object):

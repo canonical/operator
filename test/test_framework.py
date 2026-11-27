@@ -1233,6 +1233,27 @@ class TestFramework:
             'ObjectWithStorage[obj]/on/event[1]',
         ])
 
+    def test_remove_unreferenced_events_digits_in_kind(self, request: pytest.FixtureRequest):
+        # Event kinds derived from names such as 'redis2' contain digits.
+        framework = create_framework(request)
+
+        class Evt(ops.EventBase):
+            pass
+
+        class Events(ops.ObjectEvents):
+            redis2_ready = ops.EventSource(Evt)
+
+        class Obj(ops.Object):
+            on = Events()
+
+        o = Obj(framework, 'obj')
+        handle = ops.Handle(o.on, 'redis2_ready', '100')
+        framework.register_type(Evt, o.on, 'redis2_ready')
+        framework.save_snapshot(Evt(handle))
+        assert list(framework._storage.list_snapshots()) == [handle.path]
+        framework.remove_unreferenced_events()
+        assert list(framework._storage.list_snapshots()) == []
+
     def test_wrapped_handler(self, request: pytest.FixtureRequest):
         # It's fine to wrap the event handler, as long as the framework can
         # still call it with just the `event` argument.
