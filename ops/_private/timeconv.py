@@ -42,7 +42,7 @@ def parse_rfc3339(s: str) -> datetime.datetime:
     We also handle timestamps produced by Juju's FormatTime method, which is
     RFC3339 but using a space rather than 'T' to separate the date and time.
     """
-    match = _TIMESTAMP_RE.match(s)
+    match = _TIMESTAMP_RE.fullmatch(s)
     if not match:
         raise ValueError(f'invalid timestamp {s!r}')
     y, m, d, hh, mm, ss, sfrac, zone = match.groups()
@@ -50,7 +50,7 @@ def parse_rfc3339(s: str) -> datetime.datetime:
     if zone in ('Z', 'z'):
         tz = datetime.timezone.utc
     else:
-        match = _TIMEOFFSET_RE.match(zone)
+        match = _TIMEOFFSET_RE.fullmatch(zone)
         if not match:
             raise ValueError(f'invalid timestamp {s!r}')
         sign, zh, zm = match.groups()
