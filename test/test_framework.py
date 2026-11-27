@@ -162,6 +162,13 @@ class TestFramework:
         else:
             pytest.fail('exception NoSnapshotError not raised')
 
+    def test_handle_eq_other_type(self):
+        handle = ops.Handle(None, 'kind', 'key')
+        assert handle != 'kind[key]'
+        assert handle != None  # ruff: ignore[none-comparison]
+        assert handle in {handle}
+        assert handle not in {'kind[key]'}
+
     def test_snapshot_roundtrip(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class Foo:
             handle_kind = 'foo'
