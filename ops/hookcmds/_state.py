@@ -21,7 +21,7 @@ from typing import overload
 from ._utils import run
 
 
-def state_delete(key: str):
+def state_delete(key: str) -> None:
     """Delete server-side-state key value pairs.
 
     For more details, see:
@@ -68,7 +68,7 @@ def state_get(key: str | None) -> dict[str, str] | str:
 # We don't offer a `file` argument here as we expect that charms will generally
 # have the data to set in memory. We do always use `--file` ourselves, but with
 # stdin rather than a real file.
-def state_set(data: Mapping[str, str]):
+def state_set(data: Mapping[str, str]) -> None:
     """Set server-side-state values.
 
     For more details, see:

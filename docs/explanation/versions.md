@@ -63,7 +63,7 @@ See more: [Ops support commitments](https://github.com/canonical/operator/blob/m
 |---------|--------|--------------|-------------|
 | Ops 1.5 | <span style="color:red">✗</span> EOL | 2020-10-31 | 2024-04-26 |
 | Ops 2.23 (LTS) | <span style="color:green">●</span> Active | 2023-01-25 | 2038-01-25 |
-| Ops 3.9 | <span style="color:green">●</span> Active | 2026-10-08 | 2027-10-08 |
+| Ops 3.10 | <span style="color:green">●</span> Active | 2026-11-20 | 2027-11-20 |
 
 **Legend:**
 - <span style="color:green">●</span> Active: Currently supported

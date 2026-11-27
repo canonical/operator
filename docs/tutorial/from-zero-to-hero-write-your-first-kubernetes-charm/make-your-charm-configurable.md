@@ -123,6 +123,16 @@ As you may have noticed, `_replan_workload` looks like a more advanced variant o
 :pyobject: FastAPIDemoCharm._on_demo_server_pebble_ready
 ```
 
+You may also have noticed that a comment in `tests/unit/test_charm.py` is no longer accurate:
+
+```{literalinclude} ../../../examples/k8s-1-minimal/tests/unit/test_charm.py
+:language: python
+:start-at: "# Expected plan after Pebble ready"
+:end-at: expected_plan = ops.pebble.Plan(ROCK_LAYER.to_dict())
+```
+
+Our charm now *does* add a layer. The test simulates pebble-ready with our charm's default configuration, so `_get_pebble_layer` constructs a layer whose `command` specifies port 8000 -- matching the base layer in the application image. No other details in the constructed layer differ from the base layer, so adding the layer leaves the Pebble plan unchanged. This means you don't need to change the `expected_plan = ...` line in `tests/unit/test_charm.py`. You can adjust the comment if you like.
+
 ## Validate your charm
 
 First, repack and refresh your charm:
@@ -191,17 +201,7 @@ juju status
 
 Since we added a new feature to configure `server-port` and use it in the Pebble layer dynamically, we should write tests for the feature.
 
-First, in `tests/unit/test_charm.py`, find the `expected_plan = ` line then add a line that sets `override` for the `fastapi` service:
-
-```{literalinclude} ../../../examples/k8s-2-configurable/tests/unit/test_charm.py
-:language: python
-:start-at: "# Expected plan after Pebble ready with default config."
-:end-at: expected_plan.services["fastapi"].override = "merge"
-```
-
-This is needed because the charm's `_get_pebble_layer` method sets `override` to `merge` in the layer that it constructs.
-
-Next, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the Pebble layer:
+Add a test that sets the port in the input state and asserts that the port is used in the service's command in the Pebble layer:
 
 ```{literalinclude} ../../../examples/k8s-2-configurable/tests/unit/test_charm.py
 :language: python
