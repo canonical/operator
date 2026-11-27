@@ -117,7 +117,9 @@ class Handle:
     def __hash__(self):
         return hash((self.parent, self.kind, self.key))
 
-    def __eq__(self, other: Handle) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Handle):
+            return NotImplemented
         return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
 
     def __str__(self):
