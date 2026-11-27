@@ -50,17 +50,14 @@ jobs:
       - name: Lock dependencies
         # Not all charms have a lock file. Lock carefully, so we don't mask a stale file.
         working-directory: ${{ matrix.dir }}
-        run: |
-          if [ ! -f uv.lock ]; then uv lock; fi
+        run: if [ ! -f uv.lock ]; then uv lock; fi
       - name: Run linting and static checks
         working-directory: ${{ matrix.dir }}
-        run: |
-          tox -e lint
+        run: tox -e lint
       - name: Run unit tests with Ops and Scenario from PyPI
         # Catches broken example charms - especially important for the tutorials.
         working-directory: ${{ matrix.dir }}
-        run: |
-          tox -e unit
+        run: tox -e unit
       - name: Run unit tests with Ops and Scenario from this branch
         # Catches changes that would break the example charms on release.
         working-directory: ${{ matrix.dir }}
