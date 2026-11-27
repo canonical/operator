@@ -1,0 +1,9 @@
+name: report
+type: charm
+summary: Reports what it sees.
+description: Reports what it sees.
+config:
+  options:
+    name:
+      type: string
+      default: default

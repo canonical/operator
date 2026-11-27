@@ -2383,14 +2383,14 @@ class _CharmSpec(Generic[_CharmTypeCo]):
         return meta, config, actions
 
     @staticmethod
-    def autoload(charm_type: type[CharmType]) -> _CharmSpec[CharmType]:
-        """Construct a ``_CharmSpec`` object by looking up the metadata from the charm's repo root.
+    def _load_metadata_or_legacy(
+        charm_root: pathlib.Path,
+    ) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any] | None]:
+        """Load metadata from ``charmcraft.yaml``, or from the legacy files if it has none.
 
-        Will attempt to load the metadata off the ``charmcraft.yaml`` file
+        Raises:
+            MetadataNotFoundError: if neither has any metadata.
         """
-        charm_source_path = pathlib.Path(inspect.getfile(charm_type))
-        charm_root = charm_source_path.parent.parent
-
         # attempt to load metadata from unified charmcraft.yaml
         meta, config, actions = _CharmSpec._load_metadata(charm_root)
 
@@ -2405,7 +2405,17 @@ class _CharmSpec(Generic[_CharmTypeCo]):
                 f'expected to contain at least a `charmcraft.yaml` file '
                 f"(or a `metadata.yaml` file if it's an old charm).",
             )
+        return meta, config, actions
 
+    @staticmethod
+    def autoload(charm_type: type[CharmType]) -> _CharmSpec[CharmType]:
+        """Construct a ``_CharmSpec`` object by looking up the metadata from the charm's repo root.
+
+        Will attempt to load the metadata off the ``charmcraft.yaml`` file
+        """
+        charm_source_path = pathlib.Path(inspect.getfile(charm_type))
+        charm_root = charm_source_path.parent.parent
+        meta, config, actions = _CharmSpec._load_metadata_or_legacy(charm_root)
         return _CharmSpec(
             charm_type=charm_type,
             meta=meta,
