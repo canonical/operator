@@ -47,7 +47,9 @@ def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
     return UnitStatus._from_dict(result)
 
 
-def status_set(status: SettableStatusName, message: str | None = None, *, app: bool = False):
+def status_set(
+    status: SettableStatusName, message: str | None = None, *, app: bool = False
+) -> None:
     """Set a status of a unit or an application.
 
     For more details, see:
