@@ -1410,12 +1410,12 @@ class StoredList(typing.MutableSequence[Any]):
 
     def insert(self, index: int, value: Any) -> None:
         """Insert value before index."""
-        self._under.insert(index, value)
+        self._under.insert(index, _unwrap_stored(self._stored_data, value))
         self._stored_data.dirty = True
 
     def append(self, value: Any) -> None:
         """Append value to the end of the list."""
-        self._under.append(value)
+        self._under.append(_unwrap_stored(self._stored_data, value))
         self._stored_data.dirty = True
 
     def __eq__(self, other: object) -> bool:

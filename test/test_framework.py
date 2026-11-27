@@ -1542,6 +1542,26 @@ class TestStoredState:
 
         framework.commit()
 
+    def test_stored_list_adds_stored_values(self, request: pytest.FixtureRequest):
+        # Values that are already wrapped are unwrapped before they are added,
+        # otherwise the error only appears later, in commit().
+        framework = create_framework(request)
+
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
+
+        obj = SomeObject(framework, '1')
+        obj._stored.items = []
+        obj._stored.inner = {'a': 1}
+        items: typing.Any = obj._stored.items  # pyright: ignore[reportUnknownMemberType]
+        assert isinstance(items, ops.StoredList)
+        items.append(obj._stored.inner)
+        items.insert(0, obj._stored.inner)
+        items.extend([obj._stored.inner])
+        assert items == [{'a': 1}, {'a': 1}, {'a': 1}]
+        assert all(type(item) is dict for item in items._under)
+        framework.commit()
+
     def test_mutable_types(self, tmp_path: pathlib.Path):
         def _assert_equal(a: typing.Any, b: typing.Any):
             assert a == b
