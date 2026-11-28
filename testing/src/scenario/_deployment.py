@@ -537,7 +537,11 @@ class Juju:
         self.close()
 
     def _next_unit(self) -> tuple[str, int] | None:
-        """The next unit with an event pending, starting from the unit after the last turn."""
+        """The next unit with an event pending, starting from the unit after the last turn.
+
+        Returns:
+            The unit's ``(app_name, unit_id)``, or ``None`` if no unit has an event pending.
+        """
         pending = sorted(
             ((self._apps[app_name]._order, unit_id), app_name, unit_id)
             for (app_name, unit_id), queue in self._queues.items()
