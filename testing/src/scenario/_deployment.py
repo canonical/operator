@@ -139,7 +139,7 @@ class Dispatch:
         return f'{self.app_name}/{self.unit_id}'
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class _Charm:
     """What a ``Context`` for one of an application's units needs. Fixed at deploy."""
 
@@ -465,7 +465,15 @@ class Juju:
         _check_config(app_name, config_schema, config or {})
         storage_counts = _storage_counts(app_name, metadata, storage or {})
         new_app = App(
-            _Charm(charm_type, app_name, metadata, config_schema, actions, juju_version, trust),
+            _Charm(
+                charm_type=charm_type,
+                app_name=app_name,
+                metadata=metadata,
+                config=config_schema,
+                actions=actions,
+                juju_version=juju_version,
+                trust=trust,
+            ),
             config={**_default_config(config_schema), **(config or {})},
             storage=storage_counts,
             state_template=state_template if state_template is not None else State(),
