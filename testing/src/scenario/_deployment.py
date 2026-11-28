@@ -732,7 +732,7 @@ def _check_config(
         ):
             raise JujuError(
                 f'{app_name} config option {name!r} is a {option_type}, '
-                f'not a {type(value).__name__}: {value!r}.'
+                f'not a {type(value).__name__}.'
             )
 
 
