@@ -4856,6 +4856,24 @@ class TestTestingPebbleClient:
         infos = client.get_services(['unknown'])
         assert infos == []
 
+    def test_get_services_empty_names(self, client: _TestingPebbleClient):
+        client.add_layer(
+            'foo',
+            """\
+            summary: foo
+            services:
+              foo:
+                summary: Foo
+                command: '/bin/echo foo'
+              bar:
+                summary: Bar
+                command: '/bin/echo bar'
+            """,
+        )
+        # Pebble treats an empty list of names the same as no names.
+        infos = client.get_services([])
+        assert [info.name for info in infos] == ['bar', 'foo']
+
     def test_invalid_start_service(self, client: _TestingPebbleClient):
         with pytest.raises(pebble.APIError):
             client.start_services(['unknown'])
@@ -7096,6 +7114,16 @@ class PebbleNoticesMixin:
         notices = client.get_notices(types=[pebble.NoticeType.CHANGE_UPDATE], keys=[key])
         assert notices == []
 
+    def test_get_notices_empty_filters(self, client: PebbleClientType):
+        key1 = 'example.com/' + os.urandom(16).hex()
+        key2 = 'example.com/' + os.urandom(16).hex()
+        client.notify(pebble.NoticeType.CUSTOM, key1)
+        client.notify(pebble.NoticeType.CUSTOM, key2)
+
+        # An empty filter is the same as no filter, not a filter that matches nothing.
+        for notices in (client.get_notices(types=[]), client.get_notices(keys=[])):
+            assert {key1, key2} <= {notice.key for notice in notices}
+
 
 class TestNotices(PebbleNoticesMixin):
     @pytest.fixture
@@ -7209,6 +7237,12 @@ class TestChecks:
         assert chk3.startup == pebble.CheckStartup.DISABLED
         assert chk3.failures == 0
         assert chk3.status == pebble.CheckStatus.INACTIVE
+
+    def test_get_checks_empty_names(self, request: pytest.FixtureRequest):
+        container = self._container_with_layer(request)
+        # Pebble treats an empty list of names the same as no names.
+        checks = container.pebble.get_checks(names=[])
+        assert sorted(check.name for check in checks) == ['chk1', 'chk2', 'chk3']
 
     def test_start_checks(self, request: pytest.FixtureRequest):
         container = self._container_with_layer(request)
