@@ -446,12 +446,10 @@ class Juju:
                 the leader get no ``leader-settings-changed``.
 
         Raises:
-            JujuError: if an application of this name already exists,
-                ``num_units`` is not positive, the charm has no metadata,
-                the template sets a field ``Juju`` owns (including a
-                container's ``can_connect``), ``config`` doesn't
-                match the charm's config options, or ``storage`` doesn't
-                match the charm's stores.
+            JujuError: if Juju would refuse the deployment, for example
+                because an application of this name already exists or
+                ``config`` doesn't match the charm's config options, or if
+                the arguments are otherwise invalid.
         """
         self._check_open()
         if num_units < 1:
