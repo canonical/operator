@@ -791,6 +791,52 @@ def test_pebble_replan_checks():
     assert info_out.status == ops.pebble.CheckStatus.UP
 
 
+class PlanReaderCharm(ops.CharmBase):
+    plan: dict[str, object] | None = None
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['foo'].pebble_ready, self._on_pebble_ready)
+
+    def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
+        PlanReaderCharm.plan = dict(event.workload.get_plan().to_dict())
+
+
+def test_unknown_layer_fields_reach_the_plan():
+    # Pebble fields that aren't modelled, here made-up ones, are kept in the
+    # plan the charm sees, with the entries of each layer merged. A later layer's
+    # entry replaces an earlier one with the same name.
+    layer = ops.pebble.Layer(
+        """
+services:
+  svc:
+    override: replace
+    command: echo
+    foo: wl
+foos:
+  wl: {override: replace, user: alice}
+"""
+    )
+    other = ops.pebble.Layer(
+        """
+foos:
+  wl: {override: replace, user: carol}
+  wl2: {override: replace, user: bob}
+"""
+    )
+    container = Container('foo', can_connect=True, layers={'base': layer, 'other': other})
+    ctx = Context(PlanReaderCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
+    ctx.run(ctx.on.pebble_ready(container), State(containers={container}))
+    assert PlanReaderCharm.plan == {
+        'services': {'svc': {'override': 'replace', 'command': 'echo', 'foo': 'wl'}},
+        'foos': {
+            'wl': {'override': 'replace', 'user': 'carol'},
+            'wl2': {'override': 'replace', 'user': 'bob'},
+        },
+    }
+    assert container.plan.to_dict() == PlanReaderCharm.plan
+
+
 class CombineLayerCharm(ops.CharmBase):
     layer_name: str
     layer_dict: LayerDict

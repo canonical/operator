@@ -649,6 +649,23 @@ services:
         services_as_dict = {'foo': {'override': 'replace', 'command': 'echo foo'}}
         assert plan.services == services_as_dict
 
+    def test_unknown_fields_round_trip(self):
+        plan_yaml = """
+services:
+  foo:
+    override: replace
+    command: echo foo
+    foo: wl
+foos:
+  wl:
+    override: replace
+    user: alice
+"""[1:]
+        plan = pebble.Plan(plan_yaml)
+        assert plan.to_dict() == yaml.safe_load(plan_yaml)
+        assert plan == pebble.Plan(plan.to_yaml())
+        assert plan != pebble.Plan('services: {foo: {override: replace, command: echo foo}}')
+
     def test_plan_equality(self):
         plan1 = pebble.Plan("""
 services:
@@ -926,6 +943,71 @@ summary: Sum Mary
 
         assert s != 5
 
+    def test_unknown_fields_round_trip(self):
+        # Fields that we don't model, here made-up ones, are
+        # kept and written back out rather than dropped.
+        layer_yaml = """
+summary: sum
+services:
+  foo:
+    override: replace
+    command: echo foo
+    foo: wl
+checks:
+  chk:
+    override: replace
+    exec:
+      command: echo chk
+    future-check-field: 1
+log-targets:
+  tgt:
+    override: replace
+    type: loki
+    future-target-field: [a, b]
+foos:
+  wl:
+    override: replace
+    user: alice
+"""[1:]
+        layer = pebble.Layer(layer_yaml)
+        assert layer.to_dict() == yaml.safe_load(layer_yaml)
+        assert pebble.Layer(layer.to_yaml()) == layer
+        assert pebble.Layer(layer.to_dict()) == layer
+        assert layer.services['foo'].to_dict()['foo'] == 'wl'  # type: ignore
+
+    def test_unknown_fields_are_copied(self):
+        d = yaml.safe_load("""
+services:
+  foo:
+    override: replace
+    future: {a: 1}
+foos:
+  wl: {user: alice}
+""")
+        layer = pebble.Layer(d)
+        d['services']['foo']['future']['a'] = 2
+        d['foos']['wl']['user'] = 'bob'
+        assert layer.to_dict()['services']['foo']['future'] == {'a': 1}  # type: ignore
+        assert layer.to_dict()['foos'] == {'wl': {'user': 'alice'}}  # type: ignore
+        out = layer.to_dict()
+        out['foos']['wl']['user'] = 'carol'  # type: ignore
+        assert layer.to_dict()['foos'] == {'wl': {'user': 'alice'}}  # type: ignore
+
+    def test_unknown_field_named_like_an_attribute(self):
+        # The unknown fields are kept apart from the attributes, so a future
+        # Pebble field can't clash with one.
+        layer = pebble.Layer("""
+services:
+  foo:
+    override: replace
+    to_dict: x
+    name: y
+""")
+        service = layer.services['foo']
+        assert service.name == 'foo'
+        assert callable(service.to_dict)
+        assert service.to_dict() == {'override': 'replace', 'to_dict': 'x', 'name': 'y'}
+
 
 class TestService:
     def _assert_empty(self, service: pebble.Service, name: str):
@@ -1039,6 +1121,20 @@ class TestService:
 
         layer = pebble.Layer({'services': {'Name 1': d}})
         assert layer.to_dict() == {'services': {'Name 1': d}}
+
+    def test_merge_unknown_fields(self):
+        # Each unknown field replaces the one with the same name, and the
+        # others are kept.
+        base = pebble.Service(
+            'svc', yaml.safe_load('{override: replace, foo: a, keep: {x: 1}, swap: [1]}')
+        )
+        base._merge(pebble.Service('svc', yaml.safe_load('{override: merge, foo: b, swap: [2]}')))
+        assert base.to_dict() == {
+            'override': 'replace',
+            'foo': 'b',
+            'keep': {'x': 1},
+            'swap': [2],
+        }
 
     def test_merge(self):
         s = pebble.Service(
@@ -1222,6 +1318,11 @@ class TestCheck:
         check = pebble.Check('chk-http', d)
         assert check.level == 'foobar!'  # remains a string
 
+    def test_merge_unknown_fields(self):
+        base = pebble.Check('chk', yaml.safe_load('{override: replace, keep: 1, swap: a}'))
+        base._merge(pebble.Check('chk', yaml.safe_load('{override: merge, swap: b, new: c}')))
+        assert base.to_dict() == {'override': 'replace', 'keep': 1, 'swap': 'b', 'new': 'c'}
+
     def test_merge_keeps_level(self):
         base = pebble.Check(
             'chk', {'override': 'replace', 'level': 'alive', 'http': {'url': 'http://a/'}}
@@ -1281,6 +1382,11 @@ class TestCheck:
 
 
 class TestLogTarget:
+    def test_merge_unknown_fields(self):
+        base = pebble.LogTarget('tgt', yaml.safe_load('{override: replace, keep: 1, swap: a}'))
+        base._merge(pebble.LogTarget('tgt', yaml.safe_load('{override: merge, swap: b}')))
+        assert base.to_dict() == {'override': 'replace', 'keep': 1, 'swap': 'b'}
+
     def test_merge_keeps_override(self):
         base = pebble.LogTarget(
             'tgt', {'override': 'replace', 'type': 'loki', 'location': 'http://a/'}
@@ -2355,6 +2461,48 @@ services:
             ('POST', '/v1/layers', None, build_expected('c', False)),
             ('POST', '/v1/layers', None, build_expected('d', True)),
         ]
+
+    def test_add_layer_keeps_unknown_fields(self, client: MockClient):
+        client.responses.append({
+            'result': True,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        layer = yaml.safe_load("""
+services:
+  foo:
+    override: replace
+    command: echo bar
+    foo: wl
+foos:
+  wl:
+    override: replace
+""")
+        client.add_layer('a', layer)
+        sent = client.requests[0][3]
+        assert sent is not None
+        assert yaml.safe_load(sent['layer']) == layer
+
+    def test_get_plan_keeps_unknown_fields(self, client: MockClient):
+        plan_yaml = """
+services:
+  foo:
+    command: echo bar
+    override: replace
+    foo: wl
+foos:
+  wl:
+    override: replace
+"""[1:]
+        client.responses.append({
+            'result': plan_yaml,
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        plan = client.get_plan()
+        assert plan.to_dict() == yaml.safe_load(plan_yaml)
 
     def test_add_layer_invalid_type(self, client: MockClient):
         with pytest.raises(TypeError):
@@ -4951,3 +5099,83 @@ class TestIdentity:
     def test_no_identity(self):
         with pytest.raises(ValueError):
             pebble.Identity(access=pebble.IdentityAccess.ADMIN)
+
+
+@pytest.mark.parametrize(
+    ('cls', 'args', 'fields'),
+    [
+        (pebble.Service, ('svc',), pebble.Service._FIELDS),
+        (pebble.Check, ('chk',), pebble.Check._FIELDS),
+        (pebble.LogTarget, ('tgt',), pebble.LogTarget._FIELDS),
+        (pebble.Layer, (), pebble.Layer._FIELDS),
+    ],
+)
+def test_modelled_fields_match_the_attributes(
+    cls: typing.Any, args: tuple[str, ...], fields: typing.Any
+):
+    # A field that a class models but that is missing from its field set would
+    # be kept as unknown, and to_dict() would write that copy back over any
+    # change made to the attribute.
+    obj: object = cls(*args, {})
+    attributes = {key.replace('_', '-') for key in vars(obj) if not key.startswith('_')}
+    attributes.discard('name')
+    assert attributes == set(fields)
+
+
+@pytest.mark.parametrize(
+    ('cls', 'raw'),
+    [
+        (
+            pebble.Service,
+            {
+                'summary': 's',
+                'description': 'd',
+                'startup': 'enabled',
+                'override': 'replace',
+                'command': 'echo',
+                'after': ['a'],
+                'before': ['b'],
+                'requires': ['r'],
+                'environment': {'K': 'V'},
+                'user': 'u',
+                'user-id': 1,
+                'group': 'g',
+                'group-id': 2,
+                'working-dir': '/w',
+                'on-success': 'restart',
+                'on-failure': 'restart',
+                'on-check-failure': {'chk': 'restart'},
+                'backoff-delay': '1s',
+                'backoff-factor': 2.0,
+                'backoff-limit': '10s',
+                'kill-delay': '5s',
+            },
+        ),
+        (
+            pebble.Check,
+            {
+                'override': 'replace',
+                'level': 'alive',
+                'startup': 'enabled',
+                'period': '10s',
+                'timeout': '3s',
+                'threshold': 3,
+                'exec': {'command': 'true'},
+            },
+        ),
+        (
+            pebble.LogTarget,
+            {
+                'override': 'replace',
+                'type': 'loki',
+                'location': 'https://example.com',
+                'services': ['all'],
+                'labels': {'k': 'v'},
+            },
+        ),
+    ],
+)
+def test_every_modelled_field_round_trips_as_known(cls: typing.Any, raw: dict[str, typing.Any]):
+    obj = cls('x', raw)
+    assert obj._unknown_fields == {}
+    assert obj.to_dict() == raw

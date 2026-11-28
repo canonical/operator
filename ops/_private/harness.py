@@ -3467,6 +3467,8 @@ class _TestingPebbleClient:
                     else:
                         layer.log_targets[name] = log_target
 
+            pebble._merge_unknown_sections(layer._unknown_fields, layer_obj._unknown_fields)
+
         else:
             self._layers[label] = layer_obj
 

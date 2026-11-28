@@ -4469,6 +4469,54 @@ class TestTestingPebbleClient:
             == client.get_plan().to_yaml()
         )
 
+    def test_add_layer_keeps_unknown_fields(self, client: _TestingPebbleClient):
+        # Pebble fields that aren't modelled are kept in the stored layer when
+        # another layer is combined into it. A made-up section in only the
+        # starting layer is kept as it is. One in both layers is merged by entry:
+        # an entry in the combined layer replaces the one with the same name, and
+        # the rest are kept.
+        client.add_layer(
+            'base',
+            yaml.safe_load("""
+services:
+  foo:
+    override: replace
+    command: echo foo
+    foo: wl1
+    keep: 1
+foos:
+  wl1: {override: replace, user: alice}
+  wl2: {override: replace, user: bob}
+made-up:
+  kept: {value: 1}
+  replaced: {value: 2}
+"""),
+        )
+        client.add_layer(
+            'base',
+            yaml.safe_load("""
+services:
+  foo:
+    override: merge
+    foo: wl2
+made-up:
+  replaced: {value: 3}
+"""),
+            combine=True,
+        )
+        layer = client._layers['base'].to_dict()
+        assert layer['services']['foo'] == {  # type: ignore
+            'override': 'replace',
+            'command': 'echo foo',
+            'foo': 'wl2',
+            'keep': 1,
+        }
+        assert layer['foos'] == {  # type: ignore
+            'wl1': {'override': 'replace', 'user': 'alice'},
+            'wl2': {'override': 'replace', 'user': 'bob'},
+        }
+        assert layer['made-up'] == {'kept': {'value': 1}, 'replaced': {'value': 3}}  # type: ignore
+
     def test_add_layer_not_combined(self, client: _TestingPebbleClient):
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)

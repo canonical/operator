@@ -61,13 +61,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
-from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Generator, Iterable, Mapping, Sequence
 from typing import (
     IO,
     TYPE_CHECKING,
     Any,
     AnyStr,
     BinaryIO,
+    ClassVar,
     Generic,
     Literal,
     Protocol,
@@ -859,6 +860,34 @@ class Change:
         )
 
 
+def _get_unknown_fields(dct: Mapping[str, Any], known: Collection[str]) -> dict[str, Any]:
+    """Return a copy of the keys of a layer dict that aren't modelled.
+
+    Pebble adds layer fields over time. These are kept so that they are
+    passed back to Pebble (and out of ``to_dict``) rather than silently
+    dropped.
+    """
+    return {key: copy.deepcopy(value) for key, value in dct.items() if key not in known}
+
+
+def _merge_unknown_sections(  # pyright: ignore[reportUnusedFunction]
+    target: dict[str, Any], other: Mapping[str, Any]
+) -> None:
+    """Merge the unknown top-level sections of a layer into another.
+
+    Harness and ops.testing use this when they combine layers. We don't
+    know how to merge the entries of a section we don't model, so each
+    entry replaces the entry with the same name, and any other value replaces
+    the existing one.
+    """
+    for key, value in other.items():
+        existing = target.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            existing.update(copy.deepcopy(value))  # type: ignore
+        else:
+            target[key] = copy.deepcopy(value)
+
+
 class Plan:
     """Represents the effective Pebble configuration.
 
@@ -866,6 +895,9 @@ class Plan:
     documented at
     https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
+
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({'services', 'checks', 'log-targets'})
 
     def __init__(self, raw: str | PlanDict | None = None):
         if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
@@ -884,6 +916,7 @@ class Plan:
         self._log_targets: dict[str, LogTarget] = {
             name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
         }
+        self._unknown_fields = _get_unknown_fields(d, self._FIELDS)
 
     @property
     def services(self) -> dict[str, Service]:
@@ -919,7 +952,8 @@ class Plan:
                 {name: target.to_dict() for name, target in self._log_targets.items()},
             ),
         ]
-        dct = {name: value for name, value in fields if value}
+        dct: dict[str, Any] = {name: value for name, value in fields if value}
+        dct.update(copy.deepcopy(self._unknown_fields))
         return typing.cast('PlanDict', dct)
 
     def to_yaml(self) -> str:
@@ -945,6 +979,15 @@ class Layer:
     The format of this is documented at
     https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
+
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
+        'summary',
+        'description',
+        'services',
+        'checks',
+        'log-targets',
+    })
 
     #: Summary of the purpose of this layer.
     summary: str
@@ -973,6 +1016,7 @@ class Layer:
         self.log_targets = {
             name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
         }
+        self._unknown_fields = _get_unknown_fields(d, self._FIELDS)
 
     def to_yaml(self) -> str:
         """Convert this layer to its YAML representation."""
@@ -987,7 +1031,8 @@ class Layer:
             ('checks', {name: check.to_dict() for name, check in self.checks.items()}),
             ('log-targets', {name: target.to_dict() for name, target in self.log_targets.items()}),
         ]
-        dct = {name: value for name, value in fields if value}
+        dct: dict[str, Any] = {name: value for name, value in fields if value}
+        dct.update(copy.deepcopy(self._unknown_fields))
         return typing.cast('LayerDict', dct)
 
     def __repr__(self) -> str:
@@ -1007,6 +1052,31 @@ class Layer:
 
 class Service:
     """Represents a service description in a Pebble configuration layer."""
+
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
+        'summary',
+        'description',
+        'startup',
+        'override',
+        'command',
+        'after',
+        'before',
+        'requires',
+        'environment',
+        'user',
+        'user-id',
+        'group',
+        'group-id',
+        'working-dir',
+        'on-success',
+        'on-failure',
+        'on-check-failure',
+        'backoff-delay',
+        'backoff-factor',
+        'backoff-limit',
+        'kill-delay',
+    })
 
     def __init__(self, name: str, raw: ServiceDict | None = None):
         self.name = name
@@ -1032,6 +1102,7 @@ class Service:
         self.backoff_factor = dct.get('backoff-factor')
         self.backoff_limit = dct.get('backoff-limit', '')
         self.kill_delay = dct.get('kill-delay', '')
+        self._unknown_fields = _get_unknown_fields(dct, self._FIELDS)
 
     def to_dict(self) -> ServiceDict:
         """Convert this service object to its dict representation."""
@@ -1063,6 +1134,7 @@ class Service:
             for name, value in fields
             if value or (name in ('user-id', 'group-id') and value is not None)
         }
+        dct.update(copy.deepcopy(self._unknown_fields))
         return typing.cast('ServiceDict', dct)
 
     def _merge(self, other: Service):
@@ -1072,6 +1144,11 @@ class Service:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            if name == '_unknown_fields':
+                # We don't know how to merge these, so each one replaces
+                # the existing value, and the others are kept.
+                self._unknown_fields.update(copy.deepcopy(value))
+                continue
             if name in ('user_id', 'group_id') and value is not None:
                 setattr(self, name, value)
                 continue
@@ -1154,6 +1231,19 @@ class ServiceInfo:
 class Check:
     """Represents a check in a Pebble configuration layer."""
 
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
+        'override',
+        'level',
+        'startup',
+        'period',
+        'timeout',
+        'threshold',
+        'http',
+        'tcp',
+        'exec',
+    })
+
     def __init__(self, name: str, raw: CheckDict | None = None):
         self.name = name
         dct: CheckDict = raw or {}
@@ -1182,6 +1272,7 @@ class Check:
         if exec_ is not None:
             exec_ = copy.deepcopy(exec_)
         self.exec: ExecDict | None = exec_
+        self._unknown_fields = _get_unknown_fields(dct, self._FIELDS)
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
@@ -1197,7 +1288,8 @@ class Check:
             ('tcp', self.tcp),
             ('exec', self.exec),
         ]
-        dct = {name: value for name, value in fields if value}
+        dct: dict[str, Any] = {name: value for name, value in fields if value}
+        dct.update(copy.deepcopy(self._unknown_fields))
         return typing.cast('CheckDict', dct)
 
     def __repr__(self) -> str:
@@ -1274,6 +1366,11 @@ class Check:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            if name == '_unknown_fields':
+                # We don't know how to merge these, so each one replaces
+                # the existing value, and the others are kept.
+                self._unknown_fields.update(copy.deepcopy(value))
+                continue
             # 'not value' is safe here because a threshold of 0 is valid but
             # inconsistently applied and not of any actual use, and the other
             # fields are strings where the empty string means 'not in the layer'.
@@ -1326,6 +1423,15 @@ class CheckStartup(enum.Enum):
 class LogTarget:
     """Represents a log target in a Pebble configuration layer."""
 
+    # The fields that are modelled. Any others are kept as they are.
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
+        'override',
+        'type',
+        'location',
+        'services',
+        'labels',
+    })
+
     def __init__(self, name: str, raw: LogTargetDict | None = None):
         self.name = name
         dct: LogTargetDict = raw or {}
@@ -1336,6 +1442,7 @@ class LogTarget:
         labels = dct.get('labels')
         labels = copy.deepcopy(labels) if labels is not None else {}
         self.labels: dict[str, str] = labels
+        self._unknown_fields = _get_unknown_fields(dct, self._FIELDS)
 
     def to_dict(self) -> LogTargetDict:
         """Convert this log target object to its dict representation."""
@@ -1346,7 +1453,8 @@ class LogTarget:
             ('services', self.services),
             ('labels', self.labels),
         ]
-        dct = {name: value for name, value in fields if value}
+        dct: dict[str, Any] = {name: value for name, value in fields if value}
+        dct.update(copy.deepcopy(self._unknown_fields))
         return typing.cast('LogTargetDict', dct)
 
     def __repr__(self):
@@ -1367,6 +1475,11 @@ class LogTarget:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            if name == '_unknown_fields':
+                # We don't know how to merge these, so each one replaces
+                # the existing value, and the others are kept.
+                self._unknown_fields.update(copy.deepcopy(value))
+                continue
             # Pebble keeps the existing override when it merges a layer in.
             if not value or name in ('name', 'override'):
                 continue

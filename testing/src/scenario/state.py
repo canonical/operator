@@ -1430,6 +1430,9 @@ class Container:
             plan.checks[name] = checks[name]
         for name in sorted(log_targets.keys()):
             plan.log_targets[name] = log_targets[name]
+        # Pebble sections that ops doesn't model, such as workloads.
+        for layer in self.layers.values():
+            pebble._merge_unknown_sections(plan._unknown_fields, layer._unknown_fields)
         return plan
 
     @property
