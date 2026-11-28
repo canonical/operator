@@ -12,6 +12,7 @@ for them.
 from __future__ import annotations
 
 import contextlib
+import copy
 import dataclasses
 import hashlib
 import re
@@ -681,15 +682,11 @@ def _load_charm(
 ) -> tuple[type[CharmBase], dict[str, Any], Mapping[str, Any] | None, Mapping[str, Any] | None]:
     """A charm's class, metadata, config options and actions."""
     if isinstance(charm, CharmSpec):
-        metadata = dict(charm.meta)
+        # Copy deeply, so that changing the spec after deploying doesn't change the app.
+        metadata = copy.deepcopy(dict(charm.meta))
         config = metadata.pop('config', None)
         actions = metadata.pop('actions', None)
-        return (
-            charm.charm_type,
-            metadata,
-            dict(config) if config is not None else None,
-            dict(actions) if actions is not None else None,
-        )
+        return charm.charm_type, metadata, config, actions
     if not isinstance(charm, type):
         raise JujuError(f'Cannot deploy {charm!r}: pass a charm class or a CharmSpec.')
     try:

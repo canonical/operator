@@ -387,6 +387,17 @@ def test_a_charm_spec_can_be_deployed_more_than_once(juju: Juju):
     assert two.leader.state.unit_status == ActiveStatus('start:info')
 
 
+def test_changing_a_charm_spec_after_deploying_does_not_change_the_app(juju: Juju):
+    meta: dict[str, Any] = {**META, 'containers': {'workload': {}}}
+    app = juju.deploy(spec(MyCharm, meta))
+    juju.settle()
+    meta['containers']['sidecar'] = {}
+    unit = juju.add_unit(app)
+    juju.settle()
+    assert app.meta['containers'] == {'workload': {}}
+    assert {c.name for c in unit.state.containers} == {'workload'}
+
+
 def test_app_meta_is_charmcraft_shaped_and_read_only(juju: Juju):
     app = juju.deploy(CharmSpec(MyCharm, meta={**META, 'config': CONFIG, 'actions': {}}))
     assert app.meta == {**META, 'config': CONFIG, 'actions': {}}
