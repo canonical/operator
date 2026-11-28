@@ -541,21 +541,15 @@ def check_network_consistency(
     # having to declare a relation for it in metadata
     implicit_bindings = {'juju-info'}
     all_relations = charm_spec.get_all_relations()
-    non_sub_relations = {
-        endpoint
-        for endpoint, metadata in all_relations
-        if metadata.get('scope') != 'container'  # mark of a sub
-    }
+    # Juju binds every relation endpoint, including container-scoped ones.
+    endpoints = {endpoint for endpoint, _ in all_relations}
 
     state_bindings = {network.binding_name for network in state.networks}
-    if diff := state_bindings.difference(
-        meta_bindings.union(non_sub_relations).union(implicit_bindings),
-    ):
+    if diff := state_bindings.difference(meta_bindings.union(endpoints).union(implicit_bindings)):
         errors.append(
             f'Some network bindings defined in State are not in the metadata: {diff}.',
         )
 
-    endpoints = {endpoint for endpoint, _ in all_relations}
     if collisions := endpoints.intersection(meta_bindings):
         errors.append(
             f'Extra bindings and relation endpoints cannot share the same name: {collisions}.',

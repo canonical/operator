@@ -935,6 +935,20 @@ def test_networks_consistency():
         ),
     )
 
+    # Juju binds every relation endpoint, including container-scoped ones.
+    assert_consistent(
+        State(networks={Network('foo')}),
+        Event('start'),
+        _CharmSpec(
+            MyCharm,
+            meta={
+                'name': 'sub',
+                'subordinate': True,
+                'requires': {'foo': {'interface': 'bar', 'scope': 'container'}},
+            },
+        ),
+    )
+
 
 def test_cloudspec_consistency():
     cloud_spec = CloudSpec(
