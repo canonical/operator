@@ -348,7 +348,7 @@ def test_bad_config_option_type():
     (
         ('string', 'foo', 1),
         ('int', 1, '1'),
-        ('float', 1.0, 1),
+        ('float', 1.0, '1.0'),
         ('boolean', False, 'foo'),
     ),
 )
@@ -366,6 +366,27 @@ def test_config_types(config_type: tuple[str, Any, Any]):
     )
 
 
+@pytest.mark.parametrize(
+    'type_name,value,consistent',
+    [
+        # Juju's int doesn't accept a bool, and its float accepts an int.
+        ('int', True, False),
+        ('int', 1.0, False),
+        ('float', 1, True),
+        ('float', False, False),
+        ('boolean', 1, False),
+        ('string', True, False),
+    ],
+)
+def test_config_types_match_juju(type_name: str, value: Any, consistent: bool):
+    asserter = assert_consistent if consistent else assert_inconsistent
+    asserter(
+        State(config={'foo': value}),
+        Event('bar'),
+        _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': type_name}}}),
+    )
+
+
 @pytest.mark.parametrize('juju_version', ('3.4', '3.5', '4.0'))
 def test_config_secret(juju_version: str):
     assert_consistent(
@@ -378,21 +399,25 @@ def test_config_secret(juju_version: str):
         State(config={'foo': 1}),
         Event('bar'),
         _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': 'secret'}}}),
+        juju_version=juju_version,
     )
     assert_inconsistent(
         State(config={'foo': 'co28kefmp25c77utl3n0'}),
         Event('bar'),
         _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': 'secret'}}}),
+        juju_version=juju_version,
     )
     assert_inconsistent(
         State(config={'foo': 'secret:secret'}),
         Event('bar'),
         _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': 'secret'}}}),
+        juju_version=juju_version,
     )
     assert_inconsistent(
         State(config={'foo': 'secret:co28kefmp25c77utl3n!'}),
         Event('bar'),
         _CharmSpec(MyCharm, {}, config={'options': {'foo': {'type': 'secret'}}}),
+        juju_version=juju_version,
     )
 
 
@@ -567,10 +592,12 @@ def test_action_meta_type_inconsistent():
         _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {}}}}),
     )
 
+    # In Juju 4, an action without additionalProperties rejects undeclared params.
     assert_inconsistent(
         State(),
         ctx.on.action('foo', params={'bar': 'baz'}),
         _CharmSpec(MyCharm, meta={}, actions={'foo': None}),
+        juju_version='4.0',
     )
 
 
@@ -658,11 +685,83 @@ def test_action_params_no_type_is_not_missing():
     assert 'missing from action specification' not in str(excinfo.value)
 
 
-def test_action_params_not_declared_is_missing():
+@pytest.mark.parametrize(
+    'juju_version,additional_properties',
+    [
+        ('3.6', True),
+        ('3.6', None),
+        ('4.0', True),
+    ],
+)
+def test_action_params_not_declared_allowed(
+    juju_version: str,
+    additional_properties: bool | None,
+):
+    action_spec: dict[str, Any] = {'params': {}}
+    if additional_properties is not None:
+        action_spec['additionalProperties'] = additional_properties
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': action_spec})
+    event = ctx.on.action('foo', params={'bar': 'baz'})
+    assert_consistent(State(), event, spec, juju_version=juju_version)
+
+
+@pytest.mark.parametrize(
+    'juju_version,additional_properties',
+    [
+        ('3.6', False),
+        ('4.0', False),
+        ('4.0', None),
+    ],
+)
+def test_action_params_not_declared_rejected(
+    juju_version: str, additional_properties: bool | None
+):
+    action_spec: dict[str, Any] = {'params': {}}
+    if additional_properties is not None:
+        action_spec['additionalProperties'] = additional_properties
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': action_spec})
+    event = ctx.on.action('foo', params={'bar': 'baz'})
+    with pytest.raises(InconsistentScenarioError, match='missing from action specification'):
+        check_consistency(State(), event, spec, juju_version, 0)
+
+
+@pytest.mark.parametrize(
+    'env_version,juju_version,consistent',
+    [('4.0', '3.6', True), ('3.6', '4.0', False)],
+)
+def test_action_params_not_declared_uses_the_context_juju_version(
+    monkeypatch: pytest.MonkeyPatch, env_version: str, juju_version: str, consistent: bool
+):
+    # The default for additionalProperties comes from the Juju version the
+    # test runs under, not from the test runner's JUJU_VERSION.
+    monkeypatch.setenv('JUJU_VERSION', env_version)
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
     spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {}}})
-    with pytest.raises(InconsistentScenarioError, match='missing from action specification'):
-        check_consistency(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec, '3.0', 0)
+    event = ctx.on.action('foo', params={'bar': 'baz'})
+    asserter = assert_consistent if consistent else assert_inconsistent
+    asserter(State(), event, spec, juju_version=juju_version)
+
+
+@pytest.mark.parametrize(
+    'param_type,value,consistent',
+    [
+        # JSON Schema's integer and number don't accept a boolean.
+        ('integer', True, False),
+        ('number', False, False),
+        ('integer', 1, True),
+        ('number', 1.5, True),
+        (['integer', 'boolean'], True, True),
+        ('boolean', True, True),
+    ],
+)
+def test_action_param_bool_is_not_a_number(param_type: Any, value: Any, consistent: bool):
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': param_type}}}})
+    event = ctx.on.action('foo', params={'bar': value})
+    asserter = assert_consistent if consistent else assert_inconsistent
+    asserter(State(), event, spec)
 
 
 @pytest.mark.parametrize('juju_version', ['3.6-beta1', '3.6.9.1', '4.0-rc2'])

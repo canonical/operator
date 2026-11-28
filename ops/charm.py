@@ -2253,9 +2253,9 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
-        # The default in Juju 4 is False. The default in earlier Juju versions is True.
-        juju_version = JujuVersion(os.environ.get('JUJU_VERSION', '0.0.0'))
-        self.additional_properties = raw.get('additionalProperties', juju_version < '4.0.0')
+        self.additional_properties = raw.get(
+            'additionalProperties', _default_additional_properties()
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -2273,6 +2273,40 @@ class ConfigMeta:
 
     description: str | None
     """Description of the config option."""
+
+
+def _default_additional_properties(juju_version: JujuVersion | None = None) -> bool:
+    """Report whether an action that doesn't set ``additionalProperties`` allows extra parameters.
+
+    The default in Juju 4 is False. The default in earlier Juju versions is True.
+    Without a version, the one in ``JUJU_VERSION`` is used.
+    """
+    if juju_version is None:
+        juju_version = JujuVersion(os.environ.get('JUJU_VERSION', '0.0.0'))
+    return juju_version < '4.0.0'
+
+
+def _config_value_has_type(value: object, type_name: str) -> bool:  # pyright: ignore[reportUnusedFunction]
+    """Report whether a charm can get this value for a config option of this type.
+
+    This follows Juju's schema checks: an ``int`` option doesn't accept a bool
+    (although ``bool`` is a subclass of ``int`` in Python), and a ``float``
+    option accepts an int. A ``secret`` option is a string here; whether it is
+    a valid secret URI is checked separately.
+
+    Raises:
+        ValueError: if ``type_name`` is not a Juju config option type.
+    """
+    # https://github.com/juju/schema/blob/v1.2.0/numeric.go
+    if type_name == 'boolean':
+        return isinstance(value, bool)
+    if type_name in ('string', 'secret'):
+        return isinstance(value, str)
+    if type_name == 'int':
+        return isinstance(value, int) and not isinstance(value, bool)
+    if type_name == 'float':
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    raise ValueError(f'unknown config option type {type_name!r}')
 
 
 @dataclasses.dataclass(frozen=True)

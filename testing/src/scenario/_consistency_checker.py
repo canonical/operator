@@ -28,7 +28,8 @@ from collections.abc import Callable, Hashable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
-from ops import JujuVersion, pebble
+from ops import ActionMeta, JujuVersion, pebble
+from ops.charm import _config_value_has_type, _default_additional_properties
 
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
@@ -170,6 +171,7 @@ def check_event_consistency(
     event: Event,
     charm_spec: _CharmSpec[CharmType],
     state: State,
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the internal consistency of the ``Event`` data structure.
@@ -203,7 +205,7 @@ def check_event_consistency(
         _check_workload_event(charm_spec, event, state, errors, warnings)
 
     if event._is_action_event:
-        _check_action_event(charm_spec, event, state, errors, warnings)
+        _check_action_event(charm_spec, event, state, juju_version, errors, warnings)
 
     if event._is_storage_event:
         _check_storage_event(charm_spec, event, state, errors, warnings)
@@ -277,6 +279,7 @@ def _check_action_event(
     charm_spec: _CharmSpec[CharmType],
     event: Event,
     state: State,
+    juju_version: JujuVersion,
     errors: list[str],
     warnings: list[str],
 ):
@@ -299,7 +302,7 @@ def _check_action_event(
         )
         return
 
-    _check_action_param_types(charm_spec, action, errors, warnings)
+    _check_action_param_types(charm_spec, action, juju_version, errors, warnings)
 
 
 def _check_storage_event(
@@ -338,6 +341,7 @@ def _check_storage_event(
 def _check_action_param_types(
     charm_spec: _CharmSpec[CharmType],
     action: _Action,
+    juju_version: JujuVersion,
     errors: list[str],
     warnings: list[str],
 ):
@@ -356,7 +360,13 @@ def _check_action_param_types(
     }
     expected_param_type: dict[str, Any] = {}
     action_spec = cast('dict[str, Any]', actions[action.name] or {})
-    action_params = cast('dict[str, dict[str, Any]]', action_spec.get('params', {}))
+    action_meta = ActionMeta(action.name, action_spec)
+    # The default for additionalProperties depends on the Juju version the test
+    # runs under, not on the test runner's JUJU_VERSION.
+    additional_properties = action_spec.get(
+        'additionalProperties', _default_additional_properties(juju_version)
+    )
+    action_params = cast('dict[str, dict[str, Any]]', action_meta.parameters)
     for par_name, par_spec in action_params.items():
         value = par_spec.get('type')
         if not value:
@@ -378,10 +388,11 @@ def _check_action_param_types(
 
     for provided_param_name, provided_param_value in action.params.items():
         if provided_param_name not in action_params:
-            errors.append(
-                f'param {provided_param_name} is not a valid parameter for {action.name}: '
-                'missing from action specification',
-            )
+            if not additional_properties:
+                errors.append(
+                    f'param {provided_param_name} is not a valid parameter for {action.name}: '
+                    'missing from action specification',
+                )
             continue
         expected_type = expected_param_type.get(provided_param_name)
         if expected_type is None:
@@ -393,7 +404,11 @@ def _check_action_param_types(
                     f'type={declared_type}',
                 )
             continue
-        if not isinstance(provided_param_value, expected_type):
+        # bool is a subclass of int, but JSON Schema's integer and number
+        # don't accept a boolean.
+        if not isinstance(provided_param_value, expected_type) or (
+            isinstance(provided_param_value, bool) and bool not in expected_type
+        ):
             expected = ' or '.join(t.__name__ for t in expected_type)
             errors.append(
                 f'param {provided_param_name} is of type {type(provided_param_value)}: '
@@ -458,38 +473,26 @@ def check_config_consistency(
             )
             continue
 
-        converters = {
-            'string': str,
-            'int': int,
-            'float': float,
-            'boolean': bool,
-        }
-        if juju_version >= '3.4':
-            converters['secret'] = str
-
-        validators = {
-            'secret': _is_secret_identifier,
-        }
-
         expected_type_name = meta_config[key].get('type', None)
         if not expected_type_name:
             errors.append(f"config.yaml invalid; option {key!r} has no 'type'.")
             continue
-        validator = validators.get(expected_type_name)
 
-        expected_type = converters.get(expected_type_name)
-        if not expected_type:
+        known_types = {'string', 'int', 'float', 'boolean'}
+        if juju_version >= '3.4':
+            known_types.add('secret')
+        if expected_type_name not in known_types:
             errors.append(
                 f"config invalid for option {key!r}: 'type' {expected_type_name} unknown",
             )
 
-        elif not isinstance(value, expected_type):
+        elif not _config_value_has_type(value, expected_type_name):
             errors.append(
-                f'config invalid; option {key!r} should be of type {expected_type} '
-                f'but is of type {type(value)}.',
+                f'config invalid; option {key!r} should be of type {expected_type_name} '
+                f'but is of type {type(value).__name__}.',
             )
 
-        elif validator and not validator(value):
+        elif expected_type_name == 'secret' and not _is_secret_identifier(value):
             errors.append(
                 f'config invalid: option {key!r} value {value!r} is not valid.',
             )
