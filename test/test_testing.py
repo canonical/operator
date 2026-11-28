@@ -7236,6 +7236,43 @@ class TestChecks:
             assert info.status == pebble.CheckStatus.UP
             assert info.change_id, 'Change ID should not be None or the empty string'
 
+    def test_check_threshold_of_zero_defaults_to_three(self, request: pytest.FixtureRequest):
+        # Pebble treats a check threshold of 0 as unset, and reports the default of 3.
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta='name: mycharm\ncontainers:\n  mycontainer:',
+        )
+        request.addfinalizer(harness.cleanup)
+        harness.set_can_connect('mycontainer', True)
+        harness.begin()
+        container = harness.charm.unit.get_container('mycontainer')
+        container.add_layer(
+            'base',
+            pebble.Layer({
+                'checks': {
+                    'chk1': {'override': 'replace', 'threshold': 0, 'exec': {'command': 'foo'}},
+                    'chk2': {'override': 'replace', 'threshold': 5, 'exec': {'command': 'foo'}},
+                }
+            }),
+        )
+        assert container.get_checks('chk1')['chk1'].threshold == 3
+        container.replan()
+        assert container.get_checks('chk1')['chk1'].threshold == 3
+        assert container.get_checks('chk2')['chk2'].threshold == 5
+
+        # A layer that replaces an existing check with a threshold of 0 also
+        # gets the default.
+        container.add_layer(
+            'base',
+            pebble.Layer({
+                'checks': {
+                    'chk2': {'override': 'replace', 'threshold': 0, 'exec': {'command': 'foo'}},
+                }
+            }),
+            combine=True,
+        )
+        assert container.get_checks('chk2')['chk2'].threshold == 3
+
     @pytest.mark.parametrize(
         'combine,new_layer_name',
         [
