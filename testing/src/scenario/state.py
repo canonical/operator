@@ -2853,7 +2853,9 @@ class _Action:
     _: dataclasses.KW_ONLY
 
     params: Mapping[str, AnyJson] = dataclasses.field(default_factory=dict[str, AnyJson])
-    """Parameter values passed to the action."""
+    """Parameter values passed to the action.
+
+    Parameters that aren't passed get their default from the action's metadata, as in Juju."""
 
     id: str = dataclasses.field(default_factory=_next_action_id)
     """Juju action ID.
