@@ -6,6 +6,7 @@ The charming community has developed two approaches to writing robust, stateless
 - Holistic charms reconcile towards a goal state on every event.
 - Delta charms handle each Juju event individually.
 
+(handling-events-holistically)=
 ## Handling events holistically
 
 A typical holistic charm subscribes the same observer method, often called `_reconcile`, to all interesting Juju events.

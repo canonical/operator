@@ -51,7 +51,7 @@ To create a directory in the workload container, use {external+charmlibs:meth}`C
 self.myapp_root.mkdir(parents=True)  # Creates parent directories if needed.
 (self.myapp_root / 'private').mkdir(user='myapp', group='myapp')
 ```
-
+(files-in-containers-write-a-file)=
 ## Write a file
 
 To write a file to the workload container, use {external+charmlibs:meth}`ContainerPath.write_text <pathops.ContainerPath.write_text>` or {external+charmlibs:meth}`ContainerPath.write_bytes <pathops.ContainerPath.write_bytes>`:
