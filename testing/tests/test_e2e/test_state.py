@@ -15,7 +15,6 @@ import yaml
 from scenario.context import Context
 from scenario.errors import StateValidationError
 from scenario.state import (
-    _DEFAULT_JUJU_DATABAG,
     Address,
     BindAddress,
     CheckInfo,
@@ -182,10 +181,17 @@ def test_relation_get(mycharm: type[CharmBase]):
         for unit in rel.units:
             if unit is charm.unit:
                 continue
+            unit_id = unit.name.split('/')[-1]
+            # Juju writes each unit's addresses to its databag.
+            juju_keys = {
+                'egress-subnets': f'203.0.113.{unit_id}/32',
+                'ingress-address': f'203.0.113.{unit_id}',
+                'private-address': f'203.0.113.{unit_id}',
+            }
             if unit.name == 'remote/1':
-                assert rel.data[unit]['e'] == 'f'
+                assert dict(rel.data[unit]) == {'e': 'f', **juju_keys}
             else:
-                assert not rel.data[unit]
+                assert dict(rel.data[unit]) == juju_keys
 
     state = State(
         relations={
@@ -269,14 +275,12 @@ def test_relation_set(mycharm: type[CharmBase]):
         replace(
             relation,
             local_app_data={'a': 'b'},
-            local_unit_data={'c': 'd', **_DEFAULT_JUJU_DATABAG},
+            local_unit_data={'c': 'd'},
         )
     )
     assert out.get_relation(relation.id).local_app_data == {'a': 'b'}
-    assert out.get_relation(relation.id).local_unit_data == {
-        'c': 'd',
-        **_DEFAULT_JUJU_DATABAG,
-    }
+    # The keys that Juju writes are only visible to the charm, not in the output.
+    assert out.get_relation(relation.id).local_unit_data == {'c': 'd'}
 
 
 def test_checkinfo_changeid_none():
@@ -715,7 +719,7 @@ def test_state_immutable_with_changed_data_relation(
     relation_out = state_out.get_relation(relation_in.id)
     assert not relation_in.local_app_data
     assert relation_out.local_app_data == {'a': 'b'}
-    assert relation_out.local_unit_data == {'c': 'd', **_DEFAULT_JUJU_DATABAG}
+    assert relation_out.local_unit_data == {'c': 'd'}
 
 
 def test_state_immutable_with_changed_data_container(mycharm: type[CharmBase]):
