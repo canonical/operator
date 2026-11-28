@@ -111,6 +111,10 @@ If your checkout is a Git worktree, Git commands fail in the workshop, because t
 
 Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://canonical.com/juju/docs/ops/latest/reference/ops-testing/) instead of legacy [ops.testing.Harness](https://canonical.com/juju/docs/ops/latest/reference/ops-testing-harness/) tests.
 
+Harness is in maintenance mode. We only change it for security fixes, for significant bugs, and where it shares code with Scenario. If a difference between Harness and Juju or Pebble breaks a real charm's tests, open an issue that names the charm before opening a PR. If a PR only changes how Harness behaves, and doesn't have such an issue, we'll close the PR. A fix to code that Harness shares with Scenario can change Harness too; there's no need to split it to keep Harness unchanged.
+
+Scenario and Harness both simulate Juju and Pebble. When changing their behaviour to more accurately simulate Juju or Pebble, cite the real behaviour in the PR description. Good evidence would be a permalink to the Juju or Pebble source at a specific commit, or output from a real controller or Pebble server, or ideally both.
+
 Tests for Ops should go in the test module corresponding to the code. For example, a feature added in `ops/main.py` would go in `test/test_main.py`. However, when adding a large number of logically related tests, consider putting these in their own file, named accordingly. For example, if adding a feature `foo` in `ops/main.py`, the tests might go in `test/test_main_foo.py`.
 
 Tests for [`ops-scenario`](https://github.com/canonical/operator/tree/main/testing/tests) and [`ops-tracing`](https://github.com/canonical/operator/tree/main/tracing/test) are arranged differently in places. Try to find the most logical place to add tests, based on the code that is tested.
