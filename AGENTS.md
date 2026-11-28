@@ -34,9 +34,10 @@ This is a mature, production framework used by thousands of charms. Changes requ
 - Large test suites may get their own file: `test/test_main_foo.py`
 - Scenario tests have a different structure - follow existing patterns
 
-### Harness and the Testing Fakes
+### Harness and Scenario
 - Harness (`ops/_private/harness.py`) is in maintenance mode: only change it for security fixes, significant bugs, or code it shares with Scenario
-- If Harness differs from Juju or Pebble in a way that breaks a real charm's tests, open an issue naming the charm before opening a PR; PRs that only change Harness behaviour without one will be closed
+- If Harness differs from Juju or Pebble in a way that breaks a real charm's tests, open an issue naming the charm before opening a PR; a PR that only changes Harness behaviour and has no such issue will be closed
+- A fix to code shared with Scenario may also change Harness; don't split it out to keep Harness unchanged
 - When changing how Scenario or Harness simulates Juju or Pebble, cite the real behaviour in the PR description: a permalink to the Juju or Pebble source at a specific commit, or output from a real controller or Pebble server, or ideally both
 
 ## When Making Changes
