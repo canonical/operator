@@ -255,8 +255,7 @@ class _MockModelBackend(_ModelBackend):
         if version.has_secrets:
             return
         if version.major < 3:
-            # The secret hook commands don't exist, so ops raises FileNotFoundError,
-            # as it does in production.
+            # The secret hook commands don't exist, so match what ops raises.
             raise FileNotFoundError(
                 errno.ENOENT,
                 f'No such file or directory (Juju {version} has no secret hook commands: '

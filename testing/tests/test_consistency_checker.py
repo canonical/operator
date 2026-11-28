@@ -424,18 +424,9 @@ def test_secret_event_juju_version(juju_version: str, consistent: bool):
         assert_inconsistent(*args)
 
 
-@pytest.mark.skip(
-    "The right exception is raised but pytest.raises doesn't catch it - figure this out!"
-)
-@pytest.mark.parametrize('bad_v', ('1.0', '0', '1.2', '2.35.42', '2.99.99', '2.99'))
+@pytest.mark.parametrize('bad_v', ('1.0', '1.2', '2.35.42', '2.99.99', '2.99', '3.0.2'))
 def test_secrets_jujuv_bad(bad_v: str):
     secret = Secret({'a': 'b'})
-    assert_inconsistent(
-        State(secrets={secret}),
-        Event('bar'),
-        _CharmSpec(MyCharm, {}),
-        bad_v,
-    )
     assert_inconsistent(
         State(secrets={secret}),
         Event('secret_changed', _secret=secret),
@@ -451,11 +442,12 @@ def test_secrets_jujuv_bad(bad_v: str):
     )
 
 
-@pytest.mark.parametrize('good_v', ('3.0', '3.1', '3.33', '4.0', '100.0'))
+@pytest.mark.parametrize('good_v', ('3.0.3', '3.1', '3.33', '4.0', '100.0'))
 def test_secrets_jujuv_good(good_v: str):
+    secret = Secret({'a': 'b'})
     assert_consistent(
-        State(secrets={Secret({'a': 'b'})}),
-        Event('bar'),
+        State(secrets={secret}),
+        Event('secret_changed', _secret=secret),
         _CharmSpec(MyCharm, {}),
         good_v,
     )
