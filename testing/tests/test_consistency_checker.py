@@ -7,7 +7,7 @@ import dataclasses
 from typing import Any
 
 import pytest
-from scenario._consistency_checker import check_consistency
+from scenario._consistency_checker import check_consistency, check_relation_consistency
 from scenario.context import Context
 from scenario.errors import InconsistentScenarioError
 from scenario.state import (
@@ -22,6 +22,7 @@ from scenario.state import (
     Notice,
     PeerRelation,
     Relation,
+    RelationBase,
     Resource,
     Secret,
     State,
@@ -542,6 +543,38 @@ def test_relation_changed_without_available_remote_unit_is_inconsistent():
         Event('foo_relation_changed', _relation=relation),
         _CharmSpec(MyCharm, {'requires': {'foo': {'interface': 'bar'}}}),
     )
+
+
+def _departed_relation_results(relation: RelationBase, departing_unit: int):
+    event = Event(
+        f'{relation.endpoint}_relation_departed',
+        _relation=relation,
+        _relation_departed_unit_id=departing_unit,
+    )
+    meta = {'requires': {'foo': {'interface': 'bar'}}, 'peers': {'peers': {'interface': 'p'}}}
+    return check_relation_consistency(
+        state=State(relations={relation}),
+        event=event,
+        charm_spec=_CharmSpec(MyCharm, meta),
+        unit_id=0,
+    )
+
+
+@pytest.mark.parametrize('remote_units', [{}, {0: {}, 1: {}}])
+def test_relation_departed_uses_the_departing_unit_as_the_remote_unit(
+    remote_units: dict[int, dict[str, str]],
+):
+    # No error for a missing remote unit, and no warning about picking one.
+    results = _departed_relation_results(Relation('foo', remote_units_data=remote_units), 2)
+    assert results.errors == []
+    assert results.warnings == []
+
+
+def test_peer_relation_departed_by_this_unit_still_needs_a_remote_unit():
+    results = _departed_relation_results(PeerRelation('peers'), 0)
+    assert results.errors == [
+        "'peers_relation_departed' must provide a remote unit. Pass in `remote_unit`."
+    ]
 
 
 def test_action_not_in_meta_inconsistent():
