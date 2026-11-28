@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import inspect
 import logging
 import marshal
 import re
 import sys
 import warnings
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Generic, cast
+from collections.abc import Iterator, Sequence
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 import ops
 import ops.storage
@@ -45,6 +46,8 @@ STORED_STATE_REGEX = re.compile(
 )
 
 logger = scenario_logger.getChild('ops_main_mock')
+
+_T = TypeVar('_T')
 
 # pyright: reportPrivateUsage=false
 
@@ -108,6 +111,27 @@ class UnitStateDB:
 
         for stored_state in state.stored_states:
             db.save_snapshot(stored_state._handle_path, stored_state.content)
+
+
+def _attrs_of_type(obj: object, attr_type: type[_T], *, static: bool) -> Iterator[_T]:
+    """Yield the attributes of obj that are of attr_type.
+
+    If static is true, only look up names whose stored value is already an
+    instance of attr_type. A property is never one, so its getter doesn't
+    run. The lookup still goes through getattr so that descriptors such as
+    ObjectEvents bind to obj.
+    """
+    for name in dir(obj):
+        if static and not isinstance(inspect.getattr_static(obj, name, None), attr_type):
+            continue
+        try:
+            attr = getattr(obj, name)
+        except Exception:  # ruff: ignore[try-except-continue]
+            # A property that raises can't be the event source, so it shouldn't
+            # stop the search from reaching one that is.
+            continue
+        if isinstance(attr, attr_type):
+            yield attr
 
 
 class Ops(_Manager, Generic[CharmType]):
@@ -207,17 +231,16 @@ class Ops(_Manager, Generic[CharmType]):
             emitter_type = type(self.event._custom_event.emitter)
             # We require the event source to be an attribute on the charm object.
             # Essentially, we are replacing the unbound event with a bound one.
-            for attr_name in dir(self.charm):
-                attr = getattr(self.charm, attr_name)
-                if not isinstance(attr, ops.Object):
-                    continue
-                for sub_attr_name in dir(attr):
-                    sub_attr = getattr(attr, sub_attr_name)
-                    if not isinstance(sub_attr, ops.ObjectEvents):
-                        continue
-                    if type(sub_attr) is not emitter_type:
-                        continue
-                    return getattr(sub_attr, self.event._custom_event.event_kind)
+            # The static pass avoids running properties on the charm and its
+            # objects, which real ops never does at this point. A property can
+            # raise, or succeed with side effects that leak into the output
+            # state (for example, logging or Pebble calls). Only an event source
+            # that can only be reached through a property needs the broader pass.
+            for static in (True, False):
+                for attr in _attrs_of_type(self.charm, ops.Object, static=static):
+                    for sub_attr in _attrs_of_type(attr, ops.ObjectEvents, static=static):
+                        if type(sub_attr) is emitter_type:
+                            return getattr(sub_attr, self.event._custom_event.event_kind)
 
         owner = (
             self._get_owner(self.charm, self.event._owner_path) if self.event else self.charm.on

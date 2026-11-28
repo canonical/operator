@@ -187,10 +187,11 @@ class Manager(Generic[CharmType]):
         try:
             self.ops.run()
         except BaseException:
-            # On failure, hand the in-flight exception to Runtime.exec()'s
-            # __exit__ so it can tear down the env snapshot, then propagate.
-            self._exit_wrapped_ctx(*sys.exc_info())
-            raise
+            # Hand the exception to Runtime.exec()'s __exit__ to tear down the env.
+            # That __exit__ suppresses a clean early exit (_Abort(0)), which we shouldn't raise.
+            suppressed = self._exit_wrapped_ctx(*sys.exc_info())
+            if not suppressed:
+                raise
         # On success we must pass (None, None, None) explicitly — not
         # sys.exc_info(). When run() is invoked from Manager.__exit__ (the
         # implicit-run path), sys.exc_info() reports the *outer* exception
@@ -207,12 +208,16 @@ class Manager(Generic[CharmType]):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
-        """Close the Runtime.exec() context exactly once."""
+    ) -> bool:
+        """Close the Runtime.exec() context exactly once.
+
+        Returns:
+            Whether the context suppressed the exception.
+        """
         if self._wrapped_ctx_exited:
-            return
+            return False
         self._wrapped_ctx_exited = True
-        self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
+        return bool(self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb))
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
         try:
@@ -754,7 +759,7 @@ class Context(Generic[CharmType]):
             ``actions`` will be automatically extracted from it (if not explicitly provided).
             Otherwise, if no meta, actions, or config were provided, will be loaded from the
             ``charmcraft.yaml`` file in the charm root (falling back to ``metadata.yaml``).
-            If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+            If the ``charmcraft.yaml`` contains an ``extensions`` key (for example,
             ``extensions: [flask-framework]``), the extension's metadata,
             config, and actions will be automatically merged in.
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
