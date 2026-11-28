@@ -21,7 +21,7 @@ from ._types import Storage
 from ._utils import run
 
 
-def storage_add(counts: Mapping[str, int]):
+def storage_add(counts: Mapping[str, int]) -> None:
     """Add storage instances.
 
     For more details, see:
