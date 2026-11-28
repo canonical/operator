@@ -30,8 +30,13 @@ class Charm(ops.CharmBase):
             self.error = e
 
 
-def _run(event_name: str, call: Callable[[ops.CharmBase], object], state: State) -> ops.ModelError:
-    ctx = Context(Charm, meta=META, actions=ACTIONS, juju_version='3.6.0')
+def _run(
+    event_name: str,
+    call: Callable[[ops.CharmBase], object],
+    state: State,
+    juju_version: str = '3.6.0',
+) -> ops.ModelError:
+    ctx = Context(Charm, meta=META, actions=ACTIONS, juju_version=juju_version)
     event = ctx.on.action('back-up') if event_name == 'back_up_action' else ctx.on.update_status()
     with ctx(event, state) as mgr:
         mgr.charm.call = call
@@ -69,6 +74,22 @@ def test_secret_info_get_records_id_only():
         State(secrets={secret}),
     )
     assert isinstance(error, ops.SecretNotFoundError)
+    assert _notes(error) == [
+        f"Hook command 'secret-info-get' (id={secret.id!r}) "
+        "failed during the 'update-status' hook."
+    ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='exception notes need Python 3.11')
+def test_secret_info_get_unsupported_juju_version():
+    # get_secret runs secret-get first, so go straight to secret-info-get.
+    secret = Secret({'a': 'b'})
+    error = _run(
+        'update_status',
+        lambda charm: charm.model._backend.secret_info_get(id=secret.id),
+        State(secrets={secret}),
+        juju_version='3.0.2',
+    )
     assert _notes(error) == [
         f"Hook command 'secret-info-get' (id={secret.id!r}) "
         "failed during the 'update-status' hook."
