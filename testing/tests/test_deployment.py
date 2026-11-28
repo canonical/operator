@@ -192,6 +192,16 @@ def test_an_explicit_name_and_uuid_are_kept():
             assert (unit.state.model.name, unit.state.model.uuid) == ('mine', uuid)
 
 
+def test_closing_the_model_removes_the_units_temporary_directories():
+    with Juju() as j:
+        app = deploy_mycharm(j, num_units=2)
+        j.settle()
+        paths = [pathlib.Path(ctx._tmp_path) for ctx in app._contexts.values()]
+        assert len(paths) == 2
+        assert all(path.exists() for path in paths)
+    assert not any(path.exists() for path in paths)
+
+
 @pytest.mark.parametrize(
     ('cloud_type', 'model_type'), [('kubernetes', 'kubernetes'), ('lxd', 'lxd')]
 )

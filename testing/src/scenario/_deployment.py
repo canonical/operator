@@ -525,6 +525,8 @@ class Juju:
     def close(self) -> None:
         """Close the model. Safe to call more than once."""
         for app in self._apps.values():
+            for ctx in app._contexts.values():
+                ctx.close()
             app._contexts.clear()
         self._apps.clear()
         self._queues.clear()
