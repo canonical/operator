@@ -72,6 +72,7 @@ from typing import (
     Literal,
     Protocol,
     TextIO,
+    TypeAlias,
     TypedDict,
 )
 
@@ -101,7 +102,7 @@ ServiceDict = typing.TypedDict(
         'on-failure': str,
         'on-check-failure': dict[str, Any],
         'backoff-delay': str,
-        'backoff-factor': int | None,
+        'backoff-factor': float | None,
         'backoff-limit': str,
         'kill-delay': str | None,
     },
@@ -217,31 +218,31 @@ class _BodyHandler(Protocol):
     def __call__(self, data: bytearray, done: bool = False) -> None: ...
 
 
-_HeaderHandler = Callable[[bytearray], None]
+_HeaderHandler: TypeAlias = Callable[[bytearray], None]
 
 # tempfile.NamedTemporaryFile has an odd interface because of that
 # 'name' attribute, so we need to make a Protocol for it.
 
 
 class _Tempfile(Protocol):
-    name = ''
+    name: str
 
-    def write(self, data: bytearray): ...
+    def write(self, data: bytearray, /) -> int: ...
 
-    def close(self): ...
+    def close(self) -> None: ...
 
 
 class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and BytesIO
-    def read(self, __n: int = ...) -> typing.AnyStr: ...  # for BinaryIO
+    def read(self, n: int = ..., /) -> typing.AnyStr: ...  # for BinaryIO
 
-    def write(self, __s: typing.AnyStr) -> int: ...
+    def write(self, s: typing.AnyStr, /) -> int: ...
 
     def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
-_AnyStrFileLikeIO = _FileLikeIO[bytes] | _FileLikeIO[str]
-_TextOrBinaryIO = TextIO | BinaryIO
-_IOSource = str | bytes | _AnyStrFileLikeIO
+_AnyStrFileLikeIO: TypeAlias = _FileLikeIO[bytes] | _FileLikeIO[str]
+_TextOrBinaryIO: TypeAlias = TextIO | BinaryIO
+_IOSource: TypeAlias = str | bytes | _AnyStrFileLikeIO
 
 _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
 
@@ -345,18 +346,18 @@ if TYPE_CHECKING:
 class _WebSocket(Protocol):
     sock: socket.socket | None
 
-    def connect(self, url: str, socket: socket.socket): ...
+    def connect(self, url: str, socket: socket.socket) -> None: ...
 
-    def shutdown(self): ...
+    def shutdown(self) -> None: ...
 
-    def send(self, payload: str): ...
+    def send(self, payload: str) -> int | None: ...
 
-    def send_binary(self, payload: bytes): ...
+    def send_binary(self, payload: bytes) -> int | None: ...
 
     def recv(self) -> str | bytes: ...
 
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class _NotProvidedFlag:
@@ -379,7 +380,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
             super().__init__(host, timeout=timeout)
         self.socket_path = socket_path
 
-    def connect(self):
+    def connect(self) -> None:
         """Override connect to use Unix socket (instead of TCP socket)."""
         if not hasattr(socket, 'AF_UNIX'):
             raise NotImplementedError(f'Unix sockets not supported on {sys.platform}')
@@ -396,7 +397,7 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         super().__init__()
         self.socket_path = socket_path
 
-    def http_open(self, req: urllib.request.Request):
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         """Override http_open to use a Unix socket connection (instead of TCP)."""
         return self.do_open(
             _UnixSocketConnection,  # type:ignore
@@ -427,7 +428,7 @@ def _start_thread(target: Callable[..., Any], *args: Any, **kwargs: Any) -> thre
     return thread
 
 
-def _force_close_websocket(ws: _WebSocket):
+def _force_close_websocket(ws: _WebSocket) -> None:
     """Close a websocket so that reads and writes blocked on it unblock.
 
     ``WebSocket.shutdown()`` only closes the socket's file descriptor, and
@@ -638,6 +639,9 @@ class ChangeState(enum.Enum):
 class SystemInfo:
     """System information object."""
 
+    version: str
+    """Version of the Pebble daemon."""
+
     def __init__(self, version: str):
         self.version = version
 
@@ -652,6 +656,24 @@ class SystemInfo:
 
 class Warning:
     """Warning object."""
+
+    message: str
+    """Human-readable warning message."""
+
+    first_added: datetime.datetime
+    """Time the warning was first added."""
+
+    last_added: datetime.datetime
+    """Time the warning was last added."""
+
+    last_shown: datetime.datetime | None
+    """Time the warning was last shown, or ``None`` if it hasn't been shown."""
+
+    expire_after: str
+    """Duration after which the warning expires, for example ``'672h0m0s'``."""
+
+    repeat_after: str
+    """Duration after which the warning is shown again, for example ``'24h0m0s'``."""
 
     def __init__(
         self,
@@ -700,6 +722,15 @@ class Warning:
 class TaskProgress:
     """Task progress object."""
 
+    label: str
+    """Short description of the progress."""
+
+    done: int
+    """Number of units completed."""
+
+    total: int
+    """Total number of units."""
+
     def __init__(
         self,
         label: str,
@@ -732,6 +763,33 @@ class TaskID(str):
 
 class Task:
     """Task object."""
+
+    id: TaskID
+    """Server-generated ID for this task."""
+
+    kind: str
+    """Kind of task, for example ``'exec'`` or ``'start'``."""
+
+    summary: str
+    """Human-readable summary of the task."""
+
+    status: str
+    """Status of the task, for example ``'Doing'`` or ``'Done'``."""
+
+    log: list[str]
+    """Log entries recorded while running the task."""
+
+    progress: TaskProgress
+    """Progress of the task."""
+
+    spawn_time: datetime.datetime
+    """Time the task was created."""
+
+    ready_time: datetime.datetime | None
+    """Time the task finished, or ``None`` if it hasn't finished."""
+
+    data: dict[str, Any]
+    """Additional data associated with the task."""
 
     def __init__(
         self,
@@ -798,6 +856,36 @@ class ChangeID(str):
 
 class Change:
     """Change object."""
+
+    id: ChangeID
+    """Server-generated ID for this change."""
+
+    kind: str
+    """Kind of change, for example ``'exec'`` or ``'replan'``."""
+
+    summary: str
+    """Human-readable summary of the change."""
+
+    status: str
+    """Status of the change, for example ``'Doing'`` or ``'Done'``."""
+
+    tasks: list[Task]
+    """Tasks that make up the change."""
+
+    ready: bool
+    """Whether the change has finished."""
+
+    err: str | None
+    """Error message if the change failed, or ``None`` otherwise."""
+
+    spawn_time: datetime.datetime
+    """Time the change was created."""
+
+    ready_time: datetime.datetime | None
+    """Time the change finished, or ``None`` if it hasn't finished."""
+
+    data: dict[str, Any]
+    """Additional data associated with the change."""
 
     def __init__(
         self,
@@ -867,6 +955,10 @@ class Plan:
     https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
 
+    _services: dict[str, Service]
+    _checks: dict[str, Check]
+    _log_targets: dict[str, LogTarget]
+
     def __init__(self, raw: str | PlanDict | None = None):
         if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
             d = yaml.safe_load(raw) or {}  # type: ignore
@@ -875,13 +967,11 @@ class Plan:
         d = typing.cast('PlanDict', d)
 
         self._raw = raw
-        self._services: dict[str, Service] = {
+        self._services = {
             name: Service(name, service) for name, service in d.get('services', {}).items()
         }
-        self._checks: dict[str, Check] = {
-            name: Check(name, check) for name, check in d.get('checks', {}).items()
-        }
-        self._log_targets: dict[str, LogTarget] = {
+        self._checks = {name: Check(name, check) for name, check in d.get('checks', {}).items()}
+        self._log_targets = {
             name: LogTarget(name, target) for name, target in d.get('log-targets', {}).items()
         }
 
@@ -959,7 +1049,7 @@ class Layer:
 
     def __init__(self, raw: str | LayerDict | None = None):
         if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
-            d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
+            d = yaml.safe_load(raw) or {}  # type: ignore
         else:
             d = raw or {}
         d = typing.cast('LayerDict', d)
@@ -1007,6 +1097,81 @@ class Layer:
 
 class Service:
     """Represents a service description in a Pebble configuration layer."""
+
+    name: str
+    """Name of the service."""
+
+    summary: str
+    """Short description of the service."""
+
+    description: str
+    """Longer description of the service."""
+
+    startup: str
+    """Startup mode, ``'enabled'`` or ``'disabled'``, or an empty string if not set."""
+
+    override: str
+    """How this service combines with a service of the same name in earlier layers.
+
+    Either ``'merge'`` or ``'replace'``, or an empty string if not set.
+    """
+
+    command: str
+    """Command to run the service."""
+
+    after: list[str]
+    """Services that this service starts after."""
+
+    before: list[str]
+    """Services that this service starts before."""
+
+    requires: list[str]
+    """Services that must start along with this service."""
+
+    environment: dict[str, str]
+    """Environment variables for the service's command."""
+
+    user: str
+    """Username to run the service as."""
+
+    user_id: int | None
+    """User ID to run the service as."""
+
+    group: str
+    """Group name to run the service as."""
+
+    group_id: int | None
+    """Group ID to run the service as."""
+
+    working_dir: str
+    """Working directory for the service's command."""
+
+    on_success: str
+    """Action to take when the service exits successfully.
+
+    For example, ``'restart'`` or ``'shutdown'``.
+    """
+
+    on_failure: str
+    """Action to take when the service exits with an error.
+
+    For example, ``'restart'`` or ``'shutdown'``.
+    """
+
+    on_check_failure: dict[str, Any]
+    """Actions to take when a health check fails, keyed by check name."""
+
+    backoff_delay: str
+    """Initial delay before restarting the service, for example ``'500ms'``."""
+
+    backoff_factor: float | None
+    """Factor by which the backoff delay increases after each restart."""
+
+    backoff_limit: str
+    """Maximum backoff delay, for example ``'30s'``."""
+
+    kill_delay: str | None
+    """Time to wait after sending SIGTERM before sending SIGKILL, for example ``'5s'``."""
 
     def __init__(self, name: str, raw: ServiceDict | None = None):
         self.name = name
@@ -1065,7 +1230,7 @@ class Service:
         }
         return typing.cast('ServiceDict', dct)
 
-    def _merge(self, other: Service):
+    def _merge(self, other: Service) -> None:
         """Merges this service object with another service definition.
 
         For attributes present in both objects, the passed in service
@@ -1116,6 +1281,15 @@ class ServiceStatus(enum.Enum):
 class ServiceInfo:
     """Service status information."""
 
+    name: str
+    """Name of the service."""
+
+    startup: ServiceStartup | str
+    """Startup mode, or the raw string if Pebble returns an unknown value."""
+
+    current: ServiceStatus | str
+    """Current status of the service, or the raw string if Pebble returns an unknown value."""
+
     def __init__(
         self,
         name: str,
@@ -1154,34 +1328,67 @@ class ServiceInfo:
 class Check:
     """Represents a check in a Pebble configuration layer."""
 
+    name: str
+    """Name of the check."""
+
+    override: str
+    """How this check combines with a check of the same name in earlier layers.
+
+    Either ``'merge'`` or ``'replace'``, or an empty string if not set.
+    """
+
+    level: CheckLevel | str
+    """Level of the check, or the raw string if the level is unknown."""
+
+    startup: CheckStartup
+    """Startup mode of the check. :attr:`CheckStartup.UNSET` is treated as enabled."""
+
+    period: str | None
+    """How often to run the check, for example ``'10s'``."""
+
+    timeout: str | None
+    """How long to wait for the check to complete before it fails, for example ``'3s'``."""
+
+    threshold: int | None
+    """Number of consecutive failures before the check is considered down."""
+
+    http: HttpDict | None
+    """Configuration for an HTTP check, or ``None`` if this isn't an HTTP check."""
+
+    tcp: TcpDict | None
+    """Configuration for a TCP check, or ``None`` if this isn't a TCP check."""
+
+    exec: ExecDict | None
+    """Configuration for an exec check, or ``None`` if this isn't an exec check."""
+
     def __init__(self, name: str, raw: CheckDict | None = None):
         self.name = name
         dct: CheckDict = raw or {}
-        self.override: str = dct.get('override', '')
+        self.override = dct.get('override', '')
         try:
             level: CheckLevel | str = CheckLevel(dct.get('level', ''))
         except ValueError:
             level = dct.get('level', '')
         self.level = level
         self.startup = CheckStartup(dct.get('startup', ''))
-        self.period: str | None = dct.get('period', '')
-        self.timeout: str | None = dct.get('timeout', '')
-        self.threshold: int | None = dct.get('threshold')
+        self.period = dct.get('period', '')
+        self.timeout = dct.get('timeout', '')
+        self.threshold = dct.get('threshold')
 
         http = dct.get('http')
         if http is not None:
             http = copy.deepcopy(http)
-        self.http: HttpDict | None = http
+        self.http = http
 
         tcp = dct.get('tcp')
         if tcp is not None:
             tcp = copy.deepcopy(tcp)
-        self.tcp: TcpDict | None = tcp
+        self.tcp = tcp
 
         exec_ = dct.get('exec')
         if exec_ is not None:
             exec_ = copy.deepcopy(exec_)
-        self.exec: ExecDict | None = exec_
+        self.exec = exec_
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
@@ -1267,7 +1474,7 @@ class Check:
                 continue
             self.tcp[name] = value
 
-    def _merge(self, other: Check):
+    def _merge(self, other: Check) -> None:
         """Merges this check object with another check definition.
 
         For attributes present in both objects, the passed in check
@@ -1326,16 +1533,41 @@ class CheckStartup(enum.Enum):
 class LogTarget:
     """Represents a log target in a Pebble configuration layer."""
 
+    name: str
+    """Name of the log target."""
+
+    override: str
+    """How this log target combines with a log target of the same name in earlier layers.
+
+    Either ``'merge'`` or ``'replace'``, or an empty string if not set.
+    """
+
+    type: str
+    """Type of the log target, for example ``'loki'`` or ``'opentelemetry'``."""
+
+    location: str
+    """URL of the log target's endpoint."""
+
+    services: list[str]
+    """Services whose logs are forwarded to this log target.
+
+    ``'all'`` selects all services, and a ``-`` prefix removes a service selected by
+    an earlier layer.
+    """
+
+    labels: dict[str, str]
+    """Labels to add to the logs sent to this log target."""
+
     def __init__(self, name: str, raw: LogTargetDict | None = None):
         self.name = name
         dct: LogTargetDict = raw or {}
-        self.override: str = dct.get('override', '')
+        self.override = dct.get('override', '')
         self.type = dct.get('type', '')
         self.location = dct.get('location', '')
-        self.services: list[str] = list(dct.get('services', []))
+        self.services = list(dct.get('services', []))
         labels = dct.get('labels')
         labels = copy.deepcopy(labels) if labels is not None else {}
-        self.labels: dict[str, str] = labels
+        self.labels = labels
 
     def to_dict(self) -> LogTargetDict:
         """Convert this log target object to its dict representation."""
@@ -1352,7 +1584,7 @@ class LogTarget:
     def __repr__(self):
         return f'LogTarget({self.to_dict()!r})'
 
-    def __eq__(self, other: LogTargetDict | LogTarget):
+    def __eq__(self, other: LogTargetDict | LogTarget) -> bool:
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, LogTarget):
@@ -1360,7 +1592,7 @@ class LogTarget:
         else:
             return NotImplemented
 
-    def _merge(self, other: LogTarget):
+    def _merge(self, other: LogTarget) -> None:
         """Merges this log target object with another log target definition.
 
         For attributes present in both objects, the passed in log target
@@ -1609,7 +1841,7 @@ class CheckInfo:
         )
 
     @property
-    def has_run(self):
+    def has_run(self) -> bool:
         """Report whether this check has run at least once (successfully or otherwise).
 
         Raises:
@@ -1838,7 +2070,7 @@ class ExecProcess(Generic[AnyStr]):
             msg = 'ExecProcess instance garbage collected without call to wait() or wait_output()'
             warnings.warn(msg, ResourceWarning)
 
-    def wait(self):
+    def wait(self) -> None:
         """Wait for the process to finish.
 
         If a timeout was specified to the :meth:`Client.exec` call, this waits
@@ -1903,7 +2135,7 @@ class ExecProcess(Generic[AnyStr]):
             exit_code = change.tasks[0].data.get('exit-code', -1)
         return exit_code
 
-    def _teardown_after_error(self):
+    def _teardown_after_error(self) -> None:
         # If stdin reader thread is running, stop it.
         if self._cancel_stdin is not None:
             self._cancel_stdin()
@@ -1974,7 +2206,7 @@ class ExecProcess(Generic[AnyStr]):
 
             return (out_value, err_value)
 
-    def send_signal(self, sig: int | str):
+    def send_signal(self, sig: int | str) -> None:
         """Send the given signal to the running process.
 
         Args:
@@ -2010,7 +2242,7 @@ def _reader_to_websocket(
     encoding: str,
     cancel_reader: int | None = None,
     bufsize: int = 16 * 1024,
-):
+) -> None:
     """Read reader through to EOF and send each chunk read to the websocket."""
     try:
         while True:
@@ -2037,7 +2269,7 @@ def _reader_to_websocket(
         logger.debug('exec stdin forwarder stopped: %s', e)
 
 
-def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str | None):
+def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str | None) -> None:
     """Receive messages from websocket (until end signal) and write to writer."""
     # A multi-byte character may be split across two websocket messages, so the
     # messages cannot be decoded independently. This runs in a thread, so a
@@ -2088,7 +2320,7 @@ class _WebsocketWriter(io.BufferedIOBase):
     def __init__(self, ws: _WebSocket):
         self.ws = ws
 
-    def writable(self):
+    def writable(self) -> bool:
         """Denote this file-like object as writable."""
         return True
 
@@ -2099,7 +2331,7 @@ class _WebsocketWriter(io.BufferedIOBase):
         self.ws.send_binary(chunk)
         return len(chunk)
 
-    def close(self):
+    def close(self) -> None:
         """Send end-of-file message to websocket.
 
         Idempotent and tolerant of the underlying websocket already being
@@ -2360,6 +2592,18 @@ class Client:
 
     _chunk_size = 8192
 
+    socket_path: str
+    """Path to the Pebble API Unix socket."""
+
+    opener: urllib.request.OpenerDirector
+    """Opener used to send HTTP requests to Pebble."""
+
+    base_url: str
+    """Base URL for requests to the Pebble API."""
+
+    timeout: float
+    """Timeout in seconds for blocking operations, such as connecting to Pebble."""
+
     def __init__(
         self,
         socket_path: str,
@@ -2377,7 +2621,7 @@ class Client:
         self.timeout = timeout
 
     @contextlib.contextmanager
-    def _start_span(self, span_name: str) -> Generator[Any, None, None]:
+    def _start_span(self, span_name: str) -> Generator[Any]:
         """Start a tracing span, annotated with the Pebble socket path."""
         with tracer.start_as_current_span(span_name) as span:
             span.set_attribute('pebble.socket_path', self.socket_path)
@@ -2423,13 +2667,13 @@ class Client:
     def _ensure_content_type(
         headers: email.message.Message,
         expected: Literal['multipart/form-data', 'application/json'],
-    ):
+    ) -> dict[str, str]:
         """Parse Content-Type header from headers and ensure it's equal to expected.
 
         Return a dict of any options in the header, e.g., {'boundary': ...}.
         """
         ctype = headers.get_content_type()
-        params = headers.get_params() or {}
+        params = headers.get_params() or []
         options = {key: value for key, value in params if value}
         if ctype != expected:
             raise ProtocolError(f'expected Content-Type {expected!r}, got {ctype!r}')
@@ -2458,12 +2702,13 @@ class Client:
             with e:  # close the underlying tempfile so it doesn't leak
                 code = e.code
                 status = e.reason
+                body: dict[str, Any]
                 try:
-                    body: dict[str, Any] = json.loads(e.read())
+                    body = json.loads(e.read())
                     message: str = body['result']['message']
                 except (OSError, ValueError, KeyError) as e2:
                     # Will only happen on read error or if Pebble sends invalid JSON.
-                    body: dict[str, Any] = {}
+                    body = {}
                     message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message) from None
         except urllib.error.URLError as e:
@@ -2712,7 +2957,7 @@ class Client:
                 # Pebble server doesn't support wait endpoint, fall back to polling
                 return self._wait_change_using_polling(change_id, timeout, delay)
 
-    def _wait_change_using_wait(self, change_id: ChangeID, timeout: float | None):
+    def _wait_change_using_wait(self, change_id: ChangeID, timeout: float | None) -> Change:
         """Wait for a change to be ready using the wait-change API."""
         deadline = time.time() + timeout if timeout is not None else 0
 
@@ -2756,7 +3001,9 @@ class Client:
 
         return Change.from_dict(resp['result'])
 
-    def _wait_change_using_polling(self, change_id: ChangeID, timeout: float | None, delay: float):
+    def _wait_change_using_polling(
+        self, change_id: ChangeID, timeout: float | None, delay: float
+    ) -> Change:
         """Wait for a change to be ready by polling the get-change API."""
         deadline = time.time() + timeout if timeout is not None else 0
 
@@ -2789,7 +3036,9 @@ class Client:
             # https://github.com/canonical/pebble/issues/788
             return resp['result']['changed'] or []
 
-    def add_layer(self, label: str, layer: str | LayerDict | Layer, *, combine: bool = False):
+    def add_layer(
+        self, label: str, layer: str | LayerDict | Layer, *, combine: bool = False
+    ) -> None:
         """Dynamically add a new layer onto the Pebble configuration layers.
 
         If combine is false (the default), append the new layer as the top
@@ -2914,7 +3163,7 @@ class Client:
                 parser.remove_files()
 
     @staticmethod
-    def _raise_on_path_error(resp: _FilesResponse, path: str):
+    def _raise_on_path_error(resp: _FilesResponse, path: str) -> None:
         result = resp['result'] or []  # in case it's null instead of []
         paths = {item['path']: item for item in result}
         if path not in paths:
@@ -2935,7 +3184,7 @@ class Client:
         user: str | None = None,
         group_id: int | None = None,
         group: str | None = None,
-    ):
+    ) -> None:
         """Write content to a given file path on the remote system.
 
         Args:
@@ -3014,15 +3263,16 @@ class Client:
 
     def _encode_multipart(
         self, metadata: dict[str, Any], path: str, source: _IOSource, encoding: str
-    ):
+    ) -> tuple[Generator[bytes], str]:
         # Python's stdlib mime/multipart handling is screwy and doesn't handle
         # binary properly, so roll our own.
+        source_io: _AnyStrFileLikeIO
         if isinstance(source, str):
-            source_io: _AnyStrFileLikeIO = io.StringIO(source)
+            source_io = io.StringIO(source)
         elif isinstance(source, bytes):
-            source_io: _AnyStrFileLikeIO = io.BytesIO(source)
+            source_io = io.BytesIO(source)
         else:
-            source_io: _AnyStrFileLikeIO = source
+            source_io = source
         boundary = binascii.hexlify(os.urandom(16))
         # Pebble reads this with Go's mime.ParseMediaType, where a backslash
         # escapes the next character if it's a tspecial. Escape \ and " as Go's
@@ -3031,7 +3281,7 @@ class Client:
         path_escaped = path.replace('\\', '\\\\').replace('"', '\\"').encode('utf-8')
         content_type = f'multipart/form-data; boundary="{boundary.decode("utf-8")}"'
 
-        def generator() -> Generator[bytes, None, None]:
+        def generator() -> Generator[bytes]:
             yield b''.join([
                 b'--',
                 boundary,
@@ -3110,7 +3360,7 @@ class Client:
         user: str | None = None,
         group_id: int | None = None,
         group: str | None = None,
-    ):
+    ) -> None:
         """Create a directory on the remote system with the given attributes.
 
         Args:
@@ -3146,7 +3396,7 @@ class Client:
             resp = self._request('POST', '/v1/files', None, body)
             self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
-    def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False):
+    def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False) -> None:
         """Remove a file or directory on the remote system.
 
         Args:
@@ -3432,7 +3682,7 @@ class Client:
                     # to cancel_writer it'll trigger the select and end the thread.
                     cancel_reader, cancel_writer = os.pipe()
 
-                    def _cancel_stdin():
+                    def _cancel_stdin() -> None:
                         os.write(cancel_writer, b'x')  # doesn't matter what we write
                         os.close(cancel_writer)
 
@@ -3520,7 +3770,7 @@ class Client:
         url = f'{base_url}/v1/tasks/{task_id}/websocket/{websocket_id}'
         return url
 
-    def send_signal(self, sig: int | str, services: Iterable[str]):
+    def send_signal(self, sig: int | str, services: Iterable[str]) -> None:
         """Send the given signal to the list of services named.
 
         Args:
@@ -3770,7 +4020,7 @@ class _FilesParser:
         # these, so we'll prime the parser buffer with that missing sequence.
         self._parser.feed(b'\r\n')
 
-    def _process_header(self, data: bytearray):
+    def _process_header(self, data: bytearray) -> None:
         # The bytes parser replaces anything outside ASCII in a header value,
         # which loses a non-ASCII path. Pebble sends the headers as UTF-8.
         parser = email.parser.FeedParser()
@@ -3796,7 +4046,7 @@ class _FilesParser:
 
         self._part_type = typing.cast('Literal["response", "files"]', name)
 
-    def _process_body(self, data: bytearray, done: bool = False):
+    def _process_body(self, data: bytearray, done: bool = False) -> None:
         if self._part_type == 'response':
             self._response_data.extend(data)
             if done:
@@ -3817,29 +4067,29 @@ class _FilesParser:
                 outfile = self._get_open_tempfile()
                 outfile.write(data)
 
-    def remove_files(self):
+    def remove_files(self) -> None:
         """Remove all temporary files on disk."""
         for file in self._files.values():
             os.unlink(file.name)
         self._files.clear()
 
-    def feed(self, data: bytes):
+    def feed(self, data: bytes) -> None:
         """Provide more data to the running parser."""
         self._parser.feed(data)
 
-    def _prepare_tempfile(self, filename: str):
+    def _prepare_tempfile(self, filename: str) -> None:
         tf = tempfile.NamedTemporaryFile(delete=False)  # ruff: ignore[open-file-with-context-handler]
-        self._files[filename] = tf  # type: ignore # we have a custom protocol for it
+        self._files[filename] = tf
         self.current_filename = filename
 
-    def _get_open_tempfile(self):
+    def _get_open_tempfile(self) -> _Tempfile:
         return self._files[self.current_filename]
 
     def get_response(self) -> _FilesResponse | None:
         """Return the deserialized JSON object from the multipart "response" field."""
         return self._response
 
-    def filenames(self):
+    def filenames(self) -> list[str]:
         """Return a list of filenames from the "files" parts of the response."""
         return list(self._files.keys())
 
@@ -3909,7 +4159,7 @@ class _MultipartParser:
         if not max_boundary_length:
             self._max_boundary_length = len(b'\r\n--' + marker + b'--\r\n') + 99
 
-    def feed(self, data: bytes):
+    def feed(self, data: bytes) -> None:
         """Feeds data incrementally into the parser."""
         if self._done:
             return
