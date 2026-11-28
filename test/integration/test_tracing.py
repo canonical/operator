@@ -34,16 +34,23 @@ from test.integration.conftest import (
 def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
     """The traced charm is connected to the trace data collector directly."""
     charm_path = build_tracing_charm()
-    tracing_juju.deploy(charm_path)
+    # Only the leader can read its own application databag, so a non-leader
+    # unit takes a different path when reading the tracing relation (see
+    # #2918). Make sure the non-leader unit also sends trace data.
+    tracing_juju.deploy(charm_path, num_units=2)
     tracing_juju.integrate('test-tracing', 'tempo')
     tracing_juju.wait(jubilant.all_active)
 
+    units = {'test-tracing/0', 'test-tracing/1'}
     with kubectl_port_forward(tracing_juju.model, 'svc/tempo-worker', 3200) as endpoint:
         spans = wait_spans(endpoint, ready=lambda spans: 'ops.main' in str(spans))
         assert 'ops.main' in [span['name'] for span in spans]
 
         event_names = [event['name'] for event in get_events(spans)]
         assert 'StartEvent' in event_names
+
+        spans = wait_spans(endpoint, ready=lambda spans: units <= get_units(spans))
+        assert units <= get_units(spans), f'no spans from {units - get_units(spans)}'
 
         checkpoint = time.time()
         arg_value = 'the-one-action-arg-value'
@@ -122,7 +129,9 @@ def get_spans(endpoint: tuple[str, int], since: float = 0, https: bool = False):
     base_url = f'{"https" if https else "http"}://{host}:{port}/api/'
     # Insecure HTTPS because we don't want to fetch CA list from self-signed-certificates
     with httpx.Client(base_url=base_url, timeout=5, verify=False) as client:  # ruff: ignore[request-with-no-cert-validation]
-        response = client.get('search?tags=service.name=test-tracing')
+        # Tempo returns at most 20 traces unless asked for more, and with two
+        # units those 20 can all come from the same unit.
+        response = client.get('search?tags=service.name=test-tracing&limit=1000')
         response.raise_for_status()
         for trace in response.json()['traces']:
             if float(trace['startTimeUnixNano']) / 1e9 < since:
@@ -131,8 +140,20 @@ def get_spans(endpoint: tuple[str, int], since: float = 0, https: bool = False):
             response.raise_for_status()
             for resource in response.json()['trace']['resourceSpans']:
                 for scope in resource['scopeSpans']:
-                    spans.extend(scope['spans'])
+                    for span in scope['spans']:
+                        span['resource'] = resource.get('resource', {})
+                        spans.append(span)
     return spans
+
+
+def get_units(spans: list[dict[str, Any]]) -> set[str]:
+    """Return the names of the units that sent the spans."""
+    units: set[str] = set()
+    for span in spans:
+        for attribute in span['resource'].get('attributes', []):
+            if attribute['key'] == 'juju_unit':
+                units.add(attribute['value']['stringValue'])
+    return units
 
 
 def get_events(spans: list[dict[str, Any]]):
