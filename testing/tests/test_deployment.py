@@ -195,7 +195,7 @@ def test_an_explicit_name_and_uuid_are_kept():
 @pytest.mark.parametrize(
     ('cloud_type', 'model_type'), [('kubernetes', 'kubernetes'), ('lxd', 'lxd')]
 )
-def test_the_cloud_spec_s_type_decides_the_model_type(cloud_type: str, model_type: str):
+def test_the_cloud_spec_type_decides_the_model_type(cloud_type: str, model_type: str):
     cloud_spec = CloudSpec(type=cloud_type, name='localhost')
     with Juju(cloud_spec=cloud_spec) as j:
         model = deploy_mycharm(j).leader.state.model
@@ -734,7 +734,7 @@ def test_settle_returns_the_trace_and_reading_state_runs_nothing(juju: Juju):
     assert juju.settle() == []
 
 
-def test_a_dispatch_s_state_in_is_the_unit_s_previous_state_out(juju: Juju):
+def test_each_dispatch_starts_from_the_previous_state_out(juju: Juju):
     deploy_mycharm(juju)
     trace = juju.settle()
     for before, after in itertools.pairwise(trace):
@@ -789,7 +789,7 @@ def test_settle_is_deterministic():
         assert run() == first
 
 
-def test_a_secret_s_id_depends_only_on_its_unit_s_own_history():
+def test_secret_ids_depend_only_on_the_unit_history():
     def secret_id(*apps: str) -> str:
         with Juju() as j:
             for name in apps:
